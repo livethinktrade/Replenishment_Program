@@ -38,7 +38,7 @@ with
 		select distinct(id), transition_year, transition_season, delivery2.type, date, delivery2.upc, store,
 		qty, season, category, item_group_desc, display_size, case_size
 		from delivery2
-		inner join item_support2 on delivery2.upc = item_support2.upc),
+		inner join item_support2 on delivery2.code = item_support2.code),
 
     deliv_pivot_credit as (
 
@@ -161,6 +161,7 @@ with
 				sum(qty) AS sales
 
 		from sales_table
+		/* python dynamically */
 		where season = 'AY' and (category != 'Accessory' and category != 'GM')
 		GROUP BY store_number,item_group_desc
 		ORDER BY store_number, item_group_desc),
@@ -170,6 +171,9 @@ with
 				item_group_desc,
 				sum(qty) AS sales
 		FROM sales_table
+
+        /* python dynamically */
+
 		where season = 'FW' and (category != 'Accessory' and category != 'GM') and transition_year = 2021 and transition_season = 'FW'
 		GROUP BY store_number, item_group_desc
 		ORDER BY store_number),
@@ -180,6 +184,9 @@ with
 				item_group_desc,
 				sum(qty) AS sales
 		FROM sales_table
+
+        /* python dynamically */
+
 		where season = 'SS' and (category != 'Accessory' and category != 'GM') and transition_year = 2022 and transition_season = 'SS'
 		GROUP BY store_number, item_group_desc
 		ORDER BY store_number),
