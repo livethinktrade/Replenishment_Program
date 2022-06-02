@@ -1,7 +1,7 @@
 /*VERSION 2*/
-create table program (
+create table master_planogram (
 	
-program_id varchar(5) PRIMARY KEY,
+program_id varchar(15) PRIMARY KEY,
 carded numeric NOT NULL,
 long_hanging_top numeric NOT NULL,
 long_hanging_dress numeric NOT NULL
@@ -12,7 +12,7 @@ long_hanging_dress numeric NOT NULL
 create table store (
 	
 store_id integer PRIMARY KEY,
-initial varchar(5) NOT NULL,
+initial varchar(10) NOT NULL,
 notes varchar(50) NOT NULL
 
 );
@@ -22,9 +22,10 @@ create table store_program (
 	
 store_program_id serial PRIMARY KEY,
 store_id integer NOT NULL,
-program_id varchar(5) NOT NULL,
+program_id varchar(15) NOT NULL,
+activity varchar(10),
 
-FOREIGN KEY (program_id) REFERENCES program (program_id),
+FOREIGN KEY (program_id) REFERENCES master_plnaogram (program_id),
 FOREIGN KEY (store_id) REFERENCES store(store_id)
 
 );

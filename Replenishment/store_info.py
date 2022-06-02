@@ -37,6 +37,16 @@ class Replenishment():
                                            sheet_name='Sheet2',
                                            header=None)
 
+        self.store_programs = pd.read_excel(rf'C:\Users\User1\OneDrive\WinWin Staff Folders\Michael\Groccery Store Program\{self.store_type_input}\{self.store_type_input}_store_setting.xlsm',
+                                            sheet_name='Store Programs')
+
+        self.store_notes = pd.read_excel(rf'C:\Users\User1\OneDrive\WinWin Staff Folders\Michael\Groccery Store Program\{self.store_type_input}\{self.store_type_input}_store_setting.xlsm',
+                                         sheet_name='Store Notes')
+
+        self.master_planogram = pd.read_excel(rf'C:\Users\User1\OneDrive\WinWin Staff Folders\Michael\Groccery Store Program\MASTER PLANOGRAM.xlsx',
+                                         sheet_name='MASTER PLANOGRAM')
+
+
     def delivery_import(self, file):
 
         """This takes in an excel file and inserts delivery data into postgres
@@ -58,8 +68,8 @@ class Replenishment():
             store = new_deliv.iloc[i, 5]
             qty = new_deliv.iloc[i, 6]
             store_type = new_deliv.iloc[i, 7]
-            num = new_deliv.iloc[i, 8]
-            code = new_deliv.iloc[i,9]
+            # num = new_deliv.iloc[i, 8]
+            # code = new_deliv.iloc[i,9]
 
             # note to self: last line was comment out bc i needed the old version of the deliv insert not the new one.
 
@@ -71,8 +81,8 @@ class Replenishment():
                             store,
                             qty,
                             store_type,
-                            num,
-                            code,
+                            # num,
+                            # code,
                             self.connection_pool)
 
             i += 1
@@ -493,6 +503,53 @@ class Replenishment():
             ytd_sales_report_format(filename, replenishment_len, sales_report_len)
 
         print("\nSales Report Generated")
+
+    def store_import(self):
+
+        new_len = len(self.store_notes)
+        i = 0
+        while i < new_len:
+
+            store_id = self.store_notes.iloc[i, 0]
+            initial = self.store_notes.iloc[i, 1]
+            notes = self.store_notes.iloc[i, 2]
+
+            store_insert(store_id, initial, notes, self.connection_pool)
+
+            i += 1
+        print('\n Store Data Imported')
+
+    def store_program_import(self):
+
+        new_len = len(self.store_programs)
+        i = 0
+        while i < new_len:
+
+            store_id = self.store_programs.iloc[i, 0]
+            program_id = self.store_programs.iloc[i, 1]
+            activity = self.store_programs.iloc[i, 2]
+
+            store_program_insert(store_id, program_id, activity, self.connection_pool)
+
+            i += 1
+        print('\n Store Program Data Imported')
+
+    def master_planogram_import(self):
+
+        new_len = len(self.master_planogram)
+        i = 0
+        while i < new_len:
+
+            program_id = self.master_planogram.iloc[i, 0]
+            carded = self.master_planogram.iloc[i, 1]
+            long_hanging_top = self.master_planogram.iloc[i, 2]
+            long_hanging_dress = self.master_planogram.iloc[i, 3]
+
+            master_planogram_insert(program_id, carded, long_hanging_top, long_hanging_dress, self.connection_pool)
+
+            i += 1
+        print('\n Master Planogram Data Imported')
+
 
 
 
