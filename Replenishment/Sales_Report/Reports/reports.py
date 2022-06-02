@@ -797,3 +797,6 @@ class Reports:
 
         """, self.connection)
 
+        return on_hand
+
+
