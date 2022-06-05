@@ -118,13 +118,15 @@ CREATE TABLE sales2
 
 CREATE TABLE item_approval
 (
-    upc character varying(12) NOT NULL PRIMARY KEY,
-    price_level numeric NOT NULL,
+    code character varying(20) NOT NULL PRIMARY KEY,
+    store_price numeric NOT NULL
+);
 
-    FOREIGN KEY (upc) REFERENCES item_support (upc)
-
+CREATE TABLE inventory
+(
+    code character varying(20) not null PRIMARY KEY,
+    on_hand numeric not null
 )
-
 
 
 

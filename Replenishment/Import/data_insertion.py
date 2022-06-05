@@ -307,3 +307,27 @@ def master_planogram_insert(program_id, carded, long_hanging_top, long_hanging_d
     connection.commit()
     cursor.close()
     connection_pool.putconn(connection)
+
+
+def item_approval_insert(code, store_price, connection_pool):
+
+    connection = connection_pool.getconn()
+    cursor = connection.cursor()
+    cursor.execute("INSERT INTO item_approval (code, store_price) values (%s,%s)",
+                   (code, store_price))
+
+    connection.commit()
+    cursor.close()
+    connection_pool.putconn(connection)
+
+
+def inventory_insert(code, on_hand, connection_pool):
+
+    connection = connection_pool.getconn()
+    cursor = connection.cursor()
+    cursor.execute("INSERT INTO inventory (code, on_hand) values (%s,%s)",
+                   (code, on_hand))
+
+    connection.commit()
+    cursor.close()
+    connection_pool.putconn(connection)

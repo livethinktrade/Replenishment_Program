@@ -8,7 +8,7 @@ from Update.Transform_Sales_Data.transform import *
 from Sales_Report.Reports.reports import *
 from Sales_Report.Report_Format.weekly_toexcel import weekly_toexcel
 from Sales_Report.Report_Format.ytd_toexcel import ytd_toexcel
-from Sales_Report.Replenishment.replenishment import replenishment
+from Sales_Report.Replenishment.replenishment import *
 from Sales_Report.Report_Format.weekly_sales_report_format import weekly_sales_report_format
 from Sales_Report.Report_Format.ytd_sales_report_format import ytd_sales_report_format
 
@@ -549,6 +549,49 @@ class Replenishment():
 
             i += 1
         print('\n Master Planogram Data Imported')
+
+    def store_approval_import(self, file):
+
+        store_approval_df = approval_transform(self.store_type_input, file)
+
+        store_approval_df_len = len(store_approval_df)
+
+        i = 0
+
+        while i < store_approval_df_len:
+
+            code = store_approval_df.iloc[i, 0]
+            store_price = store_approval_df.iloc[i, 1]
+
+            item_approval_insert(code, store_price, self.connection_pool)
+
+            i += 1
+
+        print('\nApproval list imported')
+
+    def inventory_import(self, file):
+
+        inventory_df = inventory_transform(file)
+
+        inventory_df_len = len(inventory_df)
+
+        i = 0
+
+        while i < inventory_df_len:
+
+            code = inventory_df.iloc[i, 0]
+            on_hand = inventory_df.iloc[i, 1]
+
+            inventory_insert(code, on_hand, self.connection_pool)
+
+            i += 1
+
+        print('\nInventory list imported')
+
+
+    def playground(self):
+        a = replenishmentv2(self.store_type_input, self.store_setting)
+        return a
 
 
 

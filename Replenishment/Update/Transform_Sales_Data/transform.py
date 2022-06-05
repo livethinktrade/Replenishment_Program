@@ -317,5 +317,64 @@ def jewel_transform(file, transition_date_range, current_year, current_week, con
     return salesdata
 
 
-# def brookshire_transform(file, transition_date_range, current_year, current_week):
+def approval_transform(store_type_input, file):
 
+    approval = pd.read_csv(f'{file}')
+
+    store_price_column_name = {
+
+        'kvat': 'KVAT Food Stores Price',
+        'acme': 'Albertsons Acme Price',
+        'brookshire': 'Brookshire Brothers Price',
+        'kroger_nashville': 'Kroger - Nashville Price',
+        'kroger_michigan': 'Kroger - Michigan Price',
+        'kroger_louisville': 'Kroger South - Louisville Price',
+        'kroger_king_sooper': 'Kroger - King Soopers Price',
+        'kroger_delta': 'Kroger South - Delta Price',
+        'kroger_dillons': 'Kroger - Dillons Price',
+        'kroger_columbus': 'Kroger - Columbus Price',
+        'kroger_cincinnati': 'Kroger - Cincinnati Price',
+        'kroger_central': 'Kroger - Central Price',
+        'kroger_atlanta': 'Kroger South - Atlanta Price',
+        'safeway_denver': 'Albertsons Denver Price',
+        'jewel': 'Jewel Osco Price',
+        'fresh_encounter': 'Fresh Encounter Price',
+        'intermountain': 'Albertsons Intermountain Price',
+        'texas_division': 'TX Safeway Albertsons Price'
+
+    }
+
+    try:
+        store_price_column_name = store_price_column_name[f'{store_type_input}']
+
+        approval = approval[['Item', f'{store_price_column_name}']]
+
+        approval = approval.rename(columns={f'{store_price_column_name}': 'store_price',
+                                            'Item': 'code'})
+
+        approval = approval.dropna()
+
+    except:
+
+        print(
+            '\nStore not establisehd in transform approval function need to add store in the dictionary for the function\n')
+
+    return approval
+
+
+def inventory_transform(file):
+
+    inventory = pd.read_csv(f'{file}')
+
+    inventory = inventory[['Unnamed: 0', 'On Hand']]
+
+    inventory = inventory.dropna()
+
+    inventory[["Unnamed: 0", 'abc']] = inventory["Unnamed: 0"].str.split(" ", n=1, expand=True)
+
+    inventory = inventory[['Unnamed: 0', 'On Hand']]
+
+    inventory = inventory.rename(columns={'Unnamed: 0': 'code',
+                                          'On Hand': 'on_hand'})
+
+    return inventory
