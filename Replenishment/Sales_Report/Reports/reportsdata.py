@@ -1456,6 +1456,32 @@ class ReportsData:
 
         store_program = store_program[['store_id', 'carded', 'long_hanging_top', 'long_hanging_dress', 'notes']]
 
+        i = 0
+
+        store_program['programs'] = 0
+
+        while i < len(store_program):
+
+            store = store_program.loc[i, 'store_id']
+
+            programs = psql.read_sql(f'select * from store_program where store_id = {store}', self.connection)
+
+            programs = programs[['program_id']]
+
+            programs = programs.squeeze()
+
+            try:
+
+                programs = programs.str.cat(sep=', ')
+
+            except:
+
+                pass
+
+            store_program.loc[i, 'programs'] = programs
+
+            i += 1
+
         return store_program
 
 
