@@ -1,15 +1,16 @@
 import psycopg2
 import pandas as pd
 import pandas.io.sql as psql
-from Sales_Report.Reports.reports import Reports
+from Sales_Report.Reports.reportsdata import ReportsData
 
 
-def replenishmentv2(store_type_input, store_setting):
+def replenishment(store_type_input, store_setting):
 
 
     # creates a df for the Available space Replenishment table (note to self -may move this later to the main class )
-    store_setting = store_setting.set_index(0)
-    store_setting = store_setting.rename(columns={1: 'values'})
+    # no need fo code below because store settings will be changed below
+    # store_setting = store_setting.set_index(0)
+    # store_setting = store_setting.rename(columns={1: 'values'})
 
     carded_1 = store_setting.loc['Carded-1', 'values']
 
@@ -44,13 +45,9 @@ def replenishmentv2(store_type_input, store_setting):
     # this section of the code establishes the on hands by display size
 
     # creates the object to get the sd_combo table and then sorts the collumns in order (store, displaysize, case qty)
-    reports = Reports(store_type_input, store_setting)
+    reports = ReportsData(store_type_input, store_setting)
 
     on_hands = reports.on_hands()
-    on_hands = on_hands.dropna()
-    on_hands = on_hands.sort_values(by=['store', 'display_size', 'case_qty'])
-    on_hands['store'] = on_hands['store'].astype(int)
-    on_hands = on_hands.reset_index(drop=True)
 
     # takes df created from object and grabs only certain columns and does a group by function.
     # Also unindeed columns store & display and assigns new df to on_hand_display_size
@@ -150,7 +147,7 @@ def replenishmentv2(store_type_input, store_setting):
 
     # Filter out any items that have high return percentage. variable defined in store_settings
 
-    on_hands['return_ratio'] = (on_hands['credit'] * -1) / on_hands['case_size']
+    on_hands['return_ratio'] = (on_hands['credit'] * -1) / on_hands['deliveries']
 
     return_percentage = store_setting.loc['Return_Pecentage', 'values']
 
@@ -189,7 +186,14 @@ def replenishmentv2(store_type_input, store_setting):
         space_available = potential_replenishment.loc[i, 'space available']
 
         # space available for the entire program. calculated by sum qty's of (carded, top, dress) subtract from total space
-        space_available_entire_program = on_hands_store_case_total.loc[store, 'space available']
+
+        try:
+
+            space_available_entire_program = on_hands_store_case_total.loc[store, 'space available']
+
+        except KeyError:
+
+            space_available_entire_program = 0
 
         # this line is necessary because the value from the space_capcity will be used as an indexer to reference the
         # avialable space replen table
@@ -197,7 +201,12 @@ def replenishmentv2(store_type_input, store_setting):
         if space_capacity >= 3:
             space_capacity = 3
 
-        available_space_threshold = available_space_replen_table.loc[space_capacity, f'{display_size}']
+        try:
+            available_space_threshold = available_space_replen_table.loc[space_capacity, f'{display_size}']
+
+        except KeyError:
+            #random number picked so the space availe if statement will fail and give a rejection reason
+            available_space_threshold = 10
 
         # checking to see if we can replenish or not
         if space_available >= available_space_threshold:
@@ -233,7 +242,9 @@ def replenishmentv2(store_type_input, store_setting):
                 # for this store and go to the next store on the potential replen list. will break loop because if the item
                 # with the lowest on hand is > 1 then all of the other item are > 1 as well
 
-                if case_qty < 1:
+                case_qty_replenishment_threshold = store_setting.loc['case_qty_replenishment_threshold', 'values']
+
+                if case_qty < case_qty_replenishment_threshold:
 
                     # define variables that will be used to check if the item is approved or not
 
@@ -271,6 +282,9 @@ def replenishmentv2(store_type_input, store_setting):
                             group by item_group_desc, display_size, category, season, style
 
                             """, connection)
+
+                        if len(inventory) == 0:
+                            print("""\n\nINVENTORY DATA NEEDS TO BE IMPORTED\n\n""")
 
                         cases_on_hand = inventory.loc[0, 'cases_on_hand']
 
@@ -361,7 +375,7 @@ def replenishmentv2(store_type_input, store_setting):
                     replenishment_reasons = replenishment_reasons.append({'store': f'{store}',
                                                                           'case_qty': f'{case_qty}',
                                                                           'display_size': f'{display_size}',
-                                                                          'reason': 'case qty > 1'},
+                                                                          'reason': f'case qty > threshold setting of {case_qty_replenishment_threshold}'},
                                                                          ignore_index=True)
                     break
 
@@ -374,138 +388,139 @@ def replenishmentv2(store_type_input, store_setting):
 
         i += 1
 
+    replenishment['store_name'] = replenishment['initial'] + replenishment['store'].astype(str)
     return replenishment, on_hands_after_replen, replenishment_reasons
 
 
-def replenishment(store_type_input):
-    connection = psycopg2.connect(database=f"{store_type_input}", user="postgres", password="winwin", host="localhost")
-
-
-
-    #generates df that will give you a table that concist of stores that have available space
-
-    space_available = psql.read_sql("""
-
-        with colapse as(
-                select  sd_combo.store, 
-                        display_size, 
-                        sum(case_qty) as case_qty,
-                        carded,
-                        long_hanging_top,
-                        long_hanging_dress,
-                        case
-                            when display_size = 'Carded' then (carded - sum(case_qty))
-                            when display_size = 'Long Hanging Top' then (long_hanging_top - sum(case_qty))
-                            when display_size = 'Long Hanging Dress' then (long_hanging_dress - sum(case_qty))
-                            end as available_space
-
-                from sd_combo
-                inner join case_capacity on sd_combo.store = case_capacity.store
-
-                /*THIS LINE IS DEPENDENT ON THE SEASON WE ARE CURRENTLY IN, IF FW THEN SWITCH SS TO FW*/
-                where season = 'AY' or season = 'SS'
-
-                group by sd_combo.store ,display_size, long_hanging_top, long_hanging_dress, carded
-                order by sd_combo.store asc)
-            
-        select  store, display_size, round(available_space) as space_available 
-        from colapse
-        group by store, display_size, available_space
-        Having round(available_space) > 0
-
-    """, connection)
-
-    number_of_stores_need_replenish = len(space_available)
-
-    #Creates table for final replenishment order and recommendations
-    replenishment = pd.DataFrame(columns = ['initial', 'store', 'item','case','notes','case_qty','display_size'])
-
-    i=0
-
-    
-    # takes the df that concist of stores and available space and
-    # finds how many items the store that needs replenishing has in their stores number is used to helf find 
-
-    while i < number_of_stores_need_replenish:
-        
-
-        # this code is selecting  the store and dislay size and the number of available space then looking at the sd_combo table to look for recomendation 
-        store = space_available.iloc[i,0]
-        display_size = space_available.iloc[i,1]
-        space = space_available.iloc[i,2]
-
-        
-        store_on_hand = psql.read_sql(f"""
-
-
-        select initial,
-                sd_combo.store, 
-                sd_combo.item_group_desc, 
-                case_qty,
-                sd_combo.display_size, 
-                sd_combo.season, 
-                max(availability) as in_stock, 
-                notes
-        from sd_combo
-
-        inner join item_support on sd_combo.item_group_desc = item_support.item_group_desc
-        inner join case_capacity on case_capacity.store = sd_combo.store
-
-        where sd_combo.store = {store} and
-            sd_combo.display_size = '{display_size}'
-
-        group by initial,
-                sd_combo.store, 
-                sd_combo.item_group_desc, 
-                case_qty,
-                sd_combo.display_size, 
-                sd_combo.season, notes
-                
-        order by case_qty
-
-        """, connection)
-        
-        
-        #selecting items to put in the final replenishment table
-
-        number_of_items_in_store = len(store_on_hand)
-
-        x = 0
-        while space > 0:
-
-            if x < number_of_items_in_store:
-
-                initial = store_on_hand.iloc[x,0]
-                store = store_on_hand.iloc[x,1]
-                item = store_on_hand.iloc[x,2]
-                case_qty = store_on_hand.iloc[x,3]
-                display_size = store_on_hand.iloc[x,4]
-                in_stock = store_on_hand.iloc[x,6]
-                notes = store_on_hand.iloc[x,7]
-
-                #checking to see if item is in stock if not then loops around to the next item and repeats this step
-                if in_stock > 0:
-                    replenishment = replenishment.append({'initial' : f'{initial}', 
-                                                            'store' : f'{store}', 
-                                                            'item' : f'{item}',
-                                                            'case' : 1,
-                                                            'notes': f'{notes}',
-                                                            'case_qty': f'{case_qty}',
-                                                            'display_size': f'{display_size}'}, 
-                        ignore_index = True)
-
-                    space-=1
-
-                x+=1 
-            
-            else:
-                space-=1
-
-        i+=1
-
-    replenishment['store'] = replenishment['initial'] + replenishment['store']
-    replenishment.pop('initial')
-
-    return replenishment
+# def replenishment(store_type_input):
+#     connection = psycopg2.connect(database=f"{store_type_input}", user="postgres", password="winwin", host="localhost")
+#
+#
+#
+#     #generates df that will give you a table that concist of stores that have available space
+#
+#     space_available = psql.read_sql("""
+#
+#         with colapse as(
+#                 select  sd_combo.store,
+#                         display_size,
+#                         sum(case_qty) as case_qty,
+#                         carded,
+#                         long_hanging_top,
+#                         long_hanging_dress,
+#                         case
+#                             when display_size = 'Carded' then (carded - sum(case_qty))
+#                             when display_size = 'Long Hanging Top' then (long_hanging_top - sum(case_qty))
+#                             when display_size = 'Long Hanging Dress' then (long_hanging_dress - sum(case_qty))
+#                             end as available_space
+#
+#                 from sd_combo
+#                 inner join case_capacity on sd_combo.store = case_capacity.store
+#
+#                 /*THIS LINE IS DEPENDENT ON THE SEASON WE ARE CURRENTLY IN, IF FW THEN SWITCH SS TO FW*/
+#                 where season = 'AY' or season = 'SS'
+#
+#                 group by sd_combo.store ,display_size, long_hanging_top, long_hanging_dress, carded
+#                 order by sd_combo.store asc)
+#
+#         select  store, display_size, round(available_space) as space_available
+#         from colapse
+#         group by store, display_size, available_space
+#         Having round(available_space) > 0
+#
+#     """, connection)
+#
+#     number_of_stores_need_replenish = len(space_available)
+#
+#     #Creates table for final replenishment order and recommendations
+#     replenishment = pd.DataFrame(columns = ['initial', 'store', 'item','case','notes','case_qty','display_size'])
+#
+#     i=0
+#
+#
+#     # takes the df that concist of stores and available space and
+#     # finds how many items the store that needs replenishing has in their stores number is used to helf find
+#
+#     while i < number_of_stores_need_replenish:
+#
+#
+#         # this code is selecting  the store and dislay size and the number of available space then looking at the sd_combo table to look for recomendation
+#         store = space_available.iloc[i,0]
+#         display_size = space_available.iloc[i,1]
+#         space = space_available.iloc[i,2]
+#
+#
+#         store_on_hand = psql.read_sql(f"""
+#
+#
+#         select initial,
+#                 sd_combo.store,
+#                 sd_combo.item_group_desc,
+#                 case_qty,
+#                 sd_combo.display_size,
+#                 sd_combo.season,
+#                 max(availability) as in_stock,
+#                 notes
+#         from sd_combo
+#
+#         inner join item_support on sd_combo.item_group_desc = item_support.item_group_desc
+#         inner join case_capacity on case_capacity.store = sd_combo.store
+#
+#         where sd_combo.store = {store} and
+#             sd_combo.display_size = '{display_size}'
+#
+#         group by initial,
+#                 sd_combo.store,
+#                 sd_combo.item_group_desc,
+#                 case_qty,
+#                 sd_combo.display_size,
+#                 sd_combo.season, notes
+#
+#         order by case_qty
+#
+#         """, connection)
+#
+#
+#         #selecting items to put in the final replenishment table
+#
+#         number_of_items_in_store = len(store_on_hand)
+#
+#         x = 0
+#         while space > 0:
+#
+#             if x < number_of_items_in_store:
+#
+#                 initial = store_on_hand.iloc[x,0]
+#                 store = store_on_hand.iloc[x,1]
+#                 item = store_on_hand.iloc[x,2]
+#                 case_qty = store_on_hand.iloc[x,3]
+#                 display_size = store_on_hand.iloc[x,4]
+#                 in_stock = store_on_hand.iloc[x,6]
+#                 notes = store_on_hand.iloc[x,7]
+#
+#                 #checking to see if item is in stock if not then loops around to the next item and repeats this step
+#                 if in_stock > 0:
+#                     replenishment = replenishment.append({'initial' : f'{initial}',
+#                                                             'store' : f'{store}',
+#                                                             'item' : f'{item}',
+#                                                             'case' : 1,
+#                                                             'notes': f'{notes}',
+#                                                             'case_qty': f'{case_qty}',
+#                                                             'display_size': f'{display_size}'},
+#                         ignore_index = True)
+#
+#                     space-=1
+#
+#                 x+=1
+#
+#             else:
+#                 space-=1
+#
+#         i+=1
+#
+#     replenishment['store'] = replenishment['initial'] + replenishment['store']
+#     replenishment.pop('initial')
+#
+#     return replenishment
 
 
