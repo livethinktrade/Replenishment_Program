@@ -7,12 +7,13 @@ from psycopg2.extensions import register_adapter, AsIs
 psycopg2.extensions.register_adapter(np.int64, psycopg2._psycopg.AsIs)
 import re
 import pandas as pd
-from datetime import datetime, date
+from datetime import datetime
 
 
-def kroger_transform(file, store_type_input, transition_date_range, current_year, current_week):
+def kroger_transform(file, store_type_input, transition_year, transition_season, current_year, current_week):
     # Read in new kroger sales data and then selects certain columns to a new df
-    old = pd.read_csv(f'{file}.csv', skiprows=16)
+
+    old = pd.read_csv(f'{file}', skiprows=16)
     new = old[
         ['RPT_SHORT_DESC', 'RE_STO_NUM', 'UPC', 'SCANNED_RETAIL_DOLLARS', 'SCANNED_MOVEMENT', 'MFR_DESC', 'WEEK_NAME']]
 
@@ -23,13 +24,13 @@ def kroger_transform(file, store_type_input, transition_date_range, current_year
     i = 0
 
     while i < new_len:
-        MFR_check = new.iloc[i, 5]
+        MFR_check = new.loc[i, 'MFR_DESC']
         if MFR_check != 'WINWIN':
             check = "Fail"
+
         i += 1
 
     if check == "Pass":
-
         # Extracts out the data for the store year and and store week
         new[['store_year', 'name_of_code', 'cd', 'cd1', 'cd2', 'cd3', 'cd4', 'cd5', 'store_week']] = new[
             "WEEK_NAME"].str.split(" ", 8, expand=True)
@@ -49,7 +50,8 @@ def kroger_transform(file, store_type_input, transition_date_range, current_year
         new['current_year'] = current_year
         new['current_week'] = current_week
 
-        new['transition_date_range'] = f'{transition_date_range}'
+        new['transition_year'] = f'{transition_year}'
+        new['transition_season'] = f'{transition_season}'
 
         # Renames collumn names to approripate name for data insertion and update script
         new = new.rename(columns={
@@ -61,7 +63,8 @@ def kroger_transform(file, store_type_input, transition_date_range, current_year
         })
 
         # reorganizes collumns to proper format for sales table
-        new = new[['transition_date_range',
+        new = new[['transition_year',
+                   'transition_season',
                    'store_year',
                    'store_week',
                    'store_number',
@@ -79,6 +82,12 @@ def kroger_transform(file, store_type_input, transition_date_range, current_year
 
         store_list = {
 
+            'Atlanta': 'kroger_atlanta',
+            'Cincinatti': 'kroger_cincinatti',
+            'Louisville': 'kroger_louisville',
+            'Nashville': 'kroger_nashville',
+            'Dillons': 'kroger_dillons',
+            'KingSoopers': 'kroger_king_soopers',
             'Central': 'kroger_central',
             'Columbus': 'kroger_columbus',
             'Dallas': 'kroger_dallas',
@@ -87,22 +96,23 @@ def kroger_transform(file, store_type_input, transition_date_range, current_year
 
         }
 
-        i = 0
-        while i < division_len:
-            name = divisions[i]
-            store_type = store_list[divisions[i]]
+        # filter all of the data that pertains to the store_type_input
+        store_type = store_type_input
 
-            filter_df = new[new['store_type'] == f'{name}']
-            filter_df['store_type'] = store_list[divisions[i]]
+        division = list(store_list.keys())[list(store_list.values()).index(store_type)]
 
-            filter_df.to_excel(f'{store_type}_salesupdate.xlsx', index=False)
-            i += 1
+        new_filt = new[new['store_type'] == division]
 
-        salesdata = pd.read_excel(f'{store_type_input}_salesupdate.xlsx')
-        return salesdata
+        #reset index and change store type
+        new_filt = new_filt.reset_index(drop=True)
+        new_filt['store_type'] = store_type
+        salesdata = new_filt
+    else:
+        print('MFR_check failed. sales data sheet contains items that is not WinWin Products')
+    return salesdata
 
 
-def kvat_transform(file, transition_date_range, current_year, current_week):
+def kvat_transform(file, transition_year, transition_season, current_year, current_week):
     # grabs the date that will be used to set the date across the board
     old = pd.read_excel(f'{file}', skiprows=1)
     date = old.iloc[0, 4]
@@ -120,7 +130,6 @@ def kvat_transform(file, transition_date_range, current_year, current_week):
     # recreating data frame so I don't have to redefine the column names
     old = pd.read_excel(f'{file}', skiprows=3)
 
-    old.columns
 
     old['qty'] = old['Units Sold'] + old['Units Sold.1'] + old['Units Sold.2'] + old['Units Sold.3'] + old[
         'Units Sold.4'] + old['Units Sold.5'] + old['Units Sold.6']
@@ -140,7 +149,8 @@ def kvat_transform(file, transition_date_range, current_year, current_week):
     old['UPC'] = old['UPC'].astype(float).astype(np.int64)
 
     # seting transition date range and store_week values for data and store_type
-    old['transition_date_range'] = f'{transition_date_range}'
+    old['transition_year'] = transition_year
+    old['transition_season'] = f'{transition_season}'
     old['store_week'] = date
     old['store_type'] = 'kvat'
     old['store_year'] = store_year
@@ -149,7 +159,8 @@ def kvat_transform(file, transition_date_range, current_year, current_week):
 
     old = old.rename(columns={'UPC': 'upc'})
 
-    salesdata = old[['transition_date_range',
+    salesdata = old[['transition_year',
+                     'transition_season',
                      'store_year',
                      'store_week',
                      'store_number',
@@ -165,7 +176,7 @@ def kvat_transform(file, transition_date_range, current_year, current_week):
     return salesdata
 
 
-def safeway_denver_transform(file, transition_date_range, current_year, current_week):
+def safeway_denver_transform(file, transition_year, transition_season, current_year, current_week):
     # the first time reading the raw sales data file is extract the date from the first row
 
     old = pd.read_excel(f'{file}')
@@ -195,7 +206,7 @@ def safeway_denver_transform(file, transition_date_range, current_year, current_
 
     # assign store_week variable using datetime object
     store_week = date.strftime('%m/%d/%Y')
-    store_week
+
 
     # second time reading the raw file is to extract only the sales data
 
@@ -213,7 +224,9 @@ def safeway_denver_transform(file, transition_date_range, current_year, current_
 
     # creating transition collumn, store_week, store_year, store_type collumn
 
-    old['transition_date_range'] = f'{transition_date_range}'
+    old['transition_year'] = transition_year
+
+    old['transition_season'] = f'{transition_season}'
 
     old['store_week'] = store_week
 
@@ -225,7 +238,8 @@ def safeway_denver_transform(file, transition_date_range, current_year, current_
 
     old['current_week'] = current_week
 
-    salesdata = old[['transition_date_range',
+    salesdata = old[['transition_year',
+                     'transition_season',
                      'store_year',
                      'store_week',
                      'store_number',
@@ -335,6 +349,7 @@ def approval_transform(store_type_input, file):
         'kroger_columbus': 'Kroger - Columbus Price',
         'kroger_cincinnati': 'Kroger - Cincinnati Price',
         'kroger_central': 'Kroger - Central Price',
+        'kroger_dallas' : 'Kroger Texas - Dallas Price',
         'kroger_atlanta': 'Kroger South - Atlanta Price',
         'safeway_denver': 'Albertsons Denver Price',
         'jewel': 'Jewel Osco Price',
