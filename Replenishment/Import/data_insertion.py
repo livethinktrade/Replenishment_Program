@@ -43,56 +43,85 @@ def casecapacity_insert(store_type,
     cursor.close()
     connection_pool.putconn(connection)
 
+def delivery_update(transition_year, transition_season,
+                   type, date, upc, store, qty,
+                   store_type, num, code, connection_pool):
 
-# this is for updating prexisting data in the DB
-def deliveryupdate(transition_date_range, type, date, upc, store, qty, store_type,connection_pool):
- 
+    """ new delivery update"""
+
     connection = connection_pool.getconn()
     cursor = connection.cursor()
-    cursor.execute(f"""update delivery set qty = {qty}, transition_date_range ='{transition_date_range}' 
+    cursor.execute(f"""update delivery2 set qty = {qty}, transition_year ='{transition_year}', 
+                        transition_season ='{transition_season}' 
                         WHERE type ='{type}' and 
                         date = '{date}' and 
                         store = {store} and 
                         upc = '{upc}' and 
-                        store_type = '{store_type}'
+                        store_type = '{store_type}' and
+                        code = '{code}' and
+                        num = '{num}'
                     """)
     connection.commit()
     cursor.close()
     connection_pool.putconn(connection)
 
-# new code for deliv insert
-# def delivery_insert(transition_year,
-#                     transition_season,
-#                     type, date, upc, store, qty, store_type,
-#                     num, code, connection_pool):
+
+# this is for updating prexisting data in the DB
+# def deliveryupdate(transition_date_range, type, date, upc, store, qty, store_type,connection_pool):
+#
+#     """old delivery insert"""
 #
 #     connection = connection_pool.getconn()
 #     cursor = connection.cursor()
-#     cursor.execute(
-#         """INSERT INTO delivery2 (transition_year, transition_season,type, date, upc, store, qty, store_type, num, code)
-#                                 values (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)""",
-#         (transition_year, transition_season, type, date, upc, store, qty, store_type, num, code))
+#     cursor.execute(f"""update delivery set qty = {qty}, transition_date_range ='{transition_date_range}'
+#                         WHERE type ='{type}' and
+#                         date = '{date}' and
+#                         store = {store} and
+#                         upc = '{upc}' and
+#                         store_type = '{store_type}'
+#                     """)
+#     connection.commit()
+#     cursor.close()
+#     connection_pool.putconn(connection)
+
+#new code for deliv insert
+def delivery_insert(transition_year,
+                    transition_season,
+                    type, date, upc, store, qty, store_type,
+                    num, code, connection_pool):
+
+    """new delivery insert"""
+
+    connection = connection_pool.getconn()
+    cursor = connection.cursor()
+    cursor.execute(
+        """INSERT INTO delivery2 (transition_year, transition_season,type, date, upc, store, qty, store_type, num, code)
+                                values (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)""",
+        (transition_year, transition_season, type, date, upc, store, qty, store_type, num, code))
+
+    connection.commit()
+    cursor.close()
+    connection_pool.putconn(connection)
+
+
+
+# def delivery_insert(transition_date_range,type, date , upc, store, qty, store_type, num, connection_pool):
+#
+#     """old delivery insert"""
+#
+#     connection = connection_pool.getconn()
+#     cursor = connection.cursor()
+#     cursor.execute("INSERT INTO delivery (transition_date_range,type, date, upc, store, qty, store_type, num) values (%s,%s,%s,%s,%s,%s,%s,%s)",
+#            (transition_date_range,type,date,upc,store,qty, store_type,num))
 #
 #     connection.commit()
 #     cursor.close()
 #     connection_pool.putconn(connection)
 
 
-# old delivery_insert
-def delivery_insert(transition_date_range,type, date , upc, store, qty, store_type, num, connection_pool):
-
-    connection = connection_pool.getconn()
-    cursor = connection.cursor()
-    cursor.execute("INSERT INTO delivery (transition_date_range,type, date, upc, store, qty, store_type, num) values (%s,%s,%s,%s,%s,%s,%s,%s)",
-           (transition_date_range,type,date,upc,store,qty, store_type,num))
-
-    connection.commit()
-    cursor.close()
-    connection_pool.putconn(connection)
-
-
 # this is for updating prexisting data in the DB
-def salesupdate(transition_date_range,	
+def salesupdate(transition_year,
+                transition_season,
                 store_year,	
                 store_week,	
                 store_number,	
@@ -106,9 +135,10 @@ def salesupdate(transition_date_range,
  
     connection = connection_pool.getconn()
     cursor = connection.cursor()
-    cursor.execute(f"""update sales 
+    cursor.execute(f"""update sales2 
                         set qty = {qty}, 
-                            transition_date_range ='{transition_date_range}',
+                            transition_year ='{transition_year}',
+                            transition_season = '{transition_season}',
                             sales={sales},
                             current_year = {current_year},
                             current_week = {current_week}
@@ -122,57 +152,60 @@ def salesupdate(transition_date_range,
     cursor.close()
     connection_pool.putconn(connection)
 
-# new code for sales insert
-# def sales_insert(transition_year,
-#                  transition_season,
-#                  store_year,
-#                  store_week,
-#                  store_number,
-#                  upc,
-#                  sales,
-#                  qty,
-#                  current_year,
-#                  current_week,
-#                  store_type,
-#                  connection_pool):
-#
-#     connection = connection_pool.getconn()
-#     cursor = connection.cursor()
-#     cursor.execute("""INSERT INTO sales2 (transition_year, transition_season,store_year,
-#                                         store_week,store_number,upc,sales,qty,current_year,
-#                                         current_week,store_type)
-#                         values (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)""",
-#
-#                    (transition_year, transition_season, store_year, store_week,
-#                     store_number, upc, sales, qty, current_year, current_week, store_type))
-#
-#     connection.commit()
-#     cursor.close()
-#     connection_pool.putconn(connection)
+def sales_insert(transition_year,
+                 transition_season,
+                 store_year,
+                 store_week,
+                 store_number,
+                 upc,
+                 sales,
+                 qty,
+                 current_year,
+                 current_week,
+                 store_type,
+                 connection_pool):
 
-
-# old version sales insert
-def sales_insert(transition_date_range,
-                store_year,
-                store_week,
-                store_number,
-                upc,
-                sales,
-                qty,
-                current_year,
-                current_week,
-                store_type,
-                connection_pool):
-
+    """New Sales Insert"""
 
     connection = connection_pool.getconn()
     cursor = connection.cursor()
-    cursor.execute("INSERT INTO sales (transition_date_range,store_year,store_week,store_number,upc,sales,qty,current_year,current_week,store_type) values (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)",
-                   (transition_date_range,store_year,store_week,store_number,upc,sales,qty,current_year,current_week,store_type))
+    cursor.execute("""INSERT INTO sales2 (transition_year, transition_season,store_year,
+                                        store_week,store_number,upc,sales,qty,current_year,
+                                        current_week,store_type)
+                        values (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)""",
+
+                   (transition_year, transition_season, store_year, store_week,
+                    store_number, upc, sales, qty, current_year, current_week, store_type))
 
     connection.commit()
     cursor.close()
     connection_pool.putconn(connection)
+
+
+
+# def sales_insert(transition_date_range,
+#                 store_year,
+#                 store_week,
+#                 store_number,
+#                 upc,
+#                 sales,
+#                 qty,
+#                 current_year,
+#                 current_week,
+#                 store_type,
+#                 connection_pool):
+#
+#     """old sales insert"""
+#
+#
+#     connection = connection_pool.getconn()
+#     cursor = connection.cursor()
+#     cursor.execute("INSERT INTO sales (transition_date_range,store_year,store_week,store_number,upc,sales,qty,current_year,current_week,store_type) values (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)",
+#                    (transition_date_range,store_year,store_week,store_number,upc,sales,qty,current_year,current_week,store_type))
+#
+#     connection.commit()
+#     cursor.close()
+#     connection_pool.putconn(connection)
 
 
 
@@ -193,6 +226,8 @@ def item_support_insert(season,
                         packing,
                         upc_11_digit,
                         connection_pool):
+
+    """ new item support sheet insert"""
 
     connection = connection_pool.getconn()
     cursor = connection.cursor()
