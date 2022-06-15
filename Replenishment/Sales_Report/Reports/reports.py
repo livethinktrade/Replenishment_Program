@@ -2,7 +2,7 @@
 import datetime
 from Sales_Report.Replenishment.replenishment import *
 from Sales_Report.Replenishment.initial_order import *
-from Sales_Report.Report_Format.weekly_sales_report_format import weekly_sales_report_format
+from Sales_Report.Report_Format.weekly_sales_report_format import ReportFormat
 from openpyxl import load_workbook
 
 class Reports:
@@ -39,10 +39,10 @@ class Reports:
         self.store_program = self.store_setting.loc['store_program','values']
 
         # external report variables
-        self.ytd_mask_sales_table = store_setting.loc['ytd_mask_sales_table','values']
-        self.ytd_womask_sales_table = store_setting.loc['ytd_womask_sales_table','values']
-        self.item_sales_rank = store_setting.loc['item_sales_rank','values']
-        self.top20 = store_setting.loc['top20','values']
+        self.ytd_mask_sales_table = self.store_setting.loc['ytd_mask_sales_table','values']
+        self.ytd_womask_sales_table = self.store_setting.loc['ytd_womask_sales_table','values']
+        self.item_sales_rank = self.store_setting.loc['item_sales_rank','values']
+        self.top20 = self.store_setting.loc['top20','values']
 
     def internal_report(self,filename):
 
@@ -57,6 +57,8 @@ class Reports:
 
             writer.book = ExcelWorkbook
 
+
+            #calls for replenishment df and inserts to excel then formats it
             self.replenishment_reasons.to_excel(writer, sheet_name="Replenishment Reasons", index=False)
 
             if self.initial_orders == 1:
@@ -91,7 +93,9 @@ class Reports:
 
                 store_sales_rank = self.reports.store_sales_rank()
 
-                store_sales_rank.to_excel(writer, sheet_name="Store Ranks", index=False)
+                store_sales_rank_len = len(store_sales_rank)
+
+                store_sales_rank.to_excel(writer, sheet_name="Store Ranks", index=False, startcol=1)
 
             if self.item_approval ==1:
 
@@ -106,6 +110,10 @@ class Reports:
                 store_program.to_excel(writer, sheet_name="Store Program", index=False)
 
             writer.save()
+
+        format = ReportFormat(filename, 1,1,store_sales_rank_len, self.store_setting)
+
+        format.internal_report()
 
 
 
@@ -220,4 +228,10 @@ class Reports:
             self.on_hand.to_excel(writer, sheet_name="On Hand", index=False)
 
 
-        weekly_sales_report_format(filename, self.replenishment_len, self.sales_report_len)
+
+        # weekly_sales_report_format(filename, self.replenishment_len, self.sales_report_len)
+        # ReportsFormat class instantiated for use later
+        format = ReportFormat(filename, self.replenishment_len, self.sales_report_len, 1, self.store_setting)
+
+        format.external_report()
+
