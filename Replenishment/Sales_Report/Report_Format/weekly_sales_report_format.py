@@ -337,6 +337,59 @@ class ReportFormat:
 
         self.wb.save(self.filename)
 
+    def top20_format(self):
+
+        ws = self.wb['Sales Report']
+
+        pattern_fill_gray = PatternFill(patternType='solid', fgColor='D0CECE')
+
+        ws.row_dimensions[1].height = 30
+
+        for row in ws.iter_rows(min_row=0, max_row=22, min_col=0, max_col=2):
+            for cell in row:
+                cell.border = self.border
+
+        ws.merge_cells('A1:B1')
+        top_left_cell = ws['A1']
+        top_left_cell.value = "Top 20 Stores "
+
+        ws.column_dimensions['B'].width = 20
+
+        for row in ws.iter_rows(min_row=1, max_row=22, min_col=1, max_col=2):
+            for cell in row:
+                cell.alignment = Alignment(horizontal='center', vertical='center')
+
+        for row in ws.iter_rows(min_row=1, max_row=2, min_col=1, max_col=2):
+            for cell in row:
+                cell.fill = pattern_fill_gray
+
+        for row in ws.iter_rows(min_row=1, max_row=2, min_col=1, max_col=2):
+            for cell in row:
+                cell.font = Font(bold=True)
+
+        #outlining store summary
+        for row in ws.iter_rows(min_row=1, max_row=2, min_col=13, max_col=15):
+            for cell in row:
+                cell.border = self.border
+
+        #change width of columns for stores supported table
+        ws.column_dimensions['M'].width = 20
+        ws.column_dimensions['N'].width = 25
+        ws.column_dimensions['O'].width = 20
+
+        # change text to wrap text and center aligns
+
+        for row in ws.iter_rows(min_row=1, max_row=30, min_col=1, max_col=20):
+            for cell in row:
+                cell.alignment = Alignment(horizontal='center', vertical='center')
+
+        for row in ws.iter_rows(min_row=1, max_row=1, min_col=1, max_col=20):
+            for cell in row:
+                cell.alignment = Alignment(wrap_text=True, horizontal='center', vertical='center')
+
+
+        self.wb.save(self.filename)
+
     def item_sales_ranked(self):
 
         ws = self.wb['Sales Report']
@@ -705,7 +758,7 @@ class ReportFormat:
         self.replenishment(self.replenishment_len)
 
         if self.top20 == 1:
-            pass
+            self.top20_format()
 
         else:
             self.sales_report(self.sales_report_len)
