@@ -25,7 +25,7 @@ store_id integer NOT NULL,
 program_id varchar(15) NOT NULL,
 activity varchar(10),
 
-FOREIGN KEY (program_id) REFERENCES master_plnaogram (program_id),
+FOREIGN KEY (program_id) REFERENCES master_planogram (program_id),
 FOREIGN KEY (store_id) REFERENCES store(store_id)
 
 );
@@ -86,10 +86,10 @@ CREATE TABLE delivery2
     qty numeric NOT NULL,
 	store_type character varying(20) NOT NULL,
     num numeric,
-    code varchar NOT NULL,
+    code varchar(20) NOT NULL,
 
     FOREIGN KEY (code) REFERENCES item_support2 (code),
---    FOREIGN KEY (store) REFERENCES store(store_id) */
+    FOREIGN KEY (store) REFERENCES store(store_id)
 
 );
 
