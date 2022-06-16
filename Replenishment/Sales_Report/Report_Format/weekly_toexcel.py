@@ -11,12 +11,11 @@ import datetime
 
 
 def weekly_toexcel(store_type_input, replenishment_report, sales_report, no_scan, sales_sql_YTD_Mask,
-                   sales_sql_YTD_WoMask, item_sales_rank, on_hand):
+                   sales_sql_YTD_WoMask, item_sales_rank, on_hand, store_setting):
     # STEP 7 SALES REPORT TO EXCEL
 
 
-    connection = psycopg2.connect(database=f"{store_type_input}", user="postgres", password="winwin", host="localhost")
-
+    # connection = psycopg2.connect(database=f"{store_type_input}", user="postgres", password="winwin", host="localhost")
 
     date = datetime.date.today()
     date = date.strftime("%b-%d-%Y")
@@ -26,7 +25,7 @@ def weekly_toexcel(store_type_input, replenishment_report, sales_report, no_scan
     with pd.ExcelWriter(filename) as writer:
         replenishment_report.to_excel(writer, sheet_name="Replenishment",
                             index= False,
-                            columns=('store', 'item','case','notes','case_qty','display_size'))
+                            columns=('store_name', 'item','case','notes','case_qty','display_size'))
 
 
         sales_report.to_excel(writer, 
@@ -34,12 +33,18 @@ def weekly_toexcel(store_type_input, replenishment_report, sales_report, no_scan
                         index= False, 
                         header=('Store (#)','Current Week Sales', 'Previous Week Sales','% +/- Change WOW', 'Sales ($) 2022 Current Week','Sales ($) 2021 Current Week','% +/- Change YOY','Sales ($) 2022 YTD','Sales ($) 2021 YTD','% +/- Change (YOY)')
                             )
-        
 
-    
-        no_scan.to_excel(writer, sheet_name="No Scan", index= False, header= ('store', 'item')) 
+        in_season_setting = store_setting.loc['In_Season', 'values']
 
-    
+        if in_season_setting == 1:
+
+            header = ('store', 'item_group_desc', 'last shipped', 'weeks age')
+
+        else:
+
+            header = ('store', 'item')
+
+        no_scan.to_excel(writer, sheet_name="No Scan", index= False, header= header)
 
         sales_sql_YTD_WoMask.to_excel(writer, sheet_name="Sales Report", 
                                 index= False, 
