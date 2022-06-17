@@ -1484,5 +1484,96 @@ class ReportsData:
 
         return store_program
 
+    def ghost_inventory(self):
+
+        reports = ReportsData(self.store_type_input, self.store_setting)
+
+        on_hands = reports.on_hands()
+
+        inventory_age = on_hands
+
+        i = 0
+
+        while i < len(on_hands):
+
+            store = on_hands.loc[i, 'store']
+
+            item_group_desc = on_hands.loc[i, 'item_group_desc']
+
+            # grab the last date the item was sold
+
+            date = psql.read_sql(f'''
+
+            select store_year, store_week from sales2
+            inner join item_support2 on sales2.upc = item_support2.upc_11_digit
+            where store_number = {store} and item_group_desc = '{item_group_desc}'
+            order by store_week desc
+
+            ''', self.connection)
+
+            try:
+
+                last_ship_week = date.loc[0, 'store_week']
+                last_ship_year = date.loc[0, 'store_year']
+
+                inventory_age.loc[i, 'last sale date'] = last_ship_week
+                inventory_age.loc[i, 'last sale year'] = last_ship_year
+
+            except KeyError:
+
+                inventory_age.loc[i, 'last sale date'] = 'No Sales'
+                inventory_age.loc[i, 'last sale year'] = 'No Sales'
+
+            # grabs the last date the item was shipped
+
+            date = psql.read_sql(f'''
+
+            select store, date, item_group_desc from delivery2
+            inner join item_support2 on delivery2.code = item_support2.code
+            where store = {store} and item_group_desc = '{item_group_desc}'
+            order by date desc
+
+
+            ''', self.connection)
+
+            last_ship_week = date.loc[0, 'date']
+
+            inventory_age.loc[i, 'last delivery date'] = last_ship_week
+
+            i += 1
+
+        store_program = reports.store_program()
+
+        store_program = store_program.set_index('store_id')
+
+        store_program = store_program.rename(columns={'carded': 'Carded',
+                                                      'long_hanging_top': 'Long Hanging Top',
+                                                      'long_hanging_dress': 'Long Hanging Dress'})
+
+        i = 0
+
+        while i < len(inventory_age):
+
+            try:
+
+                store = inventory_age.loc[i, 'store']
+                display_size = inventory_age.loc[i, 'display_size']
+
+                allocated_space = store_program.loc[store, display_size]
+
+                inventory_age.loc[i, 'allocated space'] = allocated_space
+
+            except KeyError:
+
+                inventory_age.loc[i, 'allocated space'] = 0
+
+            i += 1
+
+        inventory_age['% of display space'] = (inventory_age['case_qty'] / inventory_age['allocated space'])
+
+        inventory_age = inventory_age[inventory_age['season'] == 'AY']
+
+        return inventory_age
+
 
 
