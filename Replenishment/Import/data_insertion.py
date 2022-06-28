@@ -259,6 +259,49 @@ def item_support_insert(season,
     cursor.close()
     connection_pool.putconn(connection)
 
+def item_support_update(season,
+                        category,
+                        type,
+                        style,
+                        additional,
+                        display_size,
+                        pog_type,
+                        upc,
+                        code,
+                        code_qb,
+                        unique_replen_code,
+                        case_size,
+                        item_group_desc,
+                        item_desc,
+                        packing,
+                        upc_11_digit,
+                        connection_pool):
+
+    """ new item support sheet insert"""
+
+    connection = connection_pool.getconn()
+    cursor = connection.cursor()
+    cursor.execute(f"""Update item_support2 set season = '{season}', 
+                                                category = '{category}', 
+                                                type = '{type}', 
+                                                style = '{style}', 
+                                                additional = '{additional}', 
+                                                display_size = '{display_size}', 
+                                                pog_type = '{pog_type}', 
+                                                upc = '{upc}', 
+                                                code_qb = '{code_qb}', 
+                                                unique_replen_code = '{unique_replen_code}', 
+                                                case_size = {case_size}, 
+                                                item_group_desc = '{item_group_desc}',
+                                                item_desc = '{item_desc}', 
+                                                packing = {packing}, 
+                                                upc_11_digit = '{upc_11_digit}'
+                                            where code = '{code}' """)
+
+    connection.commit()
+    cursor.close()
+    connection_pool.putconn(connection)
+
 #old version support insert
 # def item_support_insert(upc,
 #                       upc_11_digit,

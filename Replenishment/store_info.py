@@ -1,7 +1,7 @@
 from psycopg2 import pool
 import pandas as pd
 import pandas.io.sql as psql
-
+import datetime
 
 from Import.data_insertion import *
 from Update.Transform_Sales_Data.transform import *
@@ -15,7 +15,7 @@ from Sales_Report.Report_Format.ytd_sales_report_format import ytd_sales_report_
 
 class Replenishment():
     
-    def __init__(self, store_type_input, transition_date_range, current_year, current_week):
+    def __init__(self, store_type_input, current_year, current_week):
         
         self.store_type_input = store_type_input
         
@@ -31,21 +31,27 @@ class Replenishment():
 
         self.current_week = current_week
 
-        self.transition_date_range = transition_date_range
 
-        self.store_setting = pd.read_excel(rf'C:\Users\User1\OneDrive\WinWin Staff Folders\Michael\Groccery Store Program\{self.store_type_input}\{self.store_type_input}_store_setting.xlsm',
-                                           sheet_name='Sheet2',
-                                           header=None)
+        # self.store_setting = pd.read_excel(rf'C:\Users\User1\OneDrive\WinWin Staff Folders\Michael\Groccery Store Program\{self.store_type_input}\{self.store_type_input}_store_setting.xlsm',
+        #                                    sheet_name='Sheet2',
+        #                                    header=None)
+        self.store_setting= pd.read_excel(rf'C:\Users\User1\OneDrive - winwinproducts.com\Groccery Store Program\{self.store_type_input}\{self.store_type_input}_store_setting.xlsm',
+                                            sheet_name='Sheet2',
+                                            header=None,
+                                            index_col=0,
+                                            names=('setting', 'values'))
 
-        self.store_programs = pd.read_excel(rf'C:\Users\User1\OneDrive\WinWin Staff Folders\Michael\Groccery Store Program\{self.store_type_input}\{self.store_type_input}_store_setting.xlsm',
+        self.transition_year = self.store_setting.loc['Transition_year', 'values']
+        self.transition_season = self.store_setting.loc['Transition_Season','values']
+
+        self.store_programs = pd.read_excel(rf'C:\Users\User1\OneDrive - winwinproducts.com\Groccery Store Program\{self.store_type_input}\{self.store_type_input}_store_setting.xlsm',
                                             sheet_name='Store Programs')
 
-        self.store_notes = pd.read_excel(rf'C:\Users\User1\OneDrive\WinWin Staff Folders\Michael\Groccery Store Program\{self.store_type_input}\{self.store_type_input}_store_setting.xlsm',
+        self.store_notes = pd.read_excel(rf'C:\Users\User1\OneDrive - winwinproducts.com\Groccery Store Program\{self.store_type_input}\{self.store_type_input}_store_setting.xlsm',
                                          sheet_name='Store Notes')
 
-        self.master_planogram = pd.read_excel(rf'C:\Users\User1\OneDrive\WinWin Staff Folders\Michael\Groccery Store Program\MASTER PLANOGRAM.xlsx',
+        self.master_planogram = pd.read_excel(rf'C:\Users\User1\OneDrive - winwinproducts.com\Groccery Store Program\MASTER PLANOGRAM.xlsx',
                                          sheet_name='MASTER PLANOGRAM')
-
 
     def delivery_import(self, file):
 
@@ -55,7 +61,7 @@ class Replenishment():
         (transition_year, transition_season, store_year, store_week, store_number,
         upc, sales, qty, current_year, current_week, store_type)"""
 
-        new_deliv = pd.read_excel(f'{file}.xlsx')
+        new_deliv = pd.read_excel(f'{file}')
 
         new_len = len(new_deliv)
         i = 0
@@ -68,8 +74,12 @@ class Replenishment():
             store = new_deliv.iloc[i, 5]
             qty = new_deliv.iloc[i, 6]
             store_type = new_deliv.iloc[i, 7]
-            # num = new_deliv.iloc[i, 8]
-            # code = new_deliv.iloc[i,9]
+            num = new_deliv.iloc[i, 8]
+            code = new_deliv.iloc[i,9]
+
+            if store_type != self.store_type_input:
+                print(f'Data Validation Failed Inserted {store_type} for {self.store_type_input} database')
+                break
 
             # note to self: last line was comment out bc i needed the old version of the deliv insert not the new one.
 
@@ -81,12 +91,15 @@ class Replenishment():
                             store,
                             qty,
                             store_type,
-                            # num,
-                            # code,
+                            num,
+                            code,
                             self.connection_pool)
 
             i += 1
-        print('\nDelivery Data Imported')
+
+        if store_type == self.store_type_input:
+
+            print('\nDelivery Data Imported')
 
     def delivery_update(self, file):
 
@@ -95,25 +108,31 @@ class Replenishment():
 
         connection = self.connection_pool.getconn()
 
-        df = pd.read_csv(f'{file}.CSV')
+        df = pd.read_csv(f'{file}')
 
         # drops uneccesary columns
-        df = df.drop(columns=['Unnamed: 0', 'Item', 'U/M', 'Sales Price', 'Amount', 'Balance'])
+        df = df.drop(columns=['Unnamed: 0', 'U/M', 'Sales Price', 'Amount', 'Balance'])
         df = df.dropna()
 
         # filters out unnecesary qb types only invoice or credit memo
-        invoice = df[df.Type == ('Invoice')]
-        credits = df[df.Type == ('Credit Memo')]
+        invoice = df[df.Type == 'Invoice']
+        credits = df[df.Type == 'Credit Memo']
         df = pd.concat([invoice, credits])
         df = df.sort_values(by=['Date'])
 
-        # df1 = df['Memo'].str.split(n=1)
+        # splitting memo to get the upc
         df[['upc', 'memo']] = df.Memo.str.split('/', n=1, expand=True)
         df.pop('Memo')
         df.pop('memo')
 
+        # splitting items to get the qb code child class
+        df[['code', 'junk']] = df.Item.str.split(' ', n=1, expand=True)
+        df.pop('junk')
+        df.pop('Item')
+
         # adding transion column and renanimg columns
-        df['transition_date_range'] = self.transition_date_range
+        df['transition_year'] = self.transition_year
+        df['transition_season'] = self.transition_season
 
         # takes hyphens out of up column extracts numbers only to prevent any rows that include freight or other non item sales (ie sales signs)
         df['upc'] = df["upc"].str.replace("-", "")
@@ -161,7 +180,7 @@ class Replenishment():
 
         }
 
-        store_type = df.iloc[0, 7]
+        store_type = df.iloc[0, 9]
 
         df['store_type'] = store_list[store_type]
 
@@ -174,7 +193,12 @@ class Replenishment():
             'Num': 'num'
         })
 
-        new_deliv_transform = df[['transition_date_range', 'type', 'date', 'upc', 'store', 'qty', 'store_type', 'num']]
+        # create new column by reorganizing column and resetting index
+        new_deliv_transform = df[
+            ['transition_year', 'transition_season', 'type', 'date', 'upc', 'store', 'qty', 'store_type', 'num',
+             'code']]
+
+        new_deliv_transform = new_deliv_transform.reset_index(drop=True)
 
         ######LOADING DATA INTO POSTGRES WITH PYTHON #########
 
@@ -185,39 +209,53 @@ class Replenishment():
 
         while i < new_deliv_transform_length:
 
-            transition_date_range = new_deliv_transform.iloc[i, 0]
-            type = new_deliv_transform.iloc[i, 1]
-            date = new_deliv_transform.iloc[i, 2]
-            upc = new_deliv_transform.iloc[i, 3]
-            store = new_deliv_transform.iloc[i, 4]
-            qty = new_deliv_transform.iloc[i, 5]
-            store_type = new_deliv_transform.iloc[i, 6]
-            num = new_deliv_transform.iloc[i, 7]
+            transition_year = new_deliv_transform.loc[i, 'transition_year']
+
+            transition_season = new_deliv_transform.loc[i, 'transition_season']
+
+            type = new_deliv_transform.loc[i, 'type']
+
+            date = new_deliv_transform.loc[i, 'date']
+
+            upc = new_deliv_transform.loc[i, 'upc']
+
+            store = new_deliv_transform.loc[i, 'store']
+
+            qty = new_deliv_transform.loc[i, 'qty']
+
+            store_type = new_deliv_transform.loc[i, 'store_type']
+
+            num = new_deliv_transform.loc[i, 'num']
+
+            code = new_deliv_transform.loc[i, 'code']
 
             duplicate_check = psql.read_sql(f"""
-                                                SELECT * FROM DELIVERY 
+                                                SELECT * FROM DELIVERY2 
                                                 WHERE type ='{type}' and 
-                                                    date = '{date}' and 
-                                                    store = {store} and 
-                                                    upc = '{upc}' and 
-                                                    store_type = '{store_type}' and
-                                                    num = {num}
+                                                        date = '{date}' and 
+                                                        store = {store} and 
+                                                        upc = '{upc}' and 
+                                                        store_type = '{store_type}' and
+                                                        code = '{code}' and
+                                                        num = '{num}'
                                             """, connection)
 
             duplicate_check_len = len(duplicate_check)
 
             if duplicate_check_len == 1:
-                deliveryupdate(transition_date_range, type, date, upc, store, qty, store_type, self.connection_pool)
+                delivery_update(transition_year, transition_season, type, date,
+                                upc, store, qty, store_type, num, code, self.connection_pool)
                 update += 1
             else:
-                delivery_insert(transition_date_range, type, date, upc, store, qty, store_type, num, self.connection_pool)
+                delivery_insert(transition_year,
+                                transition_season,
+                                type, date, upc, store, qty, store_type,
+                                num, code, self.connection_pool)
                 insert += 1
 
             i += 1
 
-            connection.commit()
-
-        self.connection_pool.putconn(connection)
+        self.connection.commit()
 
         print('\nDelivery Data Updated')
         print('Updated:', update, 'Records')
@@ -231,7 +269,7 @@ class Replenishment():
          (transition_year, transition_season, store_year, store_week, store_number,
          upc, sales, qty, current_year, current_week, store_type)"""
 
-        new_sales = pd.read_excel(f'{file}.xlsx')
+        new_sales = pd.read_excel(f'{file}')
 
         new_len = len(new_sales)
         i = 0
@@ -246,15 +284,20 @@ class Replenishment():
             qty = new_sales.iloc[i, 7]
             current_year = new_sales.iloc[i, 8]
             current_week = new_sales.iloc[i, 9]
-            # store_type = new_sales.iloc[i, 10]
+            store_type = new_sales.iloc[i, 10]
+
+            if store_type != self.store_type_input:
+                print(f'Data Validation Failed Inserted data for {store_type} for {self.store_type_input} database')
+                break
 
             sales_insert(transition_year, transition_season, store_year, store_week, store_number, upc, sales, qty,
                          current_year, current_week,
-                         # store_type,
+                         store_type,
                          self.connection_pool)
             i += 1
 
-        print('\nSales Data Imported')
+        if store_type == self.store_type_input:
+            print('\nSales Data Imported')
 
     def sales_update(self, file):
 
@@ -263,7 +306,7 @@ class Replenishment():
         kroger = [
                   'kroger_atlanta',
                   'kroger_central',
-                  'kroger_cincinnati',
+                  'kroger_cincinatti',
                   'kroger_columbus',
                   'kroger_dallas',
                   'kroger_delta',
@@ -277,15 +320,15 @@ class Replenishment():
 
         if self.store_type_input in kroger:
 
-            salesdata = kroger_transform(file, self.store_type_input, self.transition_date_range, self.current_year, self.current_week)
+            salesdata = kroger_transform(file, self.store_type_input, self.transition_year, self.transition_season, self.current_year, self.current_week)
 
         elif self.store_type_input == 'kvat':
 
-            salesdata = kvat_transform(file, self.transition_date_range, self.current_year, self.current_week)
+            salesdata = kvat_transform(file, self.transition_year, self.transition_season, self.current_year, self.current_week)
 
         elif self.store_type_input == 'safeway_denver':
 
-            salesdata = safeway_denver_transform(file, self.transition_date_range, self.current_year, self.current_week)
+            salesdata = safeway_denver_transform(file, self.transition_year, self.transition_season, self.current_year, self.current_week)
 
         elif self.store_type_input == 'jewel':
 
@@ -306,19 +349,20 @@ class Replenishment():
 
         while i < salesdata_len:
 
-            transition_date_range = salesdata.iloc[i, 0]
-            store_year = salesdata.iloc[i, 1]
-            store_week = salesdata.iloc[i, 2]
-            store_number = salesdata.iloc[i, 3]
-            upc = salesdata.iloc[i, 4]
-            sales = salesdata.iloc[i, 5]
-            qty = salesdata.iloc[i, 6]
-            current_year = salesdata.iloc[i, 7]
-            current_week = salesdata.iloc[i, 8]
-            store_type = salesdata.iloc[i, 9]
+            transition_year = salesdata.loc[i, 'transition_year']
+            transition_season = salesdata.loc[i, 'transition_season']
+            store_year = salesdata.loc[i, 'store_year']
+            store_week = salesdata.loc[i, 'store_week']
+            store_number = salesdata.loc[i, 'store_number']
+            upc = salesdata.loc[i, 'upc']
+            sales = salesdata.loc[i, 'sales']
+            qty = salesdata.loc[i, 'qty']
+            current_year = salesdata.loc[i, 'current_year']
+            current_week = salesdata.loc[i, 'current_week']
+            store_type = salesdata.loc[i, 'store_type']
 
             duplicate_check = psql.read_sql(f"""
-                                                SELECT * FROM SALES 
+                                                SELECT * FROM SALES2 
                                                 WHERE store_year ={store_year} and 
                                                     store_week = '{store_week}' and 
                                                     store_number = {store_number} and 
@@ -330,7 +374,8 @@ class Replenishment():
 
             if duplicate_check_len == 1:
 
-                salesupdate(transition_date_range,
+                salesupdate(transition_year,
+                            transition_season,
                             store_year,
                             store_week,
                             store_number,
@@ -343,17 +388,18 @@ class Replenishment():
                             self.connection_pool)
                 update += 1
             else:
-                sales_insert(transition_date_range,
-                             store_year,
-                             store_week,
-                             store_number,
-                             upc,
-                             sales,
-                             qty,
-                             current_year,
-                             current_week,
-                             store_type,
-                             self.connection_pool)
+                sales_insert(transition_year,
+                            transition_season,
+                            store_year,
+                            store_week,
+                            store_number,
+                            upc,
+                            sales,
+                            qty,
+                            current_year,
+                            current_week,
+                            store_type,
+                            self.connection_pool)
                 insert += 1
                 inserted_list.append(i)
 
@@ -398,109 +444,154 @@ class Replenishment():
 
         itemsupport = pd.read_excel(f'{file}.xlsx')
 
+        update = 0
+        insert = 0
+
         item_support = len(itemsupport)
         i = 0
 
         while i < item_support:
 
-            season = itemsupport.iloc[i, 0]
-            category = itemsupport.iloc[i, 1]
-            type = itemsupport.iloc[i, 2]
-            style = itemsupport.iloc[i, 3]
-            additional = itemsupport.iloc[i, 4]
-            display_size = itemsupport.iloc[i, 5]
-            pog_type = itemsupport.iloc[i, 6]
-            upc = itemsupport.iloc[i, 7]
-            code = itemsupport.iloc[i, 8]
-            code_qb = itemsupport.iloc[i, 9]
-            unique_replen_code = itemsupport.iloc[i, 10]
-            case_size = itemsupport.iloc[i, 11]
-            item_group_desc = itemsupport.iloc[i, 12]
-            item_desc = itemsupport.iloc[i, 13]
-            packing = itemsupport.iloc[i, 14]
-            upc_11_digit = itemsupport.iloc[i, 15]
+            season = itemsupport.loc[i, 'season']
+            category = itemsupport.loc[i, 'category']
+            type = itemsupport.loc[i, 'type']
+            style = itemsupport.loc[i, 'style']
+            additional = itemsupport.loc[i, 'additional']
+            display_size = itemsupport.loc[i, 'display_size']
+            pog_type = itemsupport.loc[i, 'pog_type']
+            upc = itemsupport.loc[i, 'upc']
+            code = itemsupport.loc[i, 'code']
+            code_qb = itemsupport.loc[i, 'code_qb']
+            unique_replen_code = itemsupport.loc[i, 'unique_replen_code']
+            case_size = itemsupport.loc[i, 'case_size']
+            item_group_desc = itemsupport.loc[i, 'item_group_desc']
+            item_desc = itemsupport.loc[i, 'item_desc']
+            packing = itemsupport.loc[i, 'packing']
+            upc_11_digit = str(int(itemsupport.loc[i, 'upc_11_digit']))
 
-            item_support_insert(season,
-                                category,
-                                type,
-                                style,
-                                additional,
-                                display_size,
-                                pog_type,
-                                upc,
-                                code,
-                                code_qb,
-                                unique_replen_code,
-                                case_size,
-                                item_group_desc,
-                                item_desc,
-                                packing,
-                                upc_11_digit,
-                                self.connection_pool)
+            duplicate_check = psql.read_sql(f"""
+                                                select * from item_support2
+                                                where code = '{code}' 
+                                                """, self.connection)
+
+            if len(duplicate_check) == 1:
+
+                item_support_update(season,
+                                    category,
+                                    type,
+                                    style,
+                                    additional,
+                                    display_size,
+                                    pog_type,
+                                    upc,
+                                    code,
+                                    code_qb,
+                                    unique_replen_code,
+                                    case_size,
+                                    item_group_desc,
+                                    item_desc,
+                                    packing,
+                                    upc_11_digit,
+                                    self.connection_pool)
+                update += 1
+
+            else:
+
+                item_support_insert(season,
+                                    category,
+                                    type,
+                                    style,
+                                    additional,
+                                    display_size,
+                                    pog_type,
+                                    upc,
+                                    code,
+                                    code_qb,
+                                    unique_replen_code,
+                                    case_size,
+                                    item_group_desc,
+                                    item_desc,
+                                    packing,
+                                    upc_11_digit,
+                                    self.connection_pool)
+                insert += 1
+
             i += 1
 
+        print(f'Updated: {update}\nInserted: {insert}')
         print('\nSupport Sheet Imported')
 
     def sales_report(self):
 
-        sales_data_fequency = {
-
-            'jewel': 'weekly',
-            'kvat': 'weekly',
-            'fresh_encounter': 'weekly',
-
-            'kroger_central': 'weekly',
-            'kroger_columbus': 'weekly',
-            'kroger_columbus': 'weekly',
-            'kroger_dallas': 'weekly',
-            'kroger_delta': 'weekly',
-            'kroger_michigan': 'weekly',
-
-            'brookshire': 'weekly',
-
-            'safeway_denver': 'weekly',
-
-            'texas_division': 'ytd',
-            'acme': 'ytd',
-            'intermountain': 'ytd'
-        }
-
-        replenishment_report = replenishment(self.store_type_input)
-
-        replenishment_len = len(replenishment_report) + 1
-
         reports = Reports(self.store_type_input, self.store_setting)
 
-        sales_report = reports.sales_table()
-        item_sales_rank = reports.item_sales_rank()
-        sales_sql_YTD_Mask = reports.ytd_table_mask()
-        sales_sql_YTD_WoMask = reports.ytd_table_no_mask()
-        sales_report_len = reports.sales_report_len(sales_report)
-        on_hand = reports.on_hands()
-        no_scan = reports.no_scan()
+        date = datetime.date.today()
+        date = date.strftime("%b-%d-%Y")
 
-        if sales_data_fequency[self.store_type_input] == 'weekly':
+        filename = f'{self.store_type_input}_external_sales_report_{date}.xlsx'
+        reports.external_report(filename)
 
-            filename = weekly_toexcel(self.store_type_input,
-                                      replenishment_report,
-                                      sales_report,
-                                      no_scan,
-                                      sales_sql_YTD_Mask,
-                                      sales_sql_YTD_WoMask,
-                                      item_sales_rank,
-                                      on_hand)
+        filename = f'{self.store_type_input}_internal_sales_report_{date}.xlsx'
+        reports.internal_report(filename)
 
-            weekly_sales_report_format(filename, replenishment_len, sales_report_len)
-
-        elif sales_data_fequency[self.store_type_input] == 'ytd':
-            filename = ytd_toexcel(self.store_type_input,
-                                   replenishment_report,
-                                   sales_report, no_scan,
-                                   sales_sql_YTD_WoMask,
-                                   item_sales_rank,
-                                   on_hand)
-
-            ytd_sales_report_format(filename, replenishment_len, sales_report_len)
+        # sales_data_fequency = {
+        #
+        #     'jewel': 'weekly',
+        #     'kvat': 'weekly',
+        #     'fresh_encounter': 'weekly',
+        #
+        #     'kroger_central': 'weekly',
+        #     'kroger_columbus': 'weekly',
+        #     'kroger_columbus': 'weekly',
+        #     'kroger_dallas': 'weekly',
+        #     'kroger_delta': 'weekly',
+        #     'kroger_michigan': 'weekly',
+        #
+        #     'brookshire': 'weekly',
+        #
+        #     'safeway_denver': 'weekly',
+        #
+        #     'texas_division': 'ytd',
+        #     'acme': 'ytd',
+        #     'intermountain': 'ytd'
+        # }
+        #
+        # replenishment_report, on_hands_after_replen, replenishment_reasons = replenishment(self.store_type_input, self.store_setting)
+        #
+        # replenishment_len = len(replenishment_report) + 1
+        #
+        # reports = Reports(self.store_type_input, self.store_setting)
+        #
+        # sales_report = reports.sales_table()
+        # item_sales_rank = reports.item_sales_rank()
+        # sales_sql_YTD_Mask = reports.ytd_table_mask()
+        # sales_sql_YTD_WoMask = reports.ytd_table_no_mask()
+        # sales_report_len = reports.sales_report_len(sales_report)
+        # on_hand = reports.on_hands()
+        # no_scan = reports.no_scan(on_hand)
+        #
+        # if sales_data_fequency[self.store_type_input] == 'weekly':
+        #
+        #     filename = weekly_toexcel(self.store_type_input,
+        #                               replenishment_report,
+        #                               sales_report,
+        #                               no_scan,
+        #                               sales_sql_YTD_Mask,
+        #                               sales_sql_YTD_WoMask,
+        #                               item_sales_rank,
+        #                               on_hand, self.store_setting)
+        #
+        #     weekly_sales_report_format(filename, replenishment_len, sales_report_len)
+        #
+        # elif sales_data_fequency[self.store_type_input] == 'ytd':
+        #     filename = ytd_toexcel(self.store_type_input,
+        #                            replenishment_report,
+        #                            sales_report, no_scan,
+        #                            sales_sql_YTD_WoMask,
+        #                            item_sales_rank,
+        #                            on_hand)
+        #
+        #     ytd_sales_report_format(filename, replenishment_len, sales_report_len)
 
         print("\nSales Report Generated")
 
@@ -560,8 +651,8 @@ class Replenishment():
 
         while i < store_approval_df_len:
 
-            code = store_approval_df.iloc[i, 0]
-            store_price = store_approval_df.iloc[i, 1]
+            code = store_approval_df.loc[i, 'code']
+            store_price = store_approval_df.loc[i, 'store_price']
 
             item_approval_insert(code, store_price, self.connection_pool)
 
@@ -587,11 +678,6 @@ class Replenishment():
             i += 1
 
         print('\nInventory list imported')
-
-
-    def playground(self):
-        a = replenishmentv2(self.store_type_input, self.store_setting)
-        return a
 
 
 
