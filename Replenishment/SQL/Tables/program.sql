@@ -128,6 +128,12 @@ CREATE TABLE inventory
     on_hand numeric not null
 )
 
+CREATE TABLE item_size
+(
+    code character varying(20) not null PRIMARY KEY,
+    size varchar(15)
+)
+
 
 
 /*sameple data

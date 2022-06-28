@@ -679,6 +679,36 @@ class Replenishment():
 
         print('\nInventory list imported')
 
+    def size_table_update(self, file):
+
+        size_table = pd.read_excel(f'{file}.xlsx')
+
+        update = 0
+        insert = 0
+        i = 0
+
+        while i < len(size_table):
+
+            code = size_table.loc[i, 'code']
+            size = size_table.loc[i, 'size']
+
+            duplicate_check = psql.read_sql(f"""select * from item_size where code = '{code}' """, self.connection)
+
+            if len(duplicate_check) == 1:
+
+                size_table_update(code,size,self.connection_pool)
+                update+=1
+
+            else:
+
+                size_table_insert(code,size,self.connection_pool)
+                insert+=1
+
+            i+=1
+
+        print(f"Updated: {update}\nInserted: {insert}\n Store Table Updated")
+
+
 
 
 
