@@ -8,6 +8,7 @@ psycopg2.extensions.register_adapter(np.int64, psycopg2._psycopg.AsIs)
 import re
 import pandas as pd
 from datetime import datetime
+import datetime as dt
 
 
 def kroger_transform(file, store_type_input, transition_year, transition_season, current_year, current_week):
@@ -253,80 +254,89 @@ def safeway_denver_transform(file, transition_year, transition_season, current_y
     return salesdata
 
 
-def jewel_transform(file, transition_date_range, current_year, current_week, connection):
+def jewel_transform(file, transition_year, transition_season, current_year, current_week, connection):
 
-    old = pd.read_excel(f'{file}.xlsx', sheet_name='Product Scan', skiprows=1)
+    """Transform sales data  for jewel osco does not need the inputs of current_year or current_week"""
 
-    # inserting neccessary collumns for sales insert function
-    old['transition_date_range'] = transition_date_range
-    old['current_year'] = current_year
-    old['current_week'] = current_week
+    old = pd.read_excel(f'{file}', sheet_name='Product Scan', skiprows=1)
 
-    # grabbing the date to get the store year
+    # verify data
 
-    date = old.iloc[0, 3]
-    store_year = date.year
-    old['store_year'] = store_year
+    verify = old.loc[0, 'Division']
+    if 'JEWEL' in verify:
+        verify = 'pass'
 
-    # Grabs only the neccessary collumns and reformats them into the neccesary df format for the sale insertert function
-    old = old[['transition_date_range',
-               'store_year',
-               'Day',
-               'Store',
-               'UPC',
-               'Sum Net Amount',
-               'Sum Item Quantity',
-               'current_year',
-               'current_week',
-               'Division']]
+    if verify == 'pass':
+        # inserting neccessary collumns for sales insert function
+        old['transition_year'] = transition_year
+        old['transition_season'] = transition_season
+        old['store_year'] = 0
+        old['current_year'] = 0
+        old['current_week'] = 0
 
-    old = old.rename(columns={
-        'Division': 'store_type',
-        'Store': 'store_number',
-        'UPC': 'upc',
-        'Sum Net Amount': 'sales',
-        'Sum Item Quantity': 'qty',
-        'Day': 'store_week'
-    })
+        # Grabs only the neccessary collumns and reformats them into the neccesary df format for the sale insertert function
+        old = old[['transition_year',
+                   'transition_season',
+                   'store_year',
+                   'Day',
+                   'Store',
+                   'UPC',
+                   'Sum Net Amount',
+                   'Sum Item Quantity',
+                   'current_year',
+                   'current_week',
+                   'Division']]
 
-    # extracting only the store division name from colllumn and then lower caseing it so it can pass the db security check
-    old['store_type'] = old.store_type.str.replace('[^a-zA-Z]', '')
-    old['store_type'] = old.store_type.str.lower()
+        old = old.rename(columns={
+            'Division': 'store_type',
+            'Store': 'store_number',
+            'UPC': 'upc',
+            'Sum Net Amount': 'sales',
+            'Sum Item Quantity': 'qty',
+            'Day': 'store_week'
+        })
 
-    # Find the last date in the db
+        # extracting only the store division name from colllumn and then lower caseing it so it can pass the db security check
+        old['store_type'] = old.store_type.str.replace('[^a-zA-Z]', '')
+        old['store_type'] = old.store_type.str.lower()
 
-    date = psql.read_sql('select max(store_week) from sales', connection)
-    date = pd.Timestamp(date.iloc[0, 0])
+        # Find the last date in the db
 
-    # sorts dates in order and then drops current week so current week can be added based on store_week
-    old = old.sort_values(by='store_week', ascending=True)
+        date = psql.read_sql('select max(store_week) from sales2', connection)
+        date = pd.Timestamp(date.iloc[0, 0])
 
-    old = old.drop(columns=['current_week'])
+        # sorts dates in order
+        old = old.sort_values(by='store_week', ascending=True)
 
-    # using that date select the data from that date to present day in the sales sheet.
+        # using that date select the data from that date to present day in the sales sheet.
+        filt = (old['store_week'] >= date)
+        old = old.loc[filt]
 
-    filt = (old['store_week'] >= date)
+        # assigns store year, current year, and current week using the store_week column.
+        # Note that when finding the week number for the current week the week begins on Sunday and ends on Saturday
+        # this is per the CVS Schedule
 
-    old = old.loc[filt]
+        old['store_year'] = old['store_week'].dt.year
+        old['current_year'] = old['store_week'].dt.year
+        old['current_week'] = old['store_week'].apply(lambda x: (x + dt.timedelta(days=1)).week)
 
-    # uses to the dates from store_week and finds their week number they are on
-    old[['year', 'current_week', 'day']] = old['store_week'].dt.isocalendar()
+        salesdata = old[['transition_year',
+                         'transition_season',
+                         'store_year',
+                         'store_week',
+                         'store_number',
+                         'upc',
+                         'sales',
+                         'qty',
+                         'current_year',
+                         'current_week',
+                         'store_type']]
 
-    # drops unneccesary collumns and reorders columns converts data types
-    old = old.drop(columns=['year', 'day'])
+        salesdata = salesdata.reset_index(drop=True)
 
-    old['current_week'] = old['current_week'].astype(np.int64)
-
-    salesdata = old[['transition_date_range',
-                     'store_year',
-                     'store_week',
-                     'store_number',
-                     'upc',
-                     'sales',
-                     'qty',
-                     'current_year',
-                     'current_week',
-                     'store_type']]
+    else:
+        salesdata = "Failed"
+        print("\n\nFAILED DATA VERIFICATION")
 
     return salesdata
 
@@ -361,7 +371,7 @@ def approval_transform(store_type_input, file):
 
     try:
         store_price_column_name = store_price_column_name[f'{store_type_input}']
-
+        print()
         approval = approval[['Item', f'{store_price_column_name}']]
 
         approval = approval.rename(columns={f'{store_price_column_name}': 'store_price',
