@@ -256,17 +256,30 @@ def store_insert(store_id, initial, notes, connection_pool):
     connection_pool.putconn(connection)
 
 
-def store_program_insert(store_id, program_id, activity, connection_pool):
+def store_program_insert(store_program_id,store_id, program_id, activity, connection_pool):
 
     connection = connection_pool.getconn()
     cursor = connection.cursor()
-    cursor.execute("INSERT INTO store_program (store_id, program_id, activity) values (%s,%s,%s)",
-           (store_id, program_id, activity))
+    cursor.execute("INSERT INTO store_program (store_program_id, store_id, program_id, activity) values (%s,%s,%s,%s)",
+           (store_program_id,store_id, program_id, activity))
 
     connection.commit()
     cursor.close()
     connection_pool.putconn(connection)
 
+def store_program_update(store_program_id,store_id, program_id, activity, connection_pool):
+
+    connection = connection_pool.getconn()
+    cursor = connection.cursor()
+    cursor.execute(
+        f"""update store_program set store_id = '{store_id}',
+                                    program_id = '{program_id}',
+                                    activity = '{activity}'
+            where store_program_id = '{store_program_id}'""")
+
+    connection.commit()
+    cursor.close()
+    connection_pool.putconn(connection)
 
 def master_planogram_insert(program_id, carded, long_hanging_top, long_hanging_dress, connection_pool):
 
@@ -280,7 +293,6 @@ def master_planogram_insert(program_id, carded, long_hanging_top, long_hanging_d
     cursor.close()
     connection_pool.putconn(connection)
 
-
 def item_approval_insert(code, store_price, connection_pool):
 
     connection = connection_pool.getconn()
@@ -291,7 +303,6 @@ def item_approval_insert(code, store_price, connection_pool):
     connection.commit()
     cursor.close()
     connection_pool.putconn(connection)
-
 
 def inventory_insert(code, on_hand, connection_pool):
 
@@ -304,6 +315,15 @@ def inventory_insert(code, on_hand, connection_pool):
     cursor.close()
     connection_pool.putconn(connection)
 
+def inventory_update(code, on_hand, connection_pool):
+    connection = connection_pool.getconn()
+    cursor = connection.cursor()
+    cursor.execute(
+        f"update inventory set on_hand = '{on_hand}' where code = '{code}'")
+
+    connection.commit()
+    cursor.close()
+    connection_pool.putconn(connection)
 
 def size_table_insert(code,size,connection_pool):
     connection = connection_pool.getconn()

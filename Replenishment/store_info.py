@@ -332,7 +332,7 @@ class Replenishment():
 
         elif self.store_type_input == 'jewel':
 
-            salesdata = jewel_transform(file, self.transition_date_range, self.current_year, self.current_week, self.connection)
+            salesdata = jewel_transform(file, self.transition_year, self.transition_season, self.current_year, self.current_week, self.connection)
 
         # elif self.store_type_input == 'brookshire':
         #
@@ -614,16 +614,33 @@ class Replenishment():
 
         new_len = len(self.store_programs)
         i = 0
+        update = 0
+        insert = 0
         while i < new_len:
 
-            store_id = self.store_programs.iloc[i, 0]
-            program_id = self.store_programs.iloc[i, 1]
-            activity = self.store_programs.iloc[i, 2]
+            store_program_id = self.store_programs.iloc[i, 0]
+            store_id = self.store_programs.iloc[i, 1]
+            program_id = self.store_programs.iloc[i, 2]
+            activity = self.store_programs.iloc[i, 3]
 
-            store_program_insert(store_id, program_id, activity, self.connection_pool)
+            duplicate_check = psql.read_sql(f"""select * from store_program
+                                                where store_program_id = '{store_program_id}' 
+                                             """, self.connection)
+
+            if len(duplicate_check) == 1:
+
+                store_program_update(store_program_id,store_id, program_id, activity,self.connection_pool)
+                update += 1
+
+            else:
+
+                store_program_insert(store_program_id, store_id, program_id, activity, self.connection_pool)
+                insert += 1
 
             i += 1
         print('\n Store Program Data Imported')
+        print('Updated:', update, 'Records')
+        print('Inserted:', insert, 'Records')
 
     def master_planogram_import(self):
 
@@ -667,17 +684,33 @@ class Replenishment():
         inventory_df_len = len(inventory_df)
 
         i = 0
+        update = 0
+        insert = 0
 
         while i < inventory_df_len:
 
             code = inventory_df.iloc[i, 0]
             on_hand = inventory_df.iloc[i, 1]
 
-            inventory_insert(code, on_hand, self.connection_pool)
+            duplicate_check = psql.read_sql(f"""select * from inventory
+                                                where code = '{code}' 
+                                                            """, self.connection)
+
+            if len(duplicate_check) == 1:
+
+                inventory_update(code, on_hand, self.connection_pool)
+                update+=1
+
+            else:
+
+                inventory_insert(code, on_hand, self.connection_pool)
+                insert+=1
 
             i += 1
 
         print('\nInventory list imported')
+        print('Updated:', update, 'Records')
+        print('Inserted:', insert, 'Records')
 
     def size_table_update(self, file):
 
