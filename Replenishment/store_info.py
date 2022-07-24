@@ -20,12 +20,12 @@ class Replenishment():
         self.store_type_input = store_type_input
         
         self.connection_pool = pool.SimpleConnectionPool(1, 10000, 
-                                            database= f"{self.store_type_input}", 
+                                            database= "Grocery",
                                             user="postgres", 
                                             password="winwin", 
                                             host="localhost")
 
-        self.connection = psycopg2.connect(database=f"{self.store_type_input}", user="postgres", password="winwin", host="localhost")
+        self.connection = psycopg2.connect(database=f"Grocery", user="postgres", password="winwin", host="localhost")
 
         self.current_year = current_year
 
@@ -176,7 +176,12 @@ class Replenishment():
             'ALBERTSONS DENVER': 'safeway_denver',
             'TEXAS DIVISION': 'texas_division',
             'KVAT FOOD STORES': 'kvat',
-            'FRESH ENCOUNTER': 'fresh_encounter'
+            'FRESH ENCOUNTER': 'fresh_encounter',
+            'KROGER KING SOOPERS': 'kroger_king_soopers',
+            'KROGER DILLONS': 'kroger_dillons',
+            'KROGER CINCINNATI': 'kroger_cincinatti',
+            'KROGER ATLANTA': 'kroger_atlanta',
+            'KROGER NASHVILLE': 'kroger_nashville'
 
         }
 
@@ -293,7 +298,8 @@ class Replenishment():
             sales_insert(transition_year, transition_season, store_year, store_week, store_number, upc, sales, qty,
                          current_year, current_week,
                          store_type,
-                         self.connection_pool)
+                         self.connection_pool,
+                         self.store_type_input)
             i += 1
 
         if store_type == self.store_type_input:
@@ -518,8 +524,8 @@ class Replenishment():
 
             i += 1
 
-        print(f'Updated: {update}\nInserted: {insert}')
         print('\nSupport Sheet Imported')
+        print(f'Updated: {update}\nInserted: {insert}')
 
     def sales_report(self):
 
@@ -644,19 +650,38 @@ class Replenishment():
 
     def master_planogram_import(self):
 
-        new_len = len(self.master_planogram)
         i = 0
-        while i < new_len:
+        update = 0
+        insert = 0
+
+        while i < len(self.master_planogram):
 
             program_id = self.master_planogram.iloc[i, 0]
             carded = self.master_planogram.iloc[i, 1]
             long_hanging_top = self.master_planogram.iloc[i, 2]
             long_hanging_dress = self.master_planogram.iloc[i, 3]
 
-            master_planogram_insert(program_id, carded, long_hanging_top, long_hanging_dress, self.connection_pool)
+
+            duplicate_check = psql.read_sql(f"""select * from master_planogram
+                                                where program_id = '{program_id}' 
+                                                            """, self.connection)
+
+            if len(duplicate_check) == 1:
+
+                master_planogram_update(program_id, carded, long_hanging_top, long_hanging_dress, self.connection_pool)
+
+                update+=1
+
+            else:
+
+                master_planogram_insert(program_id, carded, long_hanging_top, long_hanging_dress, self.connection_pool)
+                insert+=1
 
             i += 1
-        print('\n Master Planogram Data Imported')
+
+        print('\nMaster Planogram list imported')
+        print('Updated:', update, 'Records')
+        print('Inserted:', insert, 'Records')
 
     def store_approval_import(self, file):
 
