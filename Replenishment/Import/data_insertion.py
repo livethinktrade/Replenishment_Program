@@ -45,13 +45,13 @@ def casecapacity_insert(store_type,
 
 def delivery_update(transition_year, transition_season,
                    type, date, upc, store, qty,
-                   store_type, num, code, connection_pool):
+                   store_type, num, code, connection_pool, store_type_input):
 
     """ new delivery update"""
 
     connection = connection_pool.getconn()
     cursor = connection.cursor()
-    cursor.execute(f"""update delivery2 set qty = {qty}, transition_year ='{transition_year}', 
+    cursor.execute(f"""update {store_type_input}.delivery2 set qty = {qty}, transition_year ='{transition_year}', 
                         transition_season ='{transition_season}' 
                         WHERE type ='{type}' and 
                         date = '{date}' and 
@@ -71,14 +71,14 @@ def delivery_update(transition_year, transition_season,
 def delivery_insert(transition_year,
                     transition_season,
                     type, date, upc, store, qty, store_type,
-                    num, code, connection_pool):
+                    num, code, connection_pool, store_type_input):
 
     """new delivery insert"""
 
     connection = connection_pool.getconn()
     cursor = connection.cursor()
     cursor.execute(
-        """INSERT INTO delivery2 (transition_year, transition_season,type, date, upc, store, qty, store_type, num, code)
+        f"""INSERT INTO {store_type_input}.delivery2 (transition_year, transition_season,type, date, upc, store, qty, store_type, num, code)
                                 values (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)""",
         (transition_year, transition_season, type, date, upc, store, qty, store_type, num, code))
 
@@ -99,11 +99,12 @@ def salesupdate(transition_year,
                 current_year,	
                 current_week,	
                 store_type,
-                connection_pool):
+                connection_pool,
+                store_type_input):
  
     connection = connection_pool.getconn()
     cursor = connection.cursor()
-    cursor.execute(f"""update sales2 
+    cursor.execute(f"""update {store_type_input}.sales2 
                         set qty = {qty}, 
                             transition_year ='{transition_year}',
                             transition_season = '{transition_season}',
@@ -131,13 +132,14 @@ def sales_insert(transition_year,
                  current_year,
                  current_week,
                  store_type,
-                 connection_pool):
+                 connection_pool,
+                 store_type_input):
 
     """New Sales Insert"""
 
     connection = connection_pool.getconn()
     cursor = connection.cursor()
-    cursor.execute("""INSERT INTO sales2 (transition_year, transition_season,store_year,
+    cursor.execute(f"""INSERT INTO {store_type_input}.sales2 (transition_year, transition_season,store_year,
                                         store_week,store_number,upc,sales,qty,current_year,
                                         current_week,store_type)
                         values (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)""",
@@ -244,11 +246,11 @@ def item_support_update(season,
 
 
 
-def store_insert(store_id, initial, notes, connection_pool):
+def store_insert(store_id, initial, notes, connection_pool, store_type_input):
 
     connection = connection_pool.getconn()
     cursor = connection.cursor()
-    cursor.execute("INSERT INTO store (store_id, initial, notes) values (%s,%s,%s)",
+    cursor.execute(f"INSERT INTO {store_type_input}.store (store_id, initial, notes) values (%s,%s,%s)",
            (store_id, initial, notes))
 
     connection.commit()
@@ -256,23 +258,23 @@ def store_insert(store_id, initial, notes, connection_pool):
     connection_pool.putconn(connection)
 
 
-def store_program_insert(store_program_id,store_id, program_id, activity, connection_pool):
+def store_program_insert(store_program_id,store_id, program_id, activity, connection_pool, store_type_input):
 
     connection = connection_pool.getconn()
     cursor = connection.cursor()
-    cursor.execute("INSERT INTO store_program (store_program_id, store_id, program_id, activity) values (%s,%s,%s,%s)",
+    cursor.execute(f"INSERT INTO {store_type_input}.store_program (store_program_id, store_id, program_id, activity) values (%s,%s,%s,%s)",
            (store_program_id,store_id, program_id, activity))
 
     connection.commit()
     cursor.close()
     connection_pool.putconn(connection)
 
-def store_program_update(store_program_id,store_id, program_id, activity, connection_pool):
+def store_program_update(store_program_id,store_id, program_id, activity, connection_pool, store_type_input):
 
     connection = connection_pool.getconn()
     cursor = connection.cursor()
     cursor.execute(
-        f"""update store_program set store_id = '{store_id}',
+        f"""update {store_type_input}.store_program set store_id = '{store_id}',
                                     program_id = '{program_id}',
                                     activity = '{activity}'
             where store_program_id = '{store_program_id}'""")
@@ -293,11 +295,22 @@ def master_planogram_insert(program_id, carded, long_hanging_top, long_hanging_d
     cursor.close()
     connection_pool.putconn(connection)
 
-def item_approval_insert(code, store_price, connection_pool):
+def master_planogram_update(program_id, carded, long_hanging_top, long_hanging_dress, connection_pool):
 
     connection = connection_pool.getconn()
     cursor = connection.cursor()
-    cursor.execute("INSERT INTO item_approval (code, store_price) values (%s,%s)",
+    cursor.execute(
+        f"""update master_planogram set carded = '{carded}',
+                                    long_hanging_top = '{long_hanging_top}',
+                                    long_hanging_dress = '{long_hanging_dress}'
+            where program_id = '{program_id}'""")
+
+
+def item_approval_insert(code, store_price, connection_pool, store_type_input):
+
+    connection = connection_pool.getconn()
+    cursor = connection.cursor()
+    cursor.execute(f"INSERT INTO {store_type_input}.item_approval (code, store_price) values (%s,%s)",
                    (code, store_price))
 
     connection.commit()
