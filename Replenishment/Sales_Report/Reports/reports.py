@@ -206,8 +206,8 @@ class Reports:
 
                 item_sales_rank.to_excel(writer, sheet_name="Sales Report",
                                          index=True,
-                                         columns=('item_group_desc', 'sales'),
-                                         header=('item', 'sales ($)'),
+                                         columns=('item_group_desc', 'sales','sales per active store', 'active stores','percent_of_total_sales'),
+                                         header=('item', 'sales ($)','Sales Per Active Store','Active Stores', '% of Annual Sales'),
                                          startrow=14,
                                          startcol=12)
 
