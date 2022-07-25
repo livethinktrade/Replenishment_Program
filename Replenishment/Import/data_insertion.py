@@ -330,6 +330,19 @@ def item_approval_insert(code, store_price, connection_pool, store_type_input):
     cursor.close()
     connection_pool.putconn(connection)
 
+def item_approval_update(code, store_price, connection_pool, store_type_input):
+
+    connection = connection_pool.getconn()
+    cursor = connection.cursor()
+    cursor.execute(
+        f"""update {store_type_input}.item_approval set store_price = '{store_price}'
+            where code = '{code}'""")
+
+    connection.commit()
+    cursor.close()
+    connection_pool.putconn(connection)
+
+
 def inventory_insert(code, on_hand, connection_pool):
 
     connection = connection_pool.getconn()
