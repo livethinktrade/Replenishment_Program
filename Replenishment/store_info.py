@@ -606,16 +606,37 @@ class Replenishment():
 
         new_len = len(self.store_notes)
         i = 0
+        update = 0
+        insert = 0
+
         while i < new_len:
 
             store_id = self.store_notes.iloc[i, 0]
             initial = self.store_notes.iloc[i, 1]
             notes = self.store_notes.iloc[i, 2]
 
-            store_insert(store_id, initial, notes, self.connection_pool, self.store_type_input)
+            duplicate_check = psql.read_sql(f"""select * from {self.store_type_input}.store
+                                                            where store_id = '{store_id}' 
+                                                         """, self.connection)
+
+            if len(duplicate_check) == 1:
+
+                store_update(store_id, initial, notes, self.connection_pool, self.store_type_input)
+
+                update += 1
+
+            else:
+
+                store_insert(store_id, initial, notes, self.connection_pool, self.store_type_input)
+
+                insert += 1
 
             i += 1
+
         print('\n Store Data Imported')
+        print('Updated:', update, 'Records')
+        print('Inserted:', insert, 'Records')
+
 
     def store_program_import(self):
 
@@ -691,17 +712,46 @@ class Replenishment():
         store_approval_df_len = len(store_approval_df)
 
         i = 0
+        insert = 0
+        update = 0
 
         while i < store_approval_df_len:
 
             code = store_approval_df.loc[i, 'code']
             store_price = store_approval_df.loc[i, 'store_price']
 
-            item_approval_insert(code, store_price, self.connection_pool, self.store_type_input)
+            #try and execpt is neccessary right here because POG quickbook codes have a apostophie in them and it
+            # messes with the sql below
+
+            try:
+
+                duplicate_check = psql.read_sql(f"""select * from {self.store_type_input}.item_approval
+                                                        where code = '{code}' 
+               
+                                                                    """, self.connection)
+
+                if len(duplicate_check) == 1:
+
+                    item_approval_update(code, store_price, self.connection_pool, self.store_type_input)
+
+                    update += 1
+
+                else:
+
+                    item_approval_insert(code, store_price, self.connection_pool, self.store_type_input)
+                    insert += 1
+
+            except:
+
+                pass
+
 
             i += 1
 
-        print('\nApproval list imported')
+        print('\nItem Approval List Imported')
+        print('Updated:', update, 'Records')
+        print('Inserted:', insert, 'Records')
+
 
     def inventory_import(self, file):
 
