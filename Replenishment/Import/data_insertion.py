@@ -257,6 +257,19 @@ def store_insert(store_id, initial, notes, connection_pool, store_type_input):
     cursor.close()
     connection_pool.putconn(connection)
 
+def store_update(store_id, initial, notes, connection_pool, store_type_input):
+    connection = connection_pool.getconn()
+    cursor = connection.cursor()
+    cursor.execute(
+        f"""update {store_type_input}.store set initial = '{initial}',
+                                     notes = '{notes}'
+             where store_id = '{store_id}'""")
+
+    connection.commit()
+    cursor.close()
+    connection_pool.putconn(connection)
+
+
 
 def store_program_insert(store_program_id,store_id, program_id, activity, connection_pool, store_type_input):
 
