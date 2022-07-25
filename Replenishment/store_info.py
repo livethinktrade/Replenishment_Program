@@ -93,7 +93,8 @@ class Replenishment():
                             store_type,
                             num,
                             code,
-                            self.connection_pool)
+                            self.connection_pool,
+                            self.store_type_input)
 
             i += 1
 
@@ -249,13 +250,13 @@ class Replenishment():
 
             if duplicate_check_len == 1:
                 delivery_update(transition_year, transition_season, type, date,
-                                upc, store, qty, store_type, num, code, self.connection_pool)
+                                upc, store, qty, store_type, num, code, self.connection_pool,self.store_type_input)
                 update += 1
             else:
                 delivery_insert(transition_year,
                                 transition_season,
                                 type, date, upc, store, qty, store_type,
-                                num, code, self.connection_pool)
+                                num, code, self.connection_pool, self.store_type_input)
                 insert += 1
 
             i += 1
@@ -611,7 +612,7 @@ class Replenishment():
             initial = self.store_notes.iloc[i, 1]
             notes = self.store_notes.iloc[i, 2]
 
-            store_insert(store_id, initial, notes, self.connection_pool)
+            store_insert(store_id, initial, notes, self.connection_pool, self.store_type_input)
 
             i += 1
         print('\n Store Data Imported')
@@ -629,18 +630,18 @@ class Replenishment():
             program_id = self.store_programs.iloc[i, 2]
             activity = self.store_programs.iloc[i, 3]
 
-            duplicate_check = psql.read_sql(f"""select * from store_program
+            duplicate_check = psql.read_sql(f"""select * from {self.store_type_input}.store_program
                                                 where store_program_id = '{store_program_id}' 
                                              """, self.connection)
 
             if len(duplicate_check) == 1:
 
-                store_program_update(store_program_id,store_id, program_id, activity,self.connection_pool)
+                store_program_update(store_program_id,store_id, program_id, activity,self.connection_pool, self.store_type_input)
                 update += 1
 
             else:
 
-                store_program_insert(store_program_id, store_id, program_id, activity, self.connection_pool)
+                store_program_insert(store_program_id, store_id, program_id, activity, self.connection_pool, self.store_type_input)
                 insert += 1
 
             i += 1
@@ -696,7 +697,7 @@ class Replenishment():
             code = store_approval_df.loc[i, 'code']
             store_price = store_approval_df.loc[i, 'store_price']
 
-            item_approval_insert(code, store_price, self.connection_pool)
+            item_approval_insert(code, store_price, self.connection_pool, self.store_type_input)
 
             i += 1
 

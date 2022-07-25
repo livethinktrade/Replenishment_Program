@@ -13,7 +13,7 @@ class ReportsData:
 
         self.store_setting = store_setting
 
-        self.connection = psycopg2.connect(database=f"{self.store_type_input}",
+        self.connection = psycopg2.connect(database=f"Grocery",
                                            user="postgres",
                                            password="winwin",
                                            host="localhost")
@@ -24,24 +24,27 @@ class ReportsData:
                                 'kroger_michigan',
                                 'kroger_columbus',
                                 'kroger_atlanta',
-                                'kroger_cincinnati',
+                                'kroger_cincinatti',
                                 'kroger_dillons',
-                                'kroger_king_sooper',
+                                'kroger_king_soopers',
                                 'kroger_louisville',
                                 'kroger_nashville']:
 
             self.week = 'store_week'
-        else:
+        elif store_type_input in ['intermountain', 'acme','texas_division', 'kvat', 'safeway_denver', 'jewel']:
             self.week = 'current_week'
+
+        else:
+            print('\n Store has not been established in list')
 
 
         # finds the current year per winwin company year
-        year = psql.read_sql("select max(current_year) from sales2;", self.connection)
+        year = psql.read_sql(f"select max(current_year) from {store_type_input}.sales2;", self.connection)
 
         # finds the current week the store is on
         self.store_year = year.iloc[0, 0]
 
-        num = psql.read_sql(f"select max({self.week}) from sales2 where store_year = {self.store_year}", self.connection)
+        num = psql.read_sql(f"select max({self.week}) from {store_type_input}.sales2 where store_year = {self.store_year}", self.connection)
         self.week_num = num.iloc[0, 0]
 
         # This line is neccesary for jewel because when the sales data comes in on monday it usually
@@ -56,140 +59,8 @@ class ReportsData:
         # more important for new stores rather than old.
         # helps calculate the avg store sales
 
-        num = psql.read_sql(f"select distinct({self.week}) from sales2 where store_year = {self.store_year}", self.connection)
+        num = psql.read_sql(f"select distinct({self.week}) from {self.store_type_input}.sales2 where store_year = {self.store_year}", self.connection)
         self.num = len(num)
-
-    # def sales_table(self):
-    #
-    #     """old sales table"""
-    #
-    #     # creates sales table along with sales $ per store and previous year performance
-    #
-    #     sales_sql = f"""
-    #         with date as (
-    #             select distinct store_number
-    #             from sales
-    #             order by store_number asc),
-    #
-    #             current_week as (
-    #
-    #                 select store_number, store_year, {self.week}, sum(sales) as sales
-    #                 from sales
-    #                 inner join item_support on sales.upc = item_support.upc_11_digit
-    #
-    #                 where store_year = {self.store_year} and
-    #                     {self.week} = {self.week_num} and
-    #                     (item_support.gm = 'AY' or item_support.gm = 'SS' or item_support.gm = 'FW')
-    #
-    #                 group by store_number, store_year, {self.week}
-    #
-    #                 order by store_number asc),
-    #
-    #             previous_week as (
-    #
-    #                 select store_number, store_year, {self.week}, sum(sales) as sales
-    #                 from sales
-    #                 inner join item_support on sales.upc = item_support.upc_11_digit
-    #
-    #                 where store_year = {self.store_year} and
-    #                     {self.week} = {self.week_num}-1 and
-    #                     (item_support.gm = 'AY' or item_support.gm = 'SS' or item_support.gm = 'FW')
-    #
-    #                 group by store_number, store_year, {self.week}
-    #
-    #                 order by store_number asc),
-    #
-    #             previous_year_week as (
-    #                 select store_number, store_year, {self.week}, sum(sales) as sales
-    #                 from sales
-    #                 inner join item_support on sales.upc = item_support.upc_11_digit
-    #
-    #                 where store_year = {self.store_year}-1 and
-    #                     {self.week} = {self.week_num} and
-    #                     (item_support.gm = 'AY' or item_support.gm = 'SS' or item_support.gm = 'FW')
-    #
-    #                 group by store_number, store_year, {self.week}
-    #
-    #                 order by store_number asc),
-    #
-    #             current_ytd_week as (
-    #
-    #                 select store_number, store_year, sum(sales) as sales
-    #                 from sales
-    #                 inner join item_support on sales.upc = item_support.upc_11_digit
-    #
-    #                 where store_year = {self.store_year} and
-    #                     {self.week} <= {self.week_num} and
-    #                     (item_support.gm = 'AY' or item_support.gm = 'SS' or item_support.gm = 'FW')
-    #
-    #                 group by store_number, store_year
-    #
-    #                 order by store_number asc),
-    #
-    #
-    #             previous_ytd_week as (
-    #
-    #
-    #                 select store_number, store_year, sum(sales) as sales
-    #                 from sales
-    #                 inner join item_support on sales.upc = item_support.upc_11_digit
-    #                 /*looks for previous year so maybe max -1 when finding innitial start for python program*/
-    #                 where store_year = {self.store_year}-1 and
-    #                     {self.week} <= {self.week_num} and
-    #                     (item_support.gm = 'AY' or item_support.gm = 'SS' or item_support.gm = 'FW')
-    #
-    #                 group by store_number, store_year
-    #
-    #                 order by store_number asc)
-    #
-    #         select
-    #             date.store_number,
-    #             current_week.sales as current_week,
-    #             previous_week.sales as previous_week,
-    #             /*WOW sales % */
-    #             case
-    #                 when current_week.sales < 0 or previous_week.sales <= 0
-    #                     then NULL
-    #                 when current_week.sales >= 0 or previous_week.sales > 0
-    #                     then round(((current_week.sales-previous_week.sales)/(previous_week.sales)),2)
-    #                 end as WOW_sales_percentage,
-    #
-    #
-    #
-    #             current_week.sales as current_week,
-    #             previous_year_week.sales as previous_year_week,
-    #             case
-    #                 when current_week.sales < 0 or previous_year_week.sales <= 0
-    #                     then NULL
-    #                 when current_week.sales >= 0 or previous_year_week.sales > 0
-    #                     then round(((current_week.sales-previous_year_week.sales)/(previous_year_week.sales)),2)
-    #                 end as YoY_sales_percentage,
-    #
-    #
-    #             current_ytd_week.sales as YTD_2022,
-    #             previous_ytd_week.sales as YTD_2021,
-    #             case
-    #                 when current_ytd_week.sales < 0 or previous_ytd_week.sales <= 0
-    #                     then NULL
-    #                 when current_ytd_week.sales >= 0 or previous_ytd_week.sales > 0
-    #                     then round(((current_ytd_week.sales-previous_ytd_week.sales)/(previous_ytd_week.sales)),2)
-    #                 end as YoY_sales_percentage
-    #
-    #
-    #         from date
-    #         full join current_week on date.store_number = current_week.store_number
-    #         full join previous_week on date.store_number = previous_week.store_number
-    #         full join previous_year_week on date. store_number = previous_year_week.store_number
-    #         full join current_ytd_week on date.store_number = current_ytd_week.store_number
-    #         full join previous_ytd_week on date.store_number = previous_ytd_week.store_number
-    #
-    #         order by current_ytd_week.sales desc
-    #
-    #         """
-    #
-    #     sales_report = psql.read_sql(f'{sales_sql}', self.connection)
-    #
-    #     return sales_report
 
     def sales_table(self):
 
@@ -220,7 +91,7 @@ class ReportsData:
                     item_support2.display_size,
                     item_support2.case_size,
                     item_support2.item_group_desc
-                FROM sales2
+                FROM {self.store_type_input}.sales2
                 inner JOIN item_support2 ON sales2.upc = item_support2.upc_11_digit),
 
             date as (
@@ -357,83 +228,6 @@ class ReportsData:
 
         return sales_report_len
 
-    # def ytd_table_no_mask(self):
-    #
-    #     """old ytd no mask"""
-    #
-    #     # This will generate YTD Sales and preveious YTD sales "Without Mask"
-    #
-    #     sales_sql_YTD_WoMask = f"""
-    #
-    #     with
-    #         store_count as (
-    #             select distinct store_number
-    #             from sales
-    #             where store_year = {self.store_year}),
-    #
-    #
-    #         current_ytd_week as (
-    #
-    #             select store_number, store_year, sum(sales) as sales
-    #             from sales
-    #             inner join item_support on sales.upc = item_support.upc_11_digit
-    #
-    #             where store_year = {self.store_year} and
-    #                 {self.week} <= {self.week_num} and
-    #                 (item_support.gm = 'AY' or item_support.gm = 'SS' or item_support.gm = 'FW')
-    #
-    #             group by store_number, store_year
-    #
-    #             order by store_number asc),
-    #
-    #         previous_ytd_week as (
-    #
-    #
-    #             select store_number, store_year, sum(sales) as sales
-    #             from sales
-    #             inner join item_support on sales.upc = item_support.upc_11_digit
-    #
-    #             /*looks for previous year so maybe max -1 when finding innitial start for python program*/
-    #             where store_year = {self.store_year}-1 and
-    #                 {self.week} <= {self.week_num} and
-    #                 (item_support.gm = 'AY' or item_support.gm = 'SS' or item_support.gm = 'FW')
-    #
-    #             group by store_number, store_year
-    #
-    #             order by store_number asc),
-    #
-    #         yearly_sum as (
-    #
-    #             select round(sum(sales)) as YTD_current,
-    #                 (select round(sum(sales)) as YTD_previous from previous_ytd_week)
-    #             from current_ytd_week),
-    #
-    #         yearly_sum_p2 as (
-    #             select ytd_current, ytd_previous,
-    #                     ((ytd_current-ytd_previous)/ytd_previous) as YoY_Change,
-    #                 (select count(store_number) from store_count) as store_supported
-    #             from yearly_sum)
-    #
-    #     select
-    #         ytd_current,
-    #         ytd_previous,
-    #         yoy_change,
-    #
-    #         store_supported,
-    #         /*change number to current week of store year to make program dynamic
-    #         next line calculates Avg Sales Per Wk/Store ($)*/
-    #         round(ytd_current/store_supported/{self.num}) as avg_wk_store,
-    #
-    #         /*next line calculates Avg Sales Per month/Store ($)*/
-    #         round((ytd_current/store_supported/{self.num})*4) as avg_month_store
-    #
-    #     from yearly_sum_p2
-    #     """
-    #
-    #     sales_ytd_no_mask = psql.read_sql(f'{sales_sql_YTD_WoMask}', self.connection)
-    #
-    #     return sales_ytd_no_mask
-
     def ytd_table_no_mask(self):
 
         """new ytd mask update using the updated item_support sheet"""
@@ -462,7 +256,7 @@ class ReportsData:
                             item_support2.display_size,
                             item_support2.case_size,
                             item_support2.item_group_desc
-                         FROM sales2
+                         FROM {self.store_type_input}.sales2
                          inner JOIN item_support2 ON sales2.upc = item_support2.upc_11_digit),
 
             store_count as (
@@ -532,82 +326,6 @@ class ReportsData:
 
         return sales_ytd_no_mask
 
-
-    # def ytd_table_mask(self):
-    #
-    #     """old ytd table mask"""
-    #
-    #     sales_sql_YTD_Mask = f"""
-    #
-    #         with
-    #
-    #             /*finds all of the store numbers in the database*/
-    #             store_count as (
-    #                 select distinct store_number
-    #                 from sales
-    #                 where store_year = {self.store_year}),
-    #
-    #
-    #             current_ytd_week as (
-    #
-    #                 select store_number, store_year, sum(sales) as sales
-    #                 from sales
-    #                 inner join item_support on sales.upc = item_support.upc_11_digit
-    #
-    #                 where store_year = {self.store_year} and
-    #                     {self.week} <= {self.week_num}
-    #
-    #                 group by store_number, store_year
-    #
-    #                 order by store_number asc),
-    #
-    #             previous_ytd_week as (
-    #
-    #
-    #                 select store_number, store_year, sum(sales) as sales
-    #                 from sales
-    #                 inner join item_support on sales.upc = item_support.upc_11_digit
-    #
-    #                 /*looks for previous year so maybe max -1 when finding innitial start for python program*/
-    #                 where store_year = {self.store_year}-1 and
-    #                     {self.week} <= {self.week_num}
-    #
-    #                 group by store_number, store_year
-    #
-    #                 order by store_number asc),
-    #
-    #             yearly_sum as (
-    #
-    #                 select round(sum(sales)) as YTD_current,
-    #                     (select round(sum(sales)) as YTD_previous from previous_ytd_week)
-    #                 from current_ytd_week),
-    #
-    #             yearly_sum_p2 as (
-    #                 select ytd_current, ytd_previous,
-    #                         ((ytd_current-ytd_previous)/ytd_previous) as YoY_Change,
-    #                     (select count(store_number) from store_count) as store_supported
-    #                 from yearly_sum)
-    #
-    #         select
-    #             ytd_current,
-    #             ytd_previous,
-    #             yoy_change,
-    #
-    #             store_supported,
-    #             /*change number to current week of store year to make program dynamic
-    #             next line calculates Avg Sales Per Wk/Store ($)*/
-    #             round(ytd_current/store_supported/{self.num}) as avg_wk_store,
-    #
-    #             /*next line calculates Avg Sales Per month/Store ($)*/
-    #             round((ytd_current/store_supported/{self.num})*4) as avg_month_store
-    #
-    #         from yearly_sum_p2
-    #         """
-    #
-    #     sales_sql_YTD_Mask = psql.read_sql(f'{sales_sql_YTD_Mask}', self.connection)
-    #
-    #     return sales_sql_YTD_Mask
-
     def ytd_table_mask(self):
 
         """new ytd with mask using the new support sheet"""
@@ -636,7 +354,7 @@ class ReportsData:
                             item_support2.display_size,
                             item_support2.case_size,
                             item_support2.item_group_desc
-                         FROM sales2
+                         FROM {self.store_type_input}.sales2
                          inner JOIN item_support2 ON sales2.upc = item_support2.upc_11_digit),
 
             store_count as (
@@ -704,42 +422,6 @@ class ReportsData:
 
         return sales_sql_YTD_Mask
 
-    # def item_sales_rank(self):
-    #     """ old item sales rank"""
-    #
-    #     #produce list of items ranked based off of sales for current year.
-    #     #gives the item, sales, units sold, percentage of sales per item, and season
-    #
-    #     item_sales_rank = f'''
-    #     with
-    #         year_total as(
-    #             Select sum(sales) as year_sales, sum(qty) as year_total_unit
-    #             from sales
-    #             where store_year = {self.store_year}
-    #         ),
-    #
-    #         item_sales_rank as (
-    #             Select item_group_desc, round(sum(sales),2) as sales, sum(qty) as units_sold,season
-    #             from sales
-    #             inner join item_support on sales.upc = item_support.upc_11_digit
-    #             where store_year = {self.store_year}
-    #             group by item_group_desc, season
-    #             order by sum(sales) desc)
-    #
-    #
-    #     select item_group_desc,
-    #         sales,
-    #         units_sold,
-    #         round((sales/year_sales),3) as percent_of_total_sales,
-    #         season
-    #     from item_sales_rank, year_total
-    #     '''
-    #
-    #     item_sales_rank = psql.read_sql(f'{item_sales_rank}', self.connection)
-    #     item_sales_rank = item_sales_rank.head(10)
-    #
-    #     return item_sales_rank
-
     def item_sales_rank(self):
 
         """new item sales rank"""
@@ -769,7 +451,7 @@ class ReportsData:
                     item_support2.display_size,
                     item_support2.case_size,
                     item_support2.item_group_desc
-                FROM sales2
+                FROM {self.store_type_input}.sales2
                 inner JOIN item_support2 ON sales2.upc = item_support2.upc_11_digit),
 
             year_total as(
@@ -793,24 +475,76 @@ class ReportsData:
 
         """
 
-        item_sales_rank = psql.read_sql(f'{item_sales_rank}', self.connection)
-        item_sales_rank = item_sales_rank.head(10)
+        rank = psql.read_sql(f'{item_sales_rank}', self.connection)
+
+        i = 0
+
+        while i < len(rank):
+            item = rank.loc[i, 'item_group_desc']
+
+            store_count = f"""
+
+            with
+
+            sales_table as (
+
+
+                SELECT distinct sales2.id,
+                    sales2.transition_year,
+                    sales2.transition_season,
+                    sales2.store_year,
+                    sales2.store_week,
+                    sales2.store_number,
+                    sales2.upc AS upc_11_digit,
+                    sales2.sales,
+                    sales2.qty,
+                    sales2.current_year,
+                    sales2.current_week,
+                    sales2.store_type,
+                    item_support2.season,
+                    item_support2.category,
+                    item_support2.upc,
+                    item_support2.display_size,
+                    item_support2.case_size,
+                    item_support2.item_group_desc
+                FROM {self.store_type_input}.sales2
+                inner JOIN item_support2 ON sales2.upc = item_support2.upc_11_digit),
+
+
+                store_with_item as (
+
+                select * from sales_table where item_group_desc = '{item}' and store_year = {self.store_year})
+
+            select count(distinct(store_number)) from store_with_item
+
+            """
+
+            store_count = psql.read_sql(f'{store_count}', self.connection)
+
+            store_count = store_count.iloc[0, 0]
+
+            rank.loc[i, 'active stores'] = store_count
+
+            i += 1
+
+        rank['sales per active store'] = round(rank['sales'] / rank['active stores'], 2)
+
+        rank['active stores'] = rank['active stores'].astype(int)
+
+        rank = rank.sort_values(by='sales per active store', ascending=False)
+
+        rank = rank[['item_group_desc', 'sales', 'sales per active store', 'active stores', 'percent_of_total_sales']]
+
+        item_sales_rank = rank.head(10)
+
 
         return item_sales_rank
-
-    # def on_hands(self):
-    #
-    #     # on_hand report
-    #     on_hand = psql.read_sql("SELECT * FROM SD_COMBO WHERE season = 'AY' or season = 'SS' order by store asc",
-    #                             self.connection)
-    #
-    #     return on_hand
 
     def on_hands(self):
 
         """new on hands sheet using new support sheet"""
 
-        on_hand = psql.read_sql("""
+        on_hand = psql.read_sql(f"""
 
         with
 
@@ -819,8 +553,8 @@ class ReportsData:
                 /*This table is basically the delivery table with the support sheet lined up */
                 select distinct(id), transition_year, transition_season, delivery2.type, date, delivery2.upc, store,
                 qty, season, category, item_group_desc, display_size, case_size
-                from delivery2
-                inner join item_support2 on delivery2.upc = item_support2.upc),
+                from {self.store_type_input}.delivery2
+                inner join item_support2 on {self.store_type_input}.delivery2.upc = item_support2.upc),
 
             deliv_pivot_credit as (
 
@@ -843,7 +577,7 @@ class ReportsData:
                         (
                             season = 'AY'
                             and type = 'Credit Memo'
-                            and (category != 'Accessory' and category != 'GM' and category != 'Scrub')
+                            and (category != 'Accessory' and category != 'GM' and category != 'Scrub' and category != 'Rack')
                         )
 
                          or
@@ -852,7 +586,7 @@ class ReportsData:
                         (
                             season = 'SS'
                             and type = 'Credit Memo'
-                            and (category != 'Accessory' and category != 'GM' and category != 'Scrub')
+                            and (category != 'Accessory' and category != 'GM' and category != 'Scrub' and category != 'Rack')
                             and transition_year = 2022
                             and transition_season = 'SS'
                         )
@@ -881,7 +615,7 @@ class ReportsData:
                         (
                             season = 'AY'
                             and (type = 'Invoice' or type = 'BandAid' or type = 'Reset')
-                            and (category != 'Accessory' and category != 'GM' and category != 'Scrub')
+                            and (category != 'Accessory' and category != 'GM' and category != 'Scrub' and category != 'Rack')
                         )
 
                          or
@@ -890,7 +624,7 @@ class ReportsData:
                         (
                             season = 'SS'
                             and (type = 'Invoice' or type = 'BandAid' or type = 'Reset')
-                            and (category != 'Accessory' and category != 'GM' and category != 'Scrub')
+                            and (category != 'Accessory' and category != 'GM' and category != 'Scrub' and category != 'Rack')
                             and transition_year = 2022
                             and transition_season = 'SS'
                         )
@@ -933,8 +667,8 @@ class ReportsData:
                     item_support2.display_size,
                     item_support2.case_size,
                     item_support2.item_group_desc
-                FROM sales2
-                inner JOIN item_support2 ON sales2.upc = item_support2.upc_11_digit),
+                FROM {self.store_type_input}.sales2
+                inner JOIN item_support2 ON {self.store_type_input}.sales2.upc = item_support2.upc_11_digit),
 
             sales_pivot_AY as (
 
@@ -943,7 +677,7 @@ class ReportsData:
                         sum(qty) AS sales
 
                 from sales_table
-                where season = 'AY' and (category != 'Accessory' and category != 'GM')
+                where season = 'AY' and (category != 'Accessory' and category != 'GM' and category != 'Rack')
                 GROUP BY store_number,item_group_desc
                 ORDER BY store_number, item_group_desc),
 
@@ -952,7 +686,7 @@ class ReportsData:
                         item_group_desc,
                         sum(qty) AS sales
                 FROM sales_table
-                where season = 'FW' and (category != 'Accessory' and category != 'GM') and transition_year = 2021 and transition_season = 'FW'
+                where season = 'FW' and (category != 'Accessory' and category != 'GM' and category != 'Rack') and transition_year = 2021 and transition_season = 'FW'
                 GROUP BY store_number, item_group_desc
                 ORDER BY store_number),
 
@@ -962,7 +696,7 @@ class ReportsData:
                         item_group_desc,
                         sum(qty) AS sales
                 FROM sales_table
-                where season = 'SS' and (category != 'Accessory' and category != 'GM') and transition_year = 2022 and transition_season = 'SS'
+                where season = 'SS' and (category != 'Accessory' and category != 'GM' and category != 'Rack') and transition_year = 2022 and transition_season = 'SS'
                 GROUP BY store_number, item_group_desc
                 ORDER BY store_number),
 
@@ -1041,165 +775,6 @@ class ReportsData:
 
         return on_hand
 
-    # def no_scan(self):
-    #
-    #     """old no scans using old support sheet"""
-    #
-    #     # Assigning variable from store seeting sheet 2 table.
-    #
-    #     initial_display = self.store_setting.iloc[0, 1]
-    #
-    #     in_season = self.store_setting.iloc[1, 1]
-    #
-    #     scan_ay = self.store_setting.iloc[2, 1]
-    #
-    #     scan_fw = self.store_setting.iloc[3, 1]
-    #
-    #     scan_ss = self.store_setting.iloc[4, 1]
-    #
-    #     scan_tops = self.store_setting.iloc[5, 1]
-    #
-    #     scan_dress = self.store_setting.iloc[6, 1]
-    #
-    #     scan_carded = self.store_setting.iloc[7, 1]
-    #
-    #
-    #     # SQL code for no scans below
-    #
-    #     if in_season == 1:
-    #
-    #         max_date = psql.read_sql('select max(date) from delivery', self.connection)
-    #         max_date = max_date.iloc[0, 0]
-    #         min_date = max_date - timedelta(days=21)
-    #
-    #         no_scan = psql.read_sql(f"""
-    #
-    #             /*select all of the items that have 0 sales  from the the sd_combo table*/
-    #
-    #             SELECT store, item_group_desc
-    #             FROM SD_COMBO
-    #             WHERE (season = 'AY' or season = 'SS') and
-    #                    total_sales = 0
-    #
-    #             /*except statement is taking out any item that are duplicates*/
-    #             EXCEPT
-    #
-    #                 /*Select statement is grabbing all of the items that have been shipped in the past 3 weeks*/
-    #
-    #                 select store, item_group_desc from delivery
-    #                 inner join item_support on delivery.upc = item_support.upc
-    #                 where date <= '{max_date}' and date >= '{min_date}'
-    #
-    #             order by store
-    #
-    #             """, self.connection)
-    #
-    #     elif initial_display == 1:
-    #
-    #         # if statement below is determing the different combinations for seasons
-    #
-    #         if scan_ay == 1:
-    #
-    #             if scan_fw == 1:  # ay = 1, fw=1
-    #
-    #                 if scan_ss == 1:  # ay1 fw1 ss1
-    #                     season = "(season = 'AY' or season = 'FW' or season = 'SS')"
-    #
-    #                 else:  # ay1 fw1 ss0
-    #                     season = "(season = 'AY' or season = 'FW')"
-    #
-    #             else:  # ay = 1, fw = 0
-    #
-    #                 if scan_ss == 1:  # ay1 fw0 ss1
-    #                     season = "(season = 'AY' or season = 'SS')"
-    #
-    #                 else:  # ay1 fw0 ss0
-    #                     season = "(season = 'AY')"
-    #
-    #         else:  # ay= 0
-    #
-    #             if scan_fw == 1:  # ay0 fw1
-    #
-    #                 if scan_ss == 1:  # ay0 fw1 ss1
-    #                     season = "(season = 'FW' or season = 'SS')"
-    #
-    #                 else:  # ay0 fw1 ss0
-    #                     season = "(season = 'FW')"
-    #
-    #             else:  # ay = 0, fw = 0
-    #
-    #                 if scan_ss == 1:  # ay0 fw0 ss1
-    #                     season = "(season = 'SS')"
-    #
-    #                 else:  # ay0 fw0 ss0
-    #
-    #                     print("\n\n\nALL SEASONS ON NO SCAN SETTINGS ARE SET TO 0\n\n\n")
-    #
-    #         # determining different combinations for display size
-    #
-    #         if scan_tops == 1:
-    #
-    #             if scan_dress == 1:  # top1 dress1
-    #
-    #                 if scan_carded == 1:  # top1 dress1 carded1
-    #
-    #                     display_size = """(display_size = 'Long Hanging Top' or
-    #                                         display_size = 'Long Hanging Dress' or
-    #                                         display_size = 'Carded')"""
-    #
-    #                 else:  # top1 dress1 carded0
-    #
-    #                     display_size = "(display_size = 'Long Hanging Top' or display_size = 'Long Hanging Dress')"
-    #
-    #             else:  # top1 dress0
-    #
-    #                 if scan_carded == 1:  # top1 dress0  carded 1
-    #
-    #                     display_size = "(display_size = 'Long Hanging Top' or display_size = 'Carded')"
-    #
-    #                 else:  # top1 dress0  carded 0
-    #
-    #                     display_size = "(display_size = 'Long Hanging Top')"
-    #
-    #         else:
-    #
-    #             if scan_dress == 1:  # top0 dress1
-    #
-    #                 if scan_carded == 1:  # top0 dress1 carded1
-    #
-    #                     display_size = """(display_size = 'Long Hanging Dress' or display_size = 'Carded')"""
-    #
-    #                 else:  # top0 dress1 carded0
-    #
-    #                     display_size = "(display_size = 'Long Hanging Dress')"
-    #
-    #             else:  # top0 dress0
-    #
-    #                 if scan_carded == 1:  # top0 dress0  carded 1
-    #
-    #                     display_size = "(display_size = 'Carded')"
-    #
-    #                 else:  # top0 dress0  carded 0
-    #
-    #                     print('\n\n\nNO DISPLAY SIZE SELECTED. SET SETTING IN STORE SETTINGS FILE\n\n\n')
-    #
-    #         no_scan = psql.read_sql(f"""
-    #
-    #         with long_hanging as (
-    #         select * from sd_combo
-    #         where ({display_size} and {season})),
-    #
-    #         total as (
-    #         select store, sum(total_sales)as sales from long_hanging
-    #         group by store)
-    #
-    #         select distinct store, sales from total
-    #         where sales = 0
-    #
-    #         """, self.connection)
-    #
-    #     return no_scan
-
     def no_scan(self, on_hands):
 
         """ new no scans incorporating new sd_combo df and itemsupport sheet
@@ -1240,15 +815,15 @@ class ReportsData:
 
             # no scans for in_season
 
-            max_date = psql.read_sql('select max(date) from delivery2', self.connection)
+            max_date = psql.read_sql(f'select max(date) from {self.store_type_input}.delivery2', self.connection)
             max_date = max_date.iloc[0, 0]
             min_date = max_date - timedelta(days=21)
 
             recently_shipped = psql.read_sql(f"""
 
                 select distinct(item_group_desc), store
-                from delivery2
-                inner join item_support2 on delivery2.code = item_support2.code
+                from {self.store_type_input}.delivery2
+                inner join item_support2 on {self.store_type_input}.delivery2.code = item_support2.code
                 where date <= '{max_date}' and date >= '{min_date}'
                 order by store
                 """, self.connection)
@@ -1278,8 +853,8 @@ class ReportsData:
                 last_date_shipped = psql.read_sql(f"""
 
                     select max(date)
-                    from delivery2
-                    inner join item_support2 on delivery2.code = item_support2.code
+                    from {self.store_type_input}.delivery2
+                    inner join item_support2 on {self.store_type_input}.delivery2.code = item_support2.code
                     WHERE store = {store} and item_group_desc = '{item_group_desc}'
                     """, self.connection)
 
@@ -1397,13 +972,13 @@ class ReportsData:
 
     def item_approval(self):
 
-        item_approval = """
+        item_approval = f"""
         
         select season, category, style, 
                 display_size, item_group_desc, 
                 on_hand as inventory_on_hand,
                 round((on_hand/item_support2.case_size),0) as num_of_cases,
-                store_price from item_approval
+                store_price from {self.store_type_input}.item_approval
 
         inner join item_support2 on item_approval.code = item_support2.code
         inner join inventory on item_approval.code = inventory.code
@@ -1420,7 +995,7 @@ class ReportsData:
 
         store_sales_rank = f"""
         
-        select store_number, round(sum(sales),0) as YTD_Sales from sales2
+        select store_number, round(sum(sales),0) as YTD_Sales from {self.store_type_input}.sales2
         where current_year = {self.store_year}
         group by store_number
         order by sum(sales) desc
@@ -1433,17 +1008,17 @@ class ReportsData:
 
     def store_program(self):
 
-        store_program = """
+        store_program = f"""
         
         select store_program.store_id, 
                 carded,
                 long_hanging_top,
                 long_hanging_dress,
                 notes
-        from store_program
-        inner join master_planogram on store_program.program_id = master_planogram.program_id
-        inner join store on store_program.store_id = store.store_id
-        order by store_program.store_id
+        from {self.store_type_input}.store_program
+        inner join master_planogram on {self.store_type_input}.store_program.program_id = master_planogram.program_id
+        inner join {self.store_type_input}.store on {self.store_type_input}.store_program.store_id = {self.store_type_input}.store.store_id
+        order by {self.store_type_input}.store_program.store_id
         
         """
 
@@ -1464,7 +1039,7 @@ class ReportsData:
 
             store = store_program.loc[i, 'store_id']
 
-            programs = psql.read_sql(f'select * from store_program where store_id = {store}', self.connection)
+            programs = psql.read_sql(f'select * from {self.store_type_input}.store_program where store_id = {store}', self.connection)
 
             programs = programs[['program_id']]
 
@@ -1504,8 +1079,8 @@ class ReportsData:
 
             date = psql.read_sql(f'''
 
-            select store_year, store_week from sales2
-            inner join item_support2 on sales2.upc = item_support2.upc_11_digit
+            select store_year, store_week from {self.store_type_input}.sales2
+            inner join item_support2 on {self.store_type_input}.sales2.upc = item_support2.upc_11_digit
             where store_number = {store} and item_group_desc = '{item_group_desc}'
             order by store_week desc
 
@@ -1528,9 +1103,9 @@ class ReportsData:
 
             date = psql.read_sql(f'''
 
-            select store, date, item_group_desc from delivery2
-            inner join item_support2 on delivery2.code = item_support2.code
-            where store = {store} and item_group_desc = '{item_group_desc}'
+            select store, date, item_group_desc from {self.store_type_input}.delivery2
+            inner join item_support2 on {self.store_type_input}.delivery2.code = item_support2.code
+            where {self.store_type_input}.store = {store} and item_group_desc = '{item_group_desc}'
             order by date desc
 
 
@@ -1571,7 +1146,7 @@ class ReportsData:
 
         inventory_age['% of display space'] = (inventory_age['case_qty'] / inventory_age['allocated space'])
 
-        inventory_age = inventory_age[inventory_age['season'] == 'AY']
+        # inventory_age = inventory_age[inventory_age['season'] == 'AY']
 
         return inventory_age
 
