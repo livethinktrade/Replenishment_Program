@@ -398,17 +398,10 @@ class ReportFormat:
         ws.merge_cells('M14:M15')
         ws.merge_cells('N14:N15')
         ws.merge_cells('O14:O15')
-        ws.merge_cells('P14:P15')
-        ws.merge_cells('Q14:Q15')
-        ws.merge_cells('R14:R15')
 
         ws['M14'].value = 'Rank'
         ws['N14'].value = 'Item'
         ws['O14'].value = 'Sales ($)'
-        ws['P14'].value = 'Sales Per Active Store'
-        ws['Q14'].value = 'Active Stores'
-        ws['R14'].value = '% of Annual Sales'
-
 
         ws['M16'].value = '1'
         ws['M17'].value = '2'
@@ -422,7 +415,7 @@ class ReportFormat:
         ws['M25'].value = '10'
 
         # Bold item sales rank
-        for row in ws.iter_rows(min_row=14, max_row=15, min_col=13, max_col=18):
+        for row in ws.iter_rows(min_row=14, max_row=15, min_col=13, max_col=15):
             for cell in row:
                 cell.font = Font(bold=True)
 
@@ -432,7 +425,7 @@ class ReportFormat:
         border = Border(left=bd_thin, top=bd_thin, right=bd_thin, bottom=bd_thin)
 
 
-        for row in ws.iter_rows(min_row=14, max_row=25, min_col=13, max_col=18):
+        for row in ws.iter_rows(min_row=14, max_row=25, min_col=13, max_col=15):
             for cell in row:
                 cell.border = border
 

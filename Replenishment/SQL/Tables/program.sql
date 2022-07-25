@@ -101,8 +101,8 @@ CREATE TABLE sales2
     transition_year integer,
     transition_season character varying(3) NOT NULL,
     store_year integer,
-	/*for non kroger stores, store_week is set to date for kroger set to integer*/
-    store_week integer NOT NULL,
+	/*for non kroger stores, store_week is set to date*/
+    store_week date NOT NULL,
     store_number integer NOT NULL,
     upc character varying(12) NOT NULL,
     sales numeric NOT NULL,

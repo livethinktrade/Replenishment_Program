@@ -3,7 +3,7 @@ from Sales_Report.Replenishment.replenishment import *
 
 def initial_order(store_type_input, store_setting):
 
-    connection = psycopg2.connect(database=f"Grocery", user="postgres", password="winwin", host="localhost")
+    connection = psycopg2.connect(database=f"{store_type_input}", user="postgres", password="winwin", host="localhost")
 
     # getting the on hands after replenishment
     replenishments, on_hands_after_replen, replen_reasons = replenishment(store_type_input, store_setting)
@@ -39,12 +39,12 @@ def initial_order(store_type_input, store_setting):
     on_hands_store = sd_pivot
 
     # section of the code creates table to find the store capacity for each store  only grabs programs that are active
-    store_capacity = psql.read_sql(f"""
+    store_capacity = psql.read_sql("""
 
-        select {store_type_input}.store.store_id, carded, long_hanging_top, long_hanging_dress, initial, notes, activity
-        from {store_type_input}.store_program
-        inner join master_planogram on {store_type_input}.store_program.program_id = master_planogram.program_id
-        inner join {store_type_input}.store on {store_type_input}.store.store_id = {store_type_input}.store_program.store_id
+        select store.store_id, carded, long_hanging_top, long_hanging_dress, initial, notes, activity
+        from store_program
+        inner join master_planogram on store_program.program_id = master_planogram.program_id
+        inner join store on store.store_id = store_program.store_id
         where activity = 'ACTIVE'
 
         order by store_id""", connection)
@@ -110,31 +110,9 @@ def initial_order(store_type_input, store_setting):
 
     display_space['space available'] = display_space['space allocated'] - display_space['case_qty']
 
+    display_space = display_space.sort_values(by=['space available'], ascending=False)
+
+
     on_hands_store = on_hands_store.sort_values(by=['space available'], ascending=False)
-
-    store_space = on_hands_store.set_index('store')
-
-    display_space['store space available'] = 0
-
-    i = 0
-
-    while i < len(display_space):
-        store = display_space.iloc[i, 0]
-
-        try:
-
-            store_space_available = store_space.loc[store, 'space available']
-
-            display_space.loc[i, 'store space available'] = store_space_available
-
-        except KeyError:
-            print(f'look into store {store} something is off that needs to be fixed')
-
-
-        i += 1
-
-    display_space = display_space.sort_values(by=['store space available', 'space available'], ascending=False)
-
-    display_space = display_space.rename(columns={'space available': 'display space available'})
 
     return on_hands_store, display_space
