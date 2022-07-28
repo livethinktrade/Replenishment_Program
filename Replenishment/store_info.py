@@ -182,7 +182,8 @@ class Replenishment():
             'KROGER DILLONS': 'kroger_dillons',
             'KROGER CINCINNATI': 'kroger_cincinatti',
             'KROGER ATLANTA': 'kroger_atlanta',
-            'KROGER NASHVILLE': 'kroger_nashville'
+            'KROGER NASHVILLE': 'kroger_nashville',
+            'KROGER LOUISVILLE': 'kroger_louisville'
 
         }
 
@@ -236,7 +237,7 @@ class Replenishment():
             code = new_deliv_transform.loc[i, 'code']
 
             duplicate_check = psql.read_sql(f"""
-                                                SELECT * FROM DELIVERY2 
+                                                SELECT * FROM {self.store_type_input}.DELIVERY2 
                                                 WHERE type ='{type}' and 
                                                         date = '{date}' and 
                                                         store = {store} and 
@@ -339,7 +340,7 @@ class Replenishment():
 
         elif self.store_type_input == 'jewel':
 
-            salesdata = jewel_transform(file, self.transition_year, self.transition_season, self.current_year, self.current_week, self.connection)
+            salesdata = jewel_transform(file, self.transition_year, self.transition_season, self.current_year, self.current_week, self.connection, self.store_type_input)
 
         # elif self.store_type_input == 'brookshire':
         #
@@ -369,7 +370,7 @@ class Replenishment():
             store_type = salesdata.loc[i, 'store_type']
 
             duplicate_check = psql.read_sql(f"""
-                                                SELECT * FROM SALES2 
+                                                SELECT * FROM {self.store_type_input}.SALES2 
                                                 WHERE store_year ={store_year} and 
                                                     store_week = '{store_week}' and 
                                                     store_number = {store_number} and 
@@ -392,7 +393,8 @@ class Replenishment():
                             current_year,
                             current_week,
                             store_type,
-                            self.connection_pool)
+                            self.connection_pool,
+                            self.store_type_input)
                 update += 1
             else:
                 sales_insert(transition_year,
@@ -406,7 +408,8 @@ class Replenishment():
                             current_year,
                             current_week,
                             store_type,
-                            self.connection_pool)
+                            self.connection_pool,
+                            self.store_type_input)
                 insert += 1
                 inserted_list.append(i)
 
@@ -504,23 +507,29 @@ class Replenishment():
 
             else:
 
-                item_support_insert(season,
-                                    category,
-                                    type,
-                                    style,
-                                    additional,
-                                    display_size,
-                                    pog_type,
-                                    upc,
-                                    code,
-                                    code_qb,
-                                    unique_replen_code,
-                                    case_size,
-                                    item_group_desc,
-                                    item_desc,
-                                    packing,
-                                    upc_11_digit,
-                                    self.connection_pool)
+                try:
+
+                    item_support_insert(season,
+                                        category,
+                                        type,
+                                        style,
+                                        additional,
+                                        display_size,
+                                        pog_type,
+                                        upc,
+                                        code,
+                                        code_qb,
+                                        unique_replen_code,
+                                        case_size,
+                                        item_group_desc,
+                                        item_desc,
+                                        packing,
+                                        upc_11_digit,
+                                        self.connection_pool)
+
+                except Exception as e:
+                    print("\nERROR : " + str(e) + f'Quickbook Item:  {code}' )
+
                 insert += 1
 
             i += 1
