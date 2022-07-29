@@ -254,7 +254,7 @@ def safeway_denver_transform(file, transition_year, transition_season, current_y
     return salesdata
 
 
-def jewel_transform(file, transition_year, transition_season, current_year, current_week, connection):
+def jewel_transform(file, transition_year, transition_season, current_year, current_week, connection, store_type_input):
 
     """Transform sales data  for jewel osco does not need the inputs of current_year or current_week"""
 
@@ -302,7 +302,7 @@ def jewel_transform(file, transition_year, transition_season, current_year, curr
 
         # Find the last date in the db
 
-        date = psql.read_sql('select max(store_week) from sales2', connection)
+        date = psql.read_sql(f'select max(store_week) from {store_type_input}.sales2', connection)
         date = pd.Timestamp(date.iloc[0, 0])
 
         # sorts dates in order
