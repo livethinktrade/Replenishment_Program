@@ -31,7 +31,7 @@ class ReportsData:
                                 'kroger_nashville']:
 
             self.week = 'store_week'
-        elif store_type_input in ['intermountain', 'acme','texas_division', 'kvat', 'safeway_denver', 'jewel']:
+        elif store_type_input in ['intermountain', 'acme','texas_division', 'kvat', 'safeway_denver', 'jewel', 'fresh_encounter']:
             self.week = 'current_week'
 
         else:
@@ -475,9 +475,17 @@ class ReportsData:
 
         """
 
+
+        # this SQL statement prduces a query that shows all of the items that was sold for a given year.
+        # Provides a table with item group desc, season, sum sales, sum qty, % of total sales
+
+
         rank = psql.read_sql(f'{item_sales_rank}', self.connection)
 
         i = 0
+
+        # using the previous query, python selects the item group desc and finds how many stores carried that particular item during
+        # that time. Columns will consist of item_group_desc,sales,units_sold,percent_of_total_sales,season,active,stores,sales per active store
 
         while i < len(rank):
             item = rank.loc[i, 'item_group_desc']
@@ -789,6 +797,8 @@ class ReportsData:
 
             """
 
+        # this variable will be used for the initial display no scan if needed
+        on_hand = on_hands
         on_hands = on_hands[on_hands['total_sales'] == 0]
 
         # Assigning variable from store seeting sheet 2 table.
@@ -966,7 +976,24 @@ class ReportsData:
 
         if initial_display == 1:
 
+            # apply filter per settings need to fix code below
+            # on_hands = on_hand.loc[display_size & season]
+
+            on_hands = on_hand
+
+            # select only needed columns
             on_hands = on_hands[['store', 'total_sales']]
+
+            # group by function using the store numbers. This will group the total of all sales after filtering.
+            on_hands = on_hands.groupby(by=["store"]).sum()
+
+            # reset the index
+            on_hands = on_hands.reset_index(drop=False)
+
+            # filter all stores that have 0 sales
+            # this would show that they have not sold at least one of the items from any of the cases taht have been shipped
+            on_hands = on_hands[on_hands['total_sales'] == 0]
+
 
         return on_hands
 
@@ -1105,7 +1132,7 @@ class ReportsData:
 
             select store, date, item_group_desc from {self.store_type_input}.delivery2
             inner join item_support2 on {self.store_type_input}.delivery2.code = item_support2.code
-            where {self.store_type_input}.store = {store} and item_group_desc = '{item_group_desc}'
+            where store = {store} and item_group_desc = '{item_group_desc}'
             order by date desc
 
 
