@@ -157,6 +157,11 @@ class Replenishment():
         elif self.store_type_input == 'fresh_encounter':
             df[['store_type', 'letter1']] = df.Name.str.split(',', n=1, expand=True)
             df.pop('letter1')
+
+        elif self.store_type_input == 'follett':
+            df[['store_type', 'letter1']] = df.Name.str.split(':', n=1, expand=True)
+            df.pop('letter1')
+
         else:
 
             df[['letter', 'store_type', 'letter1']] = df.Name.str.split(':', n=2, expand=True)
@@ -183,7 +188,8 @@ class Replenishment():
             'KROGER CINCINNATI': 'kroger_cincinatti',
             'KROGER ATLANTA': 'kroger_atlanta',
             'KROGER NASHVILLE': 'kroger_nashville',
-            'KROGER LOUISVILLE': 'kroger_louisville'
+            'KROGER LOUISVILLE': 'kroger_louisville',
+            'FOLLETT': 'follett'
 
         }
 

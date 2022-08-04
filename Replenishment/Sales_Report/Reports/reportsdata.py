@@ -31,7 +31,7 @@ class ReportsData:
                                 'kroger_nashville']:
 
             self.week = 'store_week'
-        elif store_type_input in ['intermountain', 'acme','texas_division', 'kvat', 'safeway_denver', 'jewel', 'fresh_encounter']:
+        elif store_type_input in ['intermountain', 'acme','texas_division', 'kvat', 'safeway_denver', 'jewel', 'fresh_encounter','follett']:
             self.week = 'current_week'
 
         else:
