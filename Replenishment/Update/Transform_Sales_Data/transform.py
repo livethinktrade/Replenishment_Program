@@ -365,7 +365,8 @@ def approval_transform(store_type_input, file):
         'jewel': 'Jewel Osco Price',
         'fresh_encounter': 'Fresh Encounter Price',
         'intermountain': 'Albertsons Intermountain Price',
-        'texas_division': 'TX Safeway Albertsons Price'
+        'texas_division': 'TX Safeway Albertsons Price',
+        'follett' : 'Follett Price'
 
     }
 
