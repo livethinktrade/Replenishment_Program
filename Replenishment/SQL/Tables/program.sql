@@ -95,13 +95,13 @@ CREATE TABLE delivery2
 
 
 
-CREATE TABLE sales2
+CREATE TABLE texas_division.sales2
 (
     id serial NOT NULL PRIMARY KEY,
     transition_year integer,
     transition_season character varying(3) NOT NULL,
     store_year integer,
-	/*for non kroger stores, store_week is set to date for kroger set to integer*/
+    date date not null,
     store_week integer NOT NULL,
     store_number integer NOT NULL,
     upc character varying(12) NOT NULL,
@@ -109,12 +109,10 @@ CREATE TABLE sales2
     qty integer NOT NULL,
     current_year integer,
     current_week integer,
+    code varchar(20) NOT NULL,
     store_type character varying(20) NOT NULL
 
-    /*FOREIGN KEY (upc) REFERENCES item_support (upc_11_digit),
-    FOREIGN KEY (store_number) REFERENCES store(store_id)*/
 );
-
 
 CREATE TABLE item_approval
 (
@@ -150,6 +148,9 @@ insert into store_program (store_id, program_id)
 values (33, '4W');
 
 insert into store_program (store_id, program_id)
-values (33, '2W');
+values (33, '2W'); */
+Create view as midwest_mask (
+ SELECT sum(sales2.sales) AS sum
+   FROM fresh_encounter.sales2
+  WHERE (sales2.store_number < 400 OR sales2.store_number > 499) AND sales2.store_year = 2022);
 
-*/
