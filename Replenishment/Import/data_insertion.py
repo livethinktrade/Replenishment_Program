@@ -121,9 +121,11 @@ def salesupdate(transition_year,
     cursor.close()
     connection_pool.putconn(connection)
 
+
 def sales_insert(transition_year,
                  transition_season,
                  store_year,
+                 date,
                  store_week,
                  store_number,
                  upc,
@@ -131,6 +133,7 @@ def sales_insert(transition_year,
                  qty,
                  current_year,
                  current_week,
+                 code,
                  store_type,
                  connection_pool,
                  store_type_input):
@@ -139,13 +142,13 @@ def sales_insert(transition_year,
 
     connection = connection_pool.getconn()
     cursor = connection.cursor()
-    cursor.execute(f"""INSERT INTO {store_type_input}.sales2 (transition_year, transition_season,store_year,
+    cursor.execute(f"""INSERT INTO {store_type_input}.sales2 (transition_year, transition_season,store_year, date,
                                         store_week,store_number,upc,sales,qty,current_year,
-                                        current_week,store_type)
-                        values (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)""",
+                                        current_week,code,store_type)
+                        values (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)""",
 
-                   (transition_year, transition_season, store_year, store_week,
-                    store_number, upc, sales, qty, current_year, current_week, store_type))
+                   (transition_year, transition_season, store_year, date, store_week,
+                    store_number, upc, sales, qty, current_year, current_week, code, store_type))
 
     connection.commit()
     cursor.close()

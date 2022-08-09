@@ -1,16 +1,10 @@
-from psycopg2 import pool
-import pandas as pd
-import pandas.io.sql as psql
-import datetime
+
 
 from Import.data_insertion import *
 from Update.Transform_Sales_Data.transform import *
 from Sales_Report.Reports.reports import *
-from Sales_Report.Report_Format.weekly_toexcel import weekly_toexcel
-from Sales_Report.Report_Format.ytd_toexcel import ytd_toexcel
 from Sales_Report.Replenishment.replenishment import *
-from Sales_Report.Report_Format.weekly_sales_report_format import weekly_sales_report_format
-from Sales_Report.Report_Format.ytd_sales_report_format import ytd_sales_report_format
+
 
 
 class Replenishment():
@@ -20,12 +14,12 @@ class Replenishment():
         self.store_type_input = store_type_input
         
         self.connection_pool = pool.SimpleConnectionPool(1, 10000, 
-                                            database= "Grocery",
+                                            database= "test",
                                             user="postgres", 
                                             password="winwin", 
                                             host="localhost")
 
-        self.connection = psycopg2.connect(database=f"Grocery", user="postgres", password="winwin", host="localhost")
+        self.connection = psycopg2.connect(database=f"test", user="postgres", password="winwin", host="localhost")
 
         self.current_year = current_year
 
@@ -100,7 +94,7 @@ class Replenishment():
 
         if store_type == self.store_type_input:
 
-            print('\nDelivery Data Imported')
+            print(f'\n {self.store_type_input} Delivery Data Imported')
 
     def delivery_update(self, file):
 
@@ -270,7 +264,7 @@ class Replenishment():
 
         self.connection.commit()
 
-        print('\nDelivery Data Updated')
+        print(f'\n {self.store_type_input} Delivery Data Updated')
         print('Updated:', update, 'Records')
         print('Inserted:', insert, 'Records')
 
@@ -287,31 +281,32 @@ class Replenishment():
         new_len = len(new_sales)
         i = 0
         while i < new_len:
-            transition_year = new_sales.iloc[i, 0]
-            transition_season = new_sales.iloc[i, 1]
-            store_year = new_sales.iloc[i, 2]
-            store_week = new_sales.iloc[i, 3]
-            store_number = new_sales.iloc[i, 4]
-            upc = new_sales.iloc[i, 5]
-            sales = new_sales.iloc[i, 6]
-            qty = new_sales.iloc[i, 7]
-            current_year = new_sales.iloc[i, 8]
-            current_week = new_sales.iloc[i, 9]
-            store_type = new_sales.iloc[i, 10]
+            transition_year = new_sales.loc[i, 'transition_year']
+            transition_season = new_sales.loc[i, 'transition_season']
+            store_year = new_sales.loc[i, 'store_year']
+            date = new_sales.loc[i, 'date']
+            store_week = new_sales.loc[i, 'store_week']
+            store_number = new_sales.loc[i, 'store_number']
+            upc = new_sales.loc[i, 'upc']
+            sales = new_sales.loc[i, 'sales']
+            qty = new_sales.loc[i, 'qty']
+            current_year = new_sales.loc[i, 'current_year']
+            current_week = new_sales.loc[i, 'current_week']
+            code = new_sales.loc[i, 'code']
+            store_type = new_sales.loc[i, 'store_type']
 
             if store_type != self.store_type_input:
                 print(f'Data Validation Failed Inserted data for {store_type} for {self.store_type_input} database')
                 break
 
-            sales_insert(transition_year, transition_season, store_year, store_week, store_number, upc, sales, qty,
-                         current_year, current_week,
-                         store_type,
-                         self.connection_pool,
-                         self.store_type_input)
+            sales_insert(transition_year, transition_season, store_year, date,
+                         store_week, store_number, upc, sales,
+                         qty, current_year, current_week, code, store_type,
+                         self.connection_pool, self.store_type_input)
             i += 1
 
         if store_type == self.store_type_input:
-            print('\nSales Data Imported')
+            print(f'\n {self.store_type_input} Sales Data Imported')
 
     def sales_update(self, file):
 
@@ -425,7 +420,7 @@ class Replenishment():
 
         self.connection_pool.putconn(connection)
 
-        print('\nSales Data Updated')
+        print(f'\n {self.store_type_input} Sales Data Updated')
         print('Updated:', update, 'Records')
         print('Inserted:', insert, 'Records')
 
@@ -454,7 +449,7 @@ class Replenishment():
 
             i += 1
 
-        print('\nCase Capacity Imported')
+        print(f'\n {self.store_type_input} Case Capacity Imported')
 
     def support_import(self, file):
 
@@ -652,7 +647,6 @@ class Replenishment():
         print('Updated:', update, 'Records')
         print('Inserted:', insert, 'Records')
 
-
     def store_program_import(self):
 
         new_len = len(self.store_programs)
@@ -834,7 +828,15 @@ class Replenishment():
 
 
 
+year = 2022
+week = 31
 
 
+
+acme = Replenishment(store_type_input='fresh_encounter',
+                     current_year= year,
+                     current_week= week)
+
+acme.sales_import('fresh_encounter_salesdata_backup_Aug-08-2022-fixed.xlsx')
 
 

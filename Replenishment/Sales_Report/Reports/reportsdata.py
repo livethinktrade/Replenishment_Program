@@ -13,7 +13,7 @@ class ReportsData:
 
         self.store_setting = store_setting
 
-        self.connection = psycopg2.connect(database=f"Grocery",
+        self.connection = psycopg2.connect(database=f"test",
                                            user="postgres",
                                            password="winwin",
                                            host="localhost")
