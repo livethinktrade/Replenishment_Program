@@ -11,314 +11,289 @@ from datetime import datetime
 import datetime as dt
 
 
-def kroger_transform(file, store_type_input, transition_year, transition_season, current_year, current_week):
-    # Read in new kroger sales data and then selects certain columns to a new df
-
-    old = pd.read_csv(f'{file}', skiprows=16)
-    new = old[
-        ['RPT_SHORT_DESC', 'RE_STO_NUM', 'UPC', 'SCANNED_RETAIL_DOLLARS', 'SCANNED_MOVEMENT', 'MFR_DESC', 'WEEK_NAME']]
-
-    # checking to see if items in sales report are only winwin products
-    new_len = len(new)
-
-    check = 'Pass'
-    i = 0
-
-    while i < new_len:
-        MFR_check = new.loc[i, 'MFR_DESC']
-        if MFR_check != 'WINWIN':
-            check = "Fail"
-
-        i += 1
-
-    if check == "Pass":
-        # Extracts out the data for the store year and and store week
-        new[['store_year', 'name_of_code', 'cd', 'cd1', 'cd2', 'cd3', 'cd4', 'cd5', 'store_week']] = new[
-            "WEEK_NAME"].str.split(" ", 8, expand=True)
-
-        new = new[['RPT_SHORT_DESC',
-                   'store_year',
-                   'store_week',
-                   'RE_STO_NUM',
-                   'UPC',
-                   'SCANNED_RETAIL_DOLLARS',
-                   'SCANNED_MOVEMENT'
-                   ]]
-
-        # Takes the numbers out for the RPT_SHORT_DESC collumn leaving only the Divison name ie ('35 Dallas' => 'Dallas')
-        new['store_week'] = new.store_week.str.extract('(\d+)')
-        new['RPT_SHORT_DESC'] = new.RPT_SHORT_DESC.str.replace('[^a-zA-Z]', '')
-        new['current_year'] = current_year
-        new['current_week'] = current_week
+class transform_data:
 
-        new['transition_year'] = f'{transition_year}'
-        new['transition_season'] = f'{transition_season}'
-
-        # Renames collumn names to approripate name for data insertion and update script
-        new = new.rename(columns={
-            'RPT_SHORT_DESC': 'store_type',
-            'RE_STO_NUM': 'store_number',
-            'UPC': 'upc',
-            'SCANNED_RETAIL_DOLLARS': 'sales',
-            'SCANNED_MOVEMENT': 'qty'
-        })
-
-        # reorganizes collumns to proper format for sales table
-        new = new[['transition_year',
-                   'transition_season',
-                   'store_year',
-                   'store_week',
-                   'store_number',
-                   'upc',
-                   'sales',
-                   'qty',
-                   'current_year',
-                   'current_week',
-                   'store_type']]
-
-        # converting division names into store_type for sales tables
-
-        divisions = new.store_type.unique().tolist()
-        division_len = len(divisions)
-
-        store_list = {
 
-            'Atl': 'kroger_atlanta',
-            'Cincy': 'kroger_cincinatti',
-            'Louisville': 'kroger_louisville',
-            'Nashville': 'kroger_nashville',
-            'Dillon': 'kroger_dillons',
-            'KingSoopers': 'kroger_king_soopers',
-            'Central': 'kroger_central',
-            'Columbus': 'kroger_columbus',
-            'Dallas': 'kroger_dallas',
-            'Delta': 'kroger_delta',
-            'Michigan': 'kroger_michigan'
+    def __init__(self, store_type_input, transition_year, transition_season, connection):
 
-        }
+        self.winwin_calender = pd.read_excel(r'C:\Users\User1\OneDrive\WinWin Staff Folders\Michael\Replenishment program\Replenishment\support document\Store Weeks Calender.xlsx',
+                                      sheet_name=f'WinWin Fiscal Year',
+                                      names=('week_number', 'date', 'winwin year'))
 
-        # filter all of the data that pertains to the store_type_input
-        store_type = store_type_input
+        self.cvs_calender = pd.read_excel(r'C:\Users\User1\OneDrive\WinWin Staff Folders\Michael\Replenishment program\Replenishment\support document\Store Weeks Calender.xlsx',
+                                      sheet_name=f'CVS Fiscal Year',
+                                      names=('week_number', 'date', 'winwin year'))
 
-        division = list(store_list.keys())[list(store_list.values()).index(store_type)]
+        self.kroger_calender = pd.read_excel(r'C:\Users\User1\OneDrive\WinWin Staff Folders\Michael\Replenishment program\Replenishment\support document\Store Weeks Calender.xlsx',
+                                      sheet_name=f'Kroger Fiscal Year',
+                                      index_col= 0,
+                                      names=('kroger_week_number', 'date', 'winwin_week_number', 'winwin year'))
 
-        new_filt = new[new['store_type'] == division]
+        self.albertson_calender = pd.read_excel(r'C:\Users\User1\OneDrive\WinWin Staff Folders\Michael\Replenishment program\Replenishment\support document\Store Weeks Calender.xlsx',
+                                      sheet_name=f'Albertson Fiscal Year',
+                                      names=('albertson_week_number', 'date', 'winwin_week_number', 'winwin year'))
 
-        #reset index and change store type
-        new_filt = new_filt.reset_index(drop=True)
-        new_filt['store_type'] = store_type
-        salesdata = new_filt
-    else:
-        print('MFR_check failed. sales data sheet contains items that is not WinWin Products')
-    return salesdata
+        self.connection = connection
 
+        self.store_type_input = store_type_input
 
-def kvat_transform(file, transition_year, transition_season, current_year, current_week):
-    # grabs the date that will be used to set the date across the board
-    old = pd.read_excel(f'{file}', skiprows=1)
-    date = old.iloc[0, 4]
+        self.transition_year = transition_year
 
-    A = datetime.strptime(date, '%m/%d/%Y')
-    store_year = A.year
+        self.transition_season = transition_season
 
-    # this is finding the current week for the stores
-    # day = A.day
-    # month = A.month
-    # year = A.year
+    def kroger_transform(self, file):
+        # Read in new kroger sales data and then selects certain columns to a new df
 
-    # current_week = date(A).isocalendar()[1]
+        old = pd.read_csv(f'{file}', skiprows=16)
+        new = old[
+            ['RPT_SHORT_DESC', 'RE_STO_NUM', 'UPC', 'SCANNED_RETAIL_DOLLARS', 'SCANNED_MOVEMENT', 'MFR_DESC', 'WEEK_NAME']]
 
-    # recreating data frame so I don't have to redefine the column names
-    old = pd.read_excel(f'{file}', skiprows=3)
+        # checking to see if items in sales report are only winwin products
+        new_len = len(new)
 
+        check = 'Pass'
+        i = 0
 
-    old['qty'] = old['Units Sold'] + old['Units Sold.1'] + old['Units Sold.2'] + old['Units Sold.3'] + old[
-        'Units Sold.4'] + old['Units Sold.5'] + old['Units Sold.6']
+        while i < new_len:
+            MFR_check = new.loc[i, 'MFR_DESC']
+            if MFR_check != 'WINWIN':
+                check = "Fail"
 
-    old['sales'] = old['Sales $'] + old['Sales $.1'] + old['Sales $.2'] + old['Sales $.3'] + old['Sales $.4'] + old[
-        'Sales $.5'] + old['Sales $.6']
+            i += 1
 
-    # drops last row due to grand total. after dropping it,
-    # store numbers can be then converted to int values
+        if check == "Pass":
+            # Extracts out the data for the store year and and store week
+            new[['store_year', 'name_of_code', 'cd', 'cd1', 'cd2', 'cd3', 'cd4', 'cd5', 'store_week']] = new[
+                "WEEK_NAME"].str.split(" ", 8, expand=True)
 
-    old.drop(old.tail(1).index, inplace=True)  # drop last n rows
+            new = new[['RPT_SHORT_DESC',
+                       'store_year',
+                       'store_week',
+                       'RE_STO_NUM',
+                       'UPC',
+                       'SCANNED_RETAIL_DOLLARS',
+                       'SCANNED_MOVEMENT'
+                       ]]
 
-    old['store_number'] = old['Store Number'].astype(float).astype(np.int64)
+            # Takes the numbers out for the RPT_SHORT_DESC (store type) collumn leaving only the Divison name ie
+            # ('35 Dallas' => 'Dallas')
+            new['store_week'] = new.store_week.str.extract('(\d+)')
+            new['RPT_SHORT_DESC'] = new.RPT_SHORT_DESC.str.replace('[^a-zA-Z]', '')
 
-    # upc values are converted from float to int64 (db requires this data type)
+            # adding the winwin year and weeknum column. weeknum column is added using the support document
+            # the
 
-    old['UPC'] = old['UPC'].astype(float).astype(np.int64)
+            i = 0
 
-    # seting transition date range and store_week values for data and store_type
-    old['transition_year'] = transition_year
-    old['transition_season'] = f'{transition_season}'
-    old['store_week'] = date
-    old['store_type'] = 'kvat'
-    old['store_year'] = store_year
-    old['current_year'] = current_year
-    old['current_week'] = current_week
+            while i < len(new):
 
-    old = old.rename(columns={'UPC': 'upc'})
+                store_week = int(new.loc[i, 'store_week'])
 
-    salesdata = old[['transition_year',
-                     'transition_season',
-                     'store_year',
-                     'store_week',
-                     'store_number',
-                     'upc',
-                     'sales',
-                     'qty',
-                     'current_year',
-                     'current_week',
-                     'store_type'
+                new.loc[i, 'current_week'] = int(self.kroger_calender.loc[store_week, 'winwin_week_number'])
 
-                     ]]
+                new.loc[i, 'date'] = self.kroger_calender.loc[store_week, 'date']
 
-    return salesdata
+                new.loc[i, 'current_year'] = int(self.kroger_calender.loc[store_week, 'winwin year'])
 
+                upc = new.loc[i, 'UPC']
 
-def safeway_denver_transform(file, transition_year, transition_season, current_year, current_week):
-    # the first time reading the raw sales data file is extract the date from the first row
+                store_number = new.loc[i, 'RE_STO_NUM']
 
-    old = pd.read_excel(f'{file}')
+                # code = self.quickbooks_code_finder(store_number, upc)
 
-    names = old.columns
-    string = names[0]
+                # new.loc[i, 'code'] = code
 
-    # stripping date from string and converting it to datetime object
+                # print(i)
+                i += 1
 
-    match_str = re.search(r'\d{1}/\d{1}/\d{4}', string)
+            new['transition_year'] = f'{self.transition_year}'
+            new['transition_season'] = f'{self.transition_season}'
 
-    if match_str == None:
-        match_str = re.search(r'\d{1}/\d{2}/\d{4}', string)
+            # Renames collumn names to approripate name for data insertion and update script
+            new = new.rename(columns={
+                'RPT_SHORT_DESC': 'store_type',
+                'RE_STO_NUM': 'store_number',
+                'UPC': 'upc',
+                'SCANNED_RETAIL_DOLLARS': 'sales',
+                'SCANNED_MOVEMENT': 'qty'
+            })
 
-    if match_str == None:
-        match_str = re.search(r'\d{2}/\d{1}/\d{4}', string)
+            # reorganizes collumns to proper format for sales table
+            new = new[['transition_year',
+                       'transition_season',
+                       'store_year',
+                       'date',
+                       'store_week',
+                       'store_number',
+                       'upc',
+                       'sales',
+                       'qty',
+                       'current_year',
+                       'current_week',
+                       # 'code',
+                       'store_type']]
 
-    if match_str == None:
-        match_str = re.search(r'\d{2}/\d{2}/\d{4}', string)
+            # converting division names into store_type for sales tables
 
-    # computed date
-    # feeding format
-    date = datetime.strptime(match_str.group(), '%m/%d/%Y').date()
+            divisions = new.store_type.unique().tolist()
+            division_len = len(divisions)
 
-    # assign store year variable using datetime object
-    store_year = date.year
+            store_list = {
 
-    # assign store_week variable using datetime object
-    store_week = date.strftime('%m/%d/%Y')
+                'Atl': 'kroger_atlanta',
+                'Cincy': 'kroger_cincinatti',
+                'Louisville': 'kroger_louisville',
+                'Nashville': 'kroger_nashville',
+                'Dillon': 'kroger_dillons',
+                'KingSoopers': 'kroger_king_soopers',
+                'Central': 'kroger_central',
+                'Columbus': 'kroger_columbus',
+                'Dallas': 'kroger_dallas',
+                'Delta': 'kroger_delta',
+                'Michigan': 'kroger_michigan'
 
+            }
 
-    # second time reading the raw file is to extract only the sales data
+            # filter all of the data that pertains to the store_type_input
+            store_type = self.store_type_input
 
-    old = pd.read_excel(f'{file}', skiprows=2)
+            division = list(store_list.keys())[list(store_list.values()).index(store_type)]
 
-    # select upc out of string and then converts to proper datatype for database
-    old['UPC - Description'] = old['UPC - Description'].str[:11]
-    old['UPC - Description'] = old['UPC - Description'].astype(str).astype(np.int64)
+            new_filt = new[new['store_type'] == division]
 
-    old = old.rename(columns={'UPC - Description': 'upc',
-                              'Sales (TY)': 'sales',
-                              'Units (TY)': 'qty',
-                              'Store': 'store_number'
-                              })
+            #reset index and change store type
+            new_filt = new_filt.reset_index(drop=True)
+            new_filt['store_type'] = store_type
+            salesdata = new_filt
+        else:
+            print('MFR_check failed. sales data sheet contains items that is not WinWin Products')
 
-    # creating transition collumn, store_week, store_year, store_type collumn
+        return salesdata
 
-    old['transition_year'] = transition_year
+    def kvat_transform(self,file, transition_year, transition_season, current_year, current_week):
+        # grabs the date that will be used to set the date across the board
+        old = pd.read_excel(f'{file}', skiprows=1)
+        date = old.iloc[0, 4]
 
-    old['transition_season'] = f'{transition_season}'
+        A = datetime.strptime(date, '%m/%d/%Y')
+        store_year = A.year
 
-    old['store_week'] = store_week
+        # this is finding the current week for the stores
+        # day = A.day
+        # month = A.month
+        # year = A.year
 
-    old['store_year'] = store_year
+        # current_week = date(A).isocalendar()[1]
 
-    old['store_type'] = 'safeway_denver'
+        # recreating data frame so I don't have to redefine the column names
+        old = pd.read_excel(f'{file}', skiprows=3)
 
-    old['current_year'] = current_year
 
-    old['current_week'] = current_week
+        old['qty'] = old['Units Sold'] + old['Units Sold.1'] + old['Units Sold.2'] + old['Units Sold.3'] + old[
+            'Units Sold.4'] + old['Units Sold.5'] + old['Units Sold.6']
 
-    salesdata = old[['transition_year',
-                     'transition_season',
-                     'store_year',
-                     'store_week',
-                     'store_number',
-                     'upc',
-                     'sales',
-                     'qty',
-                     'current_year',
-                     'current_week',
-                     'store_type']]
+        old['sales'] = old['Sales $'] + old['Sales $.1'] + old['Sales $.2'] + old['Sales $.3'] + old['Sales $.4'] + old[
+            'Sales $.5'] + old['Sales $.6']
 
-    return salesdata
+        # drops last row due to grand total. after dropping it,
+        # store numbers can be then converted to int values
 
+        old.drop(old.tail(1).index, inplace=True)  # drop last n rows
 
-def jewel_transform(file, transition_year, transition_season, current_year, current_week, connection, store_type_input):
+        old['store_number'] = old['Store Number'].astype(float).astype(np.int64)
 
-    """Transform sales data  for jewel osco does not need the inputs of current_year or current_week"""
+        # upc values are converted from float to int64 (db requires this data type)
 
-    old = pd.read_excel(f'{file}', sheet_name='Product Scan', skiprows=1)
+        old['UPC'] = old['UPC'].astype(float).astype(np.int64)
 
-    # verify data
-
-    verify = old.loc[0, 'Division']
-    if 'JEWEL' in verify:
-        verify = 'pass'
-
-    if verify == 'pass':
-        # inserting neccessary collumns for sales insert function
+        # seting transition date range and store_week values for data and store_type
         old['transition_year'] = transition_year
-        old['transition_season'] = transition_season
-        old['store_year'] = 0
-        old['current_year'] = 0
-        old['current_week'] = 0
+        old['transition_season'] = f'{transition_season}'
+        old['store_week'] = date
+        old['store_type'] = 'kvat'
+        old['store_year'] = store_year
+        old['current_year'] = current_year
+        old['current_week'] = current_week
 
-        # Grabs only the neccessary collumns and reformats them into the neccesary df format for the sale insertert function
-        old = old[['transition_year',
-                   'transition_season',
-                   'store_year',
-                   'Day',
-                   'Store',
-                   'UPC',
-                   'Sum Net Amount',
-                   'Sum Item Quantity',
-                   'current_year',
-                   'current_week',
-                   'Division']]
+        old = old.rename(columns={'UPC': 'upc'})
 
-        old = old.rename(columns={
-            'Division': 'store_type',
-            'Store': 'store_number',
-            'UPC': 'upc',
-            'Sum Net Amount': 'sales',
-            'Sum Item Quantity': 'qty',
-            'Day': 'store_week'
-        })
+        salesdata = old[['transition_year',
+                         'transition_season',
+                         'store_year',
+                         'store_week',
+                         'store_number',
+                         'upc',
+                         'sales',
+                         'qty',
+                         'current_year',
+                         'current_week',
+                         'store_type'
 
-        # extracting only the store division name from colllumn and then lower caseing it so it can pass the db security check
-        old['store_type'] = old.store_type.str.replace('[^a-zA-Z]', '')
-        old['store_type'] = old.store_type.str.lower()
+                         ]]
 
-        # Find the last date in the db
+        return salesdata
 
-        date = psql.read_sql(f'select max(store_week) from {store_type_input}.sales2', connection)
-        date = pd.Timestamp(date.iloc[0, 0])
+    def safeway_denver_transform(self,file, transition_year, transition_season, current_year, current_week):
+        # the first time reading the raw sales data file is extract the date from the first row
 
-        # sorts dates in order
-        old = old.sort_values(by='store_week', ascending=True)
+        old = pd.read_excel(f'{file}')
 
-        # using that date select the data from that date to present day in the sales sheet.
-        filt = (old['store_week'] >= date)
-        old = old.loc[filt]
+        names = old.columns
+        string = names[0]
 
-        # assigns store year, current year, and current week using the store_week column.
-        # Note that when finding the week number for the current week the week begins on Sunday and ends on Saturday
-        # this is per the CVS Schedule
+        # stripping date from string and converting it to datetime object
 
-        old['store_year'] = old['store_week'].dt.year
-        old['current_year'] = old['store_week'].dt.year
-        old['current_week'] = old['store_week'].apply(lambda x: (x + dt.timedelta(days=1)).week)
+        match_str = re.search(r'\d{1}/\d{1}/\d{4}', string)
+
+        if match_str == None:
+            match_str = re.search(r'\d{1}/\d{2}/\d{4}', string)
+
+        if match_str == None:
+            match_str = re.search(r'\d{2}/\d{1}/\d{4}', string)
+
+        if match_str == None:
+            match_str = re.search(r'\d{2}/\d{2}/\d{4}', string)
+
+        # computed date
+        # feeding format
+        date = datetime.strptime(match_str.group(), '%m/%d/%Y').date()
+
+        # assign store year variable using datetime object
+        store_year = date.year
+
+        # assign store_week variable using datetime object
+        store_week = date.strftime('%m/%d/%Y')
+
+
+        # second time reading the raw file is to extract only the sales data
+
+        old = pd.read_excel(f'{file}', skiprows=2)
+
+        # select upc out of string and then converts to proper datatype for database
+        old['UPC - Description'] = old['UPC - Description'].str[:11]
+        old['UPC - Description'] = old['UPC - Description'].astype(str).astype(np.int64)
+
+        old = old.rename(columns={'UPC - Description': 'upc',
+                                  'Sales (TY)': 'sales',
+                                  'Units (TY)': 'qty',
+                                  'Store': 'store_number'
+                                  })
+
+        # creating transition collumn, store_week, store_year, store_type collumn
+
+        old['transition_year'] = transition_year
+
+        old['transition_season'] = f'{transition_season}'
+
+        old['store_week'] = store_week
+
+        old['store_year'] = store_year
+
+        old['store_type'] = 'safeway_denver'
+
+        old['current_year'] = current_year
+
+        old['current_week'] = current_week
 
         salesdata = old[['transition_year',
                          'transition_season',
@@ -332,75 +307,207 @@ def jewel_transform(file, transition_year, transition_season, current_year, curr
                          'current_week',
                          'store_type']]
 
-        salesdata = salesdata.reset_index(drop=True)
+        return salesdata
 
-    else:
-        salesdata = "Failed"
-        print("\n\nFAILED DATA VERIFICATION")
+    def jewel_transform(self,file, transition_year, transition_season, connection, store_type_input):
 
-    return salesdata
+        """Transform sales data  for jewel osco does not need the inputs of current_year or current_week"""
+
+        old = pd.read_excel(f'{file}', sheet_name='Product Scan', skiprows=1)
+
+        # verify data
+
+        verify = old.loc[0, 'Division']
+        if 'JEWEL' in verify:
+            verify = 'pass'
+
+        if verify == 'pass':
+            # inserting neccessary collumns for sales insert function
+            old['transition_year'] = transition_year
+            old['transition_season'] = transition_season
+            old['store_year'] = 0
+            old['current_year'] = 0
+            old['current_week'] = 0
+
+            # Grabs only the neccessary collumns and reformats them into the neccesary df format for the sale insertert function
+            old = old[['transition_year',
+                       'transition_season',
+                       'store_year',
+                       'Day',
+                       'Store',
+                       'UPC',
+                       'Sum Net Amount',
+                       'Sum Item Quantity',
+                       'current_year',
+                       'current_week',
+                       'Division']]
+
+            old = old.rename(columns={
+                'Division': 'store_type',
+                'Store': 'store_number',
+                'UPC': 'upc',
+                'Sum Net Amount': 'sales',
+                'Sum Item Quantity': 'qty',
+                'Day': 'store_week'
+            })
+
+            # extracting only the store division name from colllumn and then lower caseing it so it can pass the db security check
+            old['store_type'] = old.store_type.str.replace('[^a-zA-Z]', '')
+            old['store_type'] = old.store_type.str.lower()
+
+            # Find the last date in the db
+
+            date = psql.read_sql(f'select max(store_week) from {store_type_input}.sales2', connection)
+            date = pd.Timestamp(date.iloc[0, 0])
+
+            # sorts dates in order
+            old = old.sort_values(by='store_week', ascending=True)
+
+            # using that date select the data from that date to present day in the sales sheet.
+            filt = (old['store_week'] >= date)
+            old = old.loc[filt]
+
+            # assigns store year, current year, and current week using the store_week column.
+            # Note that when finding the week number for the current week the week begins on Sunday and ends on Saturday
+            # this is per the CVS Schedule
+
+            old['store_year'] = old['store_week'].dt.year
+            old['current_year'] = old['store_week'].dt.year
+            old['current_week'] = old['store_week'].apply(lambda x: (x + dt.timedelta(days=1)).week)
+
+            salesdata = old[['transition_year',
+                             'transition_season',
+                             'store_year',
+                             'store_week',
+                             'store_number',
+                             'upc',
+                             'sales',
+                             'qty',
+                             'current_year',
+                             'current_week',
+                             'store_type']]
+
+            salesdata = salesdata.reset_index(drop=True)
+
+        else:
+            salesdata = "Failed"
+            print("\n\nFAILED DATA VERIFICATION")
+
+        return salesdata
+
+    def approval_transform(self,store_type_input, file):
+
+        approval = pd.read_csv(f'{file}')
+
+        store_price_column_name = {
+
+            'kvat': 'KVAT Food Stores Price',
+            'acme': 'Albertsons Acme Price',
+            'brookshire': 'Brookshire Brothers Price',
+            'kroger_nashville': 'Kroger - Nashville Price',
+            'kroger_michigan': 'Kroger - Michigan Price',
+            'kroger_louisville': 'Kroger South - Louisville Price',
+            'kroger_king_soopers': 'Kroger - King Soopers Price',
+            'kroger_delta': 'Kroger South - Delta Price',
+            'kroger_dillons': 'Kroger - Dillons Price',
+            'kroger_columbus': 'Kroger - Columbus Price',
+            'kroger_cincinatti': 'Kroger - Cincinnati Price',
+            'kroger_central': 'Kroger - Central Price',
+            'kroger_dallas' : 'Kroger Texas - Dallas Price',
+            'kroger_atlanta': 'Kroger South - Atlanta Price',
+            'safeway_denver': 'Albertsons Denver Price',
+            'jewel': 'Jewel Osco Price',
+            'fresh_encounter': 'Fresh Encounter Price',
+            'intermountain': 'Albertsons Intermountain Price',
+            'texas_division': 'TX Safeway Albertsons Price',
+            'follett' : 'Follett Price'
+
+        }
+
+        try:
+            store_price_column_name = store_price_column_name[f'{store_type_input}']
+            print()
+            approval = approval[['Item', f'{store_price_column_name}']]
+
+            approval = approval.rename(columns={f'{store_price_column_name}': 'store_price',
+                                                'Item': 'code'})
+
+            approval = approval.dropna()
+
+        except:
+
+            print(
+                '\nStore not establisehd in transform approval function need to add store in the dictionary for the function\n')
+
+        return approval
+
+    def inventory_transform(self,file):
+
+        inventory = pd.read_csv(f'{file}')
+
+        inventory = inventory[['Unnamed: 0', 'On Hand']]
+
+        inventory = inventory.dropna()
+
+        inventory[["Unnamed: 0", 'abc']] = inventory["Unnamed: 0"].str.split(" ", n=1, expand=True)
+
+        inventory = inventory[['Unnamed: 0', 'On Hand']]
+
+        inventory = inventory.rename(columns={'Unnamed: 0': 'code',
+                                              'On Hand': 'on_hand'})
+
+        return inventory
+
+    def date_to_week_number_conversion(self,old):
+        """
+
+        This is the reason why we are adding 8 days to the current day to find the weeknumber
+        Pythons isocalender() function is used to calculate the week number and it has an atribute of week
+        It considers Monday as the begining of the week however WinWin week starts on sunday so to address this problem
+        I added one day to each date. The week number is still off by 1 so I then add another 7 days which is another week
+        important to note that isocalendaer uses the gregorian calender which sometimes produces week 53 cvs does this as well
+
+        """
+
+        old['current_week'] = old['store_week'].apply(lambda x: (x + dt.timedelta(days=8)).week)
+
+        return old
+
+    def quickbooks_code_finder(self, store_number, upc_11_digit):
+
+        """Takes the 11 digit upc and finds the code by searching for the most recent delivery
+           this method is done instead of searching the support sheet bc there are duplicates upc
+           and I want the most recent code that was shipped associated with that sales
+        """
+
+        code = f"""
+
+        select delivery2.code
+        from {self.store_type_input}.delivery2
+        inner join public.item_support2 on {self.store_type_input}.delivery2.code = public.item_support2.code
+        where store = {store_number} and upc_11_digit = '{upc_11_digit}'
+        order by date desc
+        
+        """
+
+        code = psql.read_sql(code, self.connection)
+
+        code = code.iloc[0, 0]
+
+        return code
+
+connection = psycopg2.connect(database=f"test", user="postgres", password="winwin", host="localhost")
+store_type_input = 'kroger_central'
+transition_year = 2022
+transition_season = 'SS'
+
+a = transform_data(store_type_input,transition_year, transition_season, connection)
+
+file = r'C:\Users\User1\OneDrive\WinWin Staff Folders\Michael\Replenishment program\Replenishment\support document\sales\Sherlock Store Matrix.csv'
+
+# qb = a.quickbooks_code_finder(959, '81031202111')
 
 
-def approval_transform(store_type_input, file):
 
-    approval = pd.read_csv(f'{file}')
+trans = a.kroger_transform(file)
 
-    store_price_column_name = {
-
-        'kvat': 'KVAT Food Stores Price',
-        'acme': 'Albertsons Acme Price',
-        'brookshire': 'Brookshire Brothers Price',
-        'kroger_nashville': 'Kroger - Nashville Price',
-        'kroger_michigan': 'Kroger - Michigan Price',
-        'kroger_louisville': 'Kroger South - Louisville Price',
-        'kroger_king_soopers': 'Kroger - King Soopers Price',
-        'kroger_delta': 'Kroger South - Delta Price',
-        'kroger_dillons': 'Kroger - Dillons Price',
-        'kroger_columbus': 'Kroger - Columbus Price',
-        'kroger_cincinatti': 'Kroger - Cincinnati Price',
-        'kroger_central': 'Kroger - Central Price',
-        'kroger_dallas' : 'Kroger Texas - Dallas Price',
-        'kroger_atlanta': 'Kroger South - Atlanta Price',
-        'safeway_denver': 'Albertsons Denver Price',
-        'jewel': 'Jewel Osco Price',
-        'fresh_encounter': 'Fresh Encounter Price',
-        'intermountain': 'Albertsons Intermountain Price',
-        'texas_division': 'TX Safeway Albertsons Price',
-        'follett' : 'Follett Price'
-
-    }
-
-    try:
-        store_price_column_name = store_price_column_name[f'{store_type_input}']
-        print()
-        approval = approval[['Item', f'{store_price_column_name}']]
-
-        approval = approval.rename(columns={f'{store_price_column_name}': 'store_price',
-                                            'Item': 'code'})
-
-        approval = approval.dropna()
-
-    except:
-
-        print(
-            '\nStore not establisehd in transform approval function need to add store in the dictionary for the function\n')
-
-    return approval
-
-
-def inventory_transform(file):
-
-    inventory = pd.read_csv(f'{file}')
-
-    inventory = inventory[['Unnamed: 0', 'On Hand']]
-
-    inventory = inventory.dropna()
-
-    inventory[["Unnamed: 0", 'abc']] = inventory["Unnamed: 0"].str.split(" ", n=1, expand=True)
-
-    inventory = inventory[['Unnamed: 0', 'On Hand']]
-
-    inventory = inventory.rename(columns={'Unnamed: 0': 'code',
-                                          'On Hand': 'on_hand'})
-
-    return inventory

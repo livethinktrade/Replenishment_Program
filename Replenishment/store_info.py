@@ -341,7 +341,7 @@ class Replenishment():
 
         elif self.store_type_input == 'jewel':
 
-            salesdata = jewel_transform(file, self.transition_year, self.transition_season, self.current_year, self.current_week, self.connection, self.store_type_input)
+            salesdata = jewel_transform(file, self.transition_year, self.transition_season, self.connection, self.store_type_input)
 
         # elif self.store_type_input == 'brookshire':
         #
@@ -551,64 +551,6 @@ class Replenishment():
         filename = f'{self.store_type_input}_internal_sales_report_{date}.xlsx'
         reports.internal_report(filename)
 
-        # sales_data_fequency = {
-        #
-        #     'jewel': 'weekly',
-        #     'kvat': 'weekly',
-        #     'fresh_encounter': 'weekly',
-        #
-        #     'kroger_central': 'weekly',
-        #     'kroger_columbus': 'weekly',
-        #     'kroger_columbus': 'weekly',
-        #     'kroger_dallas': 'weekly',
-        #     'kroger_delta': 'weekly',
-        #     'kroger_michigan': 'weekly',
-        #
-        #     'brookshire': 'weekly',
-        #
-        #     'safeway_denver': 'weekly',
-        #
-        #     'texas_division': 'ytd',
-        #     'acme': 'ytd',
-        #     'intermountain': 'ytd'
-        # }
-        #
-        # replenishment_report, on_hands_after_replen, replenishment_reasons = replenishment(self.store_type_input, self.store_setting)
-        #
-        # replenishment_len = len(replenishment_report) + 1
-        #
-        # reports = Reports(self.store_type_input, self.store_setting)
-        #
-        # sales_report = reports.sales_table()
-        # item_sales_rank = reports.item_sales_rank()
-        # sales_sql_YTD_Mask = reports.ytd_table_mask()
-        # sales_sql_YTD_WoMask = reports.ytd_table_no_mask()
-        # sales_report_len = reports.sales_report_len(sales_report)
-        # on_hand = reports.on_hands()
-        # no_scan = reports.no_scan(on_hand)
-        #
-        # if sales_data_fequency[self.store_type_input] == 'weekly':
-        #
-        #     filename = weekly_toexcel(self.store_type_input,
-        #                               replenishment_report,
-        #                               sales_report,
-        #                               no_scan,
-        #                               sales_sql_YTD_Mask,
-        #                               sales_sql_YTD_WoMask,
-        #                               item_sales_rank,
-        #                               on_hand, self.store_setting)
-        #
-        #     weekly_sales_report_format(filename, replenishment_len, sales_report_len)
-        #
-        # elif sales_data_fequency[self.store_type_input] == 'ytd':
-        #     filename = ytd_toexcel(self.store_type_input,
-        #                            replenishment_report,
-        #                            sales_report, no_scan,
-        #                            sales_sql_YTD_WoMask,
-        #                            item_sales_rank,
-        #                            on_hand)
-        #
-        #     ytd_sales_report_format(filename, replenishment_len, sales_report_len)
 
         print("\nSales Report Generated")
 
@@ -760,7 +702,6 @@ class Replenishment():
         print('\nItem Approval List Imported')
         print('Updated:', update, 'Records')
         print('Inserted:', insert, 'Records')
-
 
     def inventory_import(self, file):
 
