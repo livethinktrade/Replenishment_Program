@@ -8,7 +8,7 @@ from Sales_Report.Replenishment.replenishment import *
 
 
 class Replenishment():
-    
+
     def __init__(self, store_type_input, current_year, current_week):
         
         self.store_type_input = store_type_input
@@ -44,7 +44,7 @@ class Replenishment():
         self.store_notes = pd.read_excel(rf'C:\Users\User1\OneDrive - winwinproducts.com\Groccery Store Program\{self.store_type_input}\{self.store_type_input}_store_setting.xlsm',
                                          sheet_name='Store Notes')
 
-        self.master_planogram = pd.read_excel(rf'C:\Users\User1\OneDrive - winwinproducts.com\Groccery Store Program\MASTER PLANOGRAM.xlsx',
+        self.master_planogram = pd.read_excel(rf'C:\Users\User1\OneDrive\WinWin Staff Folders\Michael\Replenishment program\Replenishment\support document\MASTER PLANOGRAM.xlsx',
                                          sheet_name='MASTER PLANOGRAM')
 
     def delivery_import(self, file):
@@ -325,50 +325,49 @@ class Replenishment():
                   'kroger_nashville',
                   'kroger_michigan']
 
+        transform = TransformData(self.store_type_input, self.transition_year, self.transition_season, connection)
+
         # series of if statement used to determine which program to use to transform the data to the proper format.
 
         if self.store_type_input in kroger:
 
-            salesdata = kroger_transform(file, self.store_type_input, self.transition_year, self.transition_season, self.current_year, self.current_week)
+            sales_data = transform.kroger_transform(file)
 
         elif self.store_type_input == 'kvat':
 
-            salesdata = kvat_transform(file, self.transition_year, self.transition_season, self.current_year, self.current_week)
+            sales_data = transform.kvat_transform(file, self.transition_year, self.transition_season, self.current_year, self.current_week)
 
         elif self.store_type_input == 'safeway_denver':
 
-            salesdata = safeway_denver_transform(file, self.transition_year, self.transition_season, self.current_year, self.current_week)
+            sales_data = transform.safeway_denver_transform(file, self.transition_year, self.transition_season, self.current_year, self.current_week)
 
         elif self.store_type_input == 'jewel':
 
-            salesdata = jewel_transform(file, self.transition_year, self.transition_season, self.connection, self.store_type_input)
-
-        # elif self.store_type_input == 'brookshire':
-        #
-        #     salesdata = brookshire_transform(file, self.transition_date_range, self.current_year, self.current_week)
+            sales_data = transform.jewel_transform(file, self.transition_year, self.transition_season, self.connection, self.store_type_input)
 
         else:
             print('Update method is not established for this store')
 
-        salesdata_len = len(salesdata)
         i = 0
         update = 0
         insert = 0
         inserted_list = []
 
-        while i < salesdata_len:
+        while i < len(sales_data):
 
-            transition_year = salesdata.loc[i, 'transition_year']
-            transition_season = salesdata.loc[i, 'transition_season']
-            store_year = salesdata.loc[i, 'store_year']
-            store_week = salesdata.loc[i, 'store_week']
-            store_number = salesdata.loc[i, 'store_number']
-            upc = salesdata.loc[i, 'upc']
-            sales = salesdata.loc[i, 'sales']
-            qty = salesdata.loc[i, 'qty']
-            current_year = salesdata.loc[i, 'current_year']
-            current_week = salesdata.loc[i, 'current_week']
-            store_type = salesdata.loc[i, 'store_type']
+            transition_year = sales_data.loc[i, 'transition_year']
+            transition_season = sales_data.loc[i, 'transition_season']
+            store_year = sales_data.loc[i, 'store_year']
+            date = sales_data.loc[i, 'date']
+            store_week = sales_data.loc[i, 'store_week']
+            store_number = sales_data.loc[i, 'store_number']
+            upc = sales_data.loc[i, 'upc']
+            sales = sales_data.loc[i, 'sales']
+            qty = sales_data.loc[i, 'qty']
+            current_year = sales_data.loc[i, 'current_year']
+            current_week = sales_data.loc[i, 'current_week']
+            code = sales_data.loc[i, 'code']
+            store_type = sales_data.loc[i, 'store_type']
 
             duplicate_check = psql.read_sql(f"""
                                                 SELECT * FROM {self.store_type_input}.SALES2 
@@ -386,6 +385,7 @@ class Replenishment():
                 salesupdate(transition_year,
                             transition_season,
                             store_year,
+                            date,
                             store_week,
                             store_number,
                             upc,
@@ -393,24 +393,27 @@ class Replenishment():
                             qty,
                             current_year,
                             current_week,
+                            code,
                             store_type,
                             self.connection_pool,
                             self.store_type_input)
                 update += 1
             else:
                 sales_insert(transition_year,
-                            transition_season,
-                            store_year,
-                            store_week,
-                            store_number,
-                            upc,
-                            sales,
-                            qty,
-                            current_year,
-                            current_week,
-                            store_type,
-                            self.connection_pool,
-                            self.store_type_input)
+                             transition_season,
+                             store_year,
+                             date,
+                             store_week,
+                             store_number,
+                             upc,
+                             sales,
+                             qty,
+                             current_year,
+                             current_week,
+                             code,
+                             store_type,
+                             self.connection_pool,
+                             self.store_type_input)
                 insert += 1
                 inserted_list.append(i)
 
@@ -658,7 +661,9 @@ class Replenishment():
 
     def store_approval_import(self, file):
 
-        store_approval_df = approval_transform(self.store_type_input, file)
+        transform = TransformData(self.store_type_input, self.transition_year, self.transition_season, connection)
+
+        store_approval_df = transform.approval_transform(self.store_type_input, file)
 
         store_approval_df_len = len(store_approval_df)
 
@@ -671,7 +676,7 @@ class Replenishment():
             code = store_approval_df.loc[i, 'code']
             store_price = store_approval_df.loc[i, 'store_price']
 
-            #try and execpt is neccessary right here because POG quickbook codes have a apostophie in them and it
+            # try and execpt is neccessary right here because POG quickbook codes have a apostophie in them and it
             # messes with the sql below
 
             try:
@@ -705,7 +710,9 @@ class Replenishment():
 
     def inventory_import(self, file):
 
-        inventory_df = inventory_transform(file)
+        transform = TransformData(self.store_type_input, self.transition_year, self.transition_season, connection)
+
+        inventory_df = transform.inventory_transform(file)
 
         inventory_df_len = len(inventory_df)
 
@@ -769,15 +776,5 @@ class Replenishment():
 
 
 
-year = 2022
-week = 31
-
-
-
-acme = Replenishment(store_type_input='fresh_encounter',
-                     current_year= year,
-                     current_week= week)
-
-acme.sales_import('fresh_encounter_salesdata_backup_Aug-08-2022-fixed.xlsx')
 
 

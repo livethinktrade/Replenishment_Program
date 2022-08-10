@@ -90,14 +90,16 @@ def delivery_insert(transition_year,
 # this is for updating prexisting data in the DB
 def salesupdate(transition_year,
                 transition_season,
-                store_year,	
+                store_year,
+                date,
                 store_week,	
                 store_number,	
                 upc,	
                 sales,	
                 qty,	
                 current_year,	
-                current_week,	
+                current_week,
+                code,
                 store_type,
                 connection_pool,
                 store_type_input):
@@ -110,7 +112,9 @@ def salesupdate(transition_year,
                             transition_season = '{transition_season}',
                             sales={sales},
                             current_year = {current_year},
-                            current_week = {current_week}
+                            current_week = {current_week},
+                            code = '{code}',
+                            date = '{date}'
                         WHERE store_year ={store_year} and 
                         store_week = '{store_week}' and 
                         store_number = {store_number} and 

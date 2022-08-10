@@ -11,8 +11,7 @@ from datetime import datetime
 import datetime as dt
 
 
-class transform_data:
-
+class TransformData():
 
     def __init__(self, store_type_input, transition_year, transition_season, connection):
 
@@ -75,39 +74,13 @@ class transform_data:
                        'SCANNED_MOVEMENT'
                        ]]
 
+            # taking the parenthesis out of data
+            new['store_week'] = new.store_week.str.extract('(\d+)')
+
             # Takes the numbers out for the RPT_SHORT_DESC (store type) collumn leaving only the Divison name ie
             # ('35 Dallas' => 'Dallas')
-            new['store_week'] = new.store_week.str.extract('(\d+)')
             new['RPT_SHORT_DESC'] = new.RPT_SHORT_DESC.str.replace('[^a-zA-Z]', '')
 
-            # adding the winwin year and weeknum column. weeknum column is added using the support document
-            # the
-
-            i = 0
-
-            while i < len(new):
-
-                store_week = int(new.loc[i, 'store_week'])
-
-                new.loc[i, 'current_week'] = int(self.kroger_calender.loc[store_week, 'winwin_week_number'])
-
-                new.loc[i, 'date'] = self.kroger_calender.loc[store_week, 'date']
-
-                new.loc[i, 'current_year'] = int(self.kroger_calender.loc[store_week, 'winwin year'])
-
-                upc = new.loc[i, 'UPC']
-
-                store_number = new.loc[i, 'RE_STO_NUM']
-
-                # code = self.quickbooks_code_finder(store_number, upc)
-
-                # new.loc[i, 'code'] = code
-
-                # print(i)
-                i += 1
-
-            new['transition_year'] = f'{self.transition_year}'
-            new['transition_season'] = f'{self.transition_season}'
 
             # Renames collumn names to approripate name for data insertion and update script
             new = new.rename(columns={
@@ -118,22 +91,6 @@ class transform_data:
                 'SCANNED_MOVEMENT': 'qty'
             })
 
-            # reorganizes collumns to proper format for sales table
-            new = new[['transition_year',
-                       'transition_season',
-                       'store_year',
-                       'date',
-                       'store_week',
-                       'store_number',
-                       'upc',
-                       'sales',
-                       'qty',
-                       'current_year',
-                       'current_week',
-                       # 'code',
-                       'store_type']]
-
-            # converting division names into store_type for sales tables
 
             divisions = new.store_type.unique().tolist()
             division_len = len(divisions)
@@ -161,14 +118,58 @@ class transform_data:
 
             new_filt = new[new['store_type'] == division]
 
-            #reset index and change store type
+            # reset index and change store type
             new_filt = new_filt.reset_index(drop=True)
             new_filt['store_type'] = store_type
-            salesdata = new_filt
+            new = new_filt
+
+
+
+            # adding the winwin year and weeknum column. weeknum column is added using the support document
+
+            i = 0
+
+            while i < len(new):
+
+                store_week = int(new.loc[i, 'store_week'])
+
+                new.loc[i, 'current_week'] = int(self.kroger_calender.loc[store_week, 'winwin_week_number'])
+
+                new.loc[i, 'date'] = self.kroger_calender.loc[store_week, 'date']
+
+                new.loc[i, 'current_year'] = int(self.kroger_calender.loc[store_week, 'winwin year'])
+
+                upc_11_digit = str(new.loc[i, 'upc'])
+
+                code = self.quickbooks_code_finder(upc_11_digit)
+
+                new.loc[i, 'code'] = code
+
+                print(i)
+                i += 1
+
+            new['transition_year'] = f'{self.transition_year}'
+            new['transition_season'] = f'{self.transition_season}'
+
+            # reorganizes collumns to proper format for sales table
+            sales_data = new[['transition_year',
+                              'transition_season',
+                              'store_year',
+                              'date',
+                              'store_week',
+                              'store_number',
+                              'upc',
+                              'sales',
+                              'qty',
+                              'current_year',
+                              'current_week',
+                              'code',
+                              'store_type']]
+
         else:
             print('MFR_check failed. sales data sheet contains items that is not WinWin Products')
 
-        return salesdata
+        return sales_data
 
     def kvat_transform(self,file, transition_year, transition_season, current_year, current_week):
         # grabs the date that will be used to set the date across the board
@@ -395,7 +396,7 @@ class transform_data:
 
         return salesdata
 
-    def approval_transform(self,store_type_input, file):
+    def approval_transform(self, file):
 
         approval = pd.read_csv(f'{file}')
 
@@ -425,7 +426,7 @@ class transform_data:
         }
 
         try:
-            store_price_column_name = store_price_column_name[f'{store_type_input}']
+            store_price_column_name = store_price_column_name[f'{self.store_type_input}']
             print()
             approval = approval[['Item', f'{store_price_column_name}']]
 
@@ -473,20 +474,15 @@ class transform_data:
 
         return old
 
-    def quickbooks_code_finder(self, store_number, upc_11_digit):
+    def quickbooks_code_finder(self, upc_11_digit):
 
-        """Takes the 11 digit upc and finds the code by searching for the most recent delivery
-           this method is done instead of searching the support sheet bc there are duplicates upc
-           and I want the most recent code that was shipped associated with that sales
-        """
+        """Takes the 11 digit upc and finds the code by searching for the support sheet """
 
         code = f"""
 
-        select delivery2.code
-        from {self.store_type_input}.delivery2
-        inner join public.item_support2 on {self.store_type_input}.delivery2.code = public.item_support2.code
-        where store = {store_number} and upc_11_digit = '{upc_11_digit}'
-        order by date desc
+        select code
+        from item_support2
+        where upc_11_digit = '{upc_11_digit}'
         
         """
 
@@ -501,7 +497,7 @@ store_type_input = 'kroger_central'
 transition_year = 2022
 transition_season = 'SS'
 
-a = transform_data(store_type_input,transition_year, transition_season, connection)
+a = TransformData(store_type_input,transition_year, transition_season, connection)
 
 file = r'C:\Users\User1\OneDrive\WinWin Staff Folders\Michael\Replenishment program\Replenishment\support document\sales\Sherlock Store Matrix.csv'
 
