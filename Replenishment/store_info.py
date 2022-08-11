@@ -9,7 +9,7 @@ from Sales_Report.Replenishment.replenishment import *
 
 class Replenishment():
 
-    def __init__(self, store_type_input, current_year, current_week):
+    def __init__(self, store_type_input):
         
         self.store_type_input = store_type_input
         
@@ -20,11 +20,6 @@ class Replenishment():
                                             host="localhost")
 
         self.connection = psycopg2.connect(database=f"test", user="postgres", password="winwin", host="localhost")
-
-        self.current_year = current_year
-
-        self.current_week = current_week
-
 
         # self.store_setting = pd.read_excel(rf'C:\Users\User1\OneDrive\WinWin Staff Folders\Michael\Groccery Store Program\{self.store_type_input}\{self.store_type_input}_store_setting.xlsm',
         #                                    sheet_name='Sheet2',
@@ -335,18 +330,18 @@ class Replenishment():
 
         elif self.store_type_input == 'kvat':
 
-            sales_data = transform.kvat_transform(file, self.transition_year, self.transition_season, self.current_year, self.current_week)
+            sales_data = transform.kvat_transform(file)
 
         elif self.store_type_input == 'safeway_denver':
 
-            sales_data = transform.safeway_denver_transform(file, self.transition_year, self.transition_season, self.current_year, self.current_week)
+            sales_data = transform.safeway_denver_transform(file)
 
         elif self.store_type_input == 'jewel':
 
-            sales_data = transform.jewel_transform(file, self.transition_year, self.transition_season, self.connection, self.store_type_input)
+            sales_data = transform.jewel_transform(file)
 
         else:
-            print('Update method is not established for this store')
+            raise Exception('Error: Sales update method is not established for this store')
 
         i = 0
         update = 0
@@ -369,10 +364,17 @@ class Replenishment():
             code = sales_data.loc[i, 'code']
             store_type = sales_data.loc[i, 'store_type']
 
+            #verifying data to make sure correct data is being inserted into the correct database
+            if store_type == self.store_type_input:
+                pass
+            else:
+                raise Exception(f'Error: {store_type} is trying to be inserted into the {self.store_type_input} table')
+
             duplicate_check = psql.read_sql(f"""
                                                 SELECT * FROM {self.store_type_input}.SALES2 
                                                 WHERE store_year ={store_year} and 
-                                                    store_week = '{store_week}' and 
+                                                    store_week = '{store_week}' and
+                                                    date = '{date}' and 
                                                     store_number = {store_number} and 
                                                     upc = '{upc}' and 
                                                     store_type = '{store_type}'
