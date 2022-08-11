@@ -15,20 +15,22 @@ class TransformData():
 
     def __init__(self, store_type_input, transition_year, transition_season, connection):
 
-        self.winwin_calender = pd.read_excel(r'C:\Users\User1\OneDrive\WinWin Staff Folders\Michael\Replenishment program\Replenishment\support document\Store Weeks Calender.xlsx',
+        self.store_weeks_calender_file = r'C:\Users\User1\OneDrive\WinWin Staff Folders\Michael\Replenishment program\Replenishment\support document\Store Weeks Calender.xlsx'
+
+        self.winwin_calender = pd.read_excel(f'{self.store_weeks_calender_file}',
                                       sheet_name=f'WinWin Fiscal Year',
                                       names=('week_number', 'date', 'winwin year'))
 
-        self.cvs_calender = pd.read_excel(r'C:\Users\User1\OneDrive\WinWin Staff Folders\Michael\Replenishment program\Replenishment\support document\Store Weeks Calender.xlsx',
+        self.cvs_calender = pd.read_excel(f'{self.store_weeks_calender_file}',
                                       sheet_name=f'CVS Fiscal Year',
                                       names=('week_number', 'date', 'winwin year'))
 
-        self.kroger_calender = pd.read_excel(r'C:\Users\User1\OneDrive\WinWin Staff Folders\Michael\Replenishment program\Replenishment\support document\Store Weeks Calender.xlsx',
+        self.kroger_calender = pd.read_excel(f'{self.store_weeks_calender_file}',
                                       sheet_name=f'Kroger Fiscal Year',
                                       index_col= 0,
                                       names=('kroger_week_number', 'date', 'winwin_week_number', 'winwin year'))
 
-        self.albertson_calender = pd.read_excel(r'C:\Users\User1\OneDrive\WinWin Staff Folders\Michael\Replenishment program\Replenishment\support document\Store Weeks Calender.xlsx',
+        self.albertson_calender = pd.read_excel(f'{self.store_weeks_calender_file}',
                                       sheet_name=f'Albertson Fiscal Year',
                                       names=('albertson_week_number', 'date', 'winwin_week_number', 'winwin year'))
 
@@ -127,6 +129,8 @@ class TransformData():
 
             # adding the winwin year and weeknum column. weeknum column is added using the support document
 
+            current_year = self.find_winwin_year()
+
             i = 0
 
             while i < len(new):
@@ -137,7 +141,7 @@ class TransformData():
 
                 new.loc[i, 'date'] = self.kroger_calender.loc[store_week, 'date']
 
-                new.loc[i, 'current_year'] = int(self.kroger_calender.loc[store_week, 'winwin year'])
+                new.loc[i, 'current_year'] = current_year
 
                 upc_11_digit = str(new.loc[i, 'upc'])
 
@@ -145,13 +149,12 @@ class TransformData():
 
                 new.loc[i, 'code'] = code
 
-                print(i)
                 i += 1
 
             new['transition_year'] = f'{self.transition_year}'
             new['transition_season'] = f'{self.transition_season}'
 
-            # reorganizes collumns to proper format for sales table
+            # reorganizes columns to proper format for sales table
             sales_data = new[['transition_year',
                               'transition_season',
                               'store_year',
@@ -167,11 +170,12 @@ class TransformData():
                               'store_type']]
 
         else:
-            print('MFR_check failed. sales data sheet contains items that is not WinWin Products')
+            raise Exception(' Error: MFR_check failed. sales data sheet contains items that is not WinWin Products')
 
         return sales_data
 
     def kvat_transform(self,file, transition_year, transition_season, current_year, current_week):
+
         # grabs the date that will be used to set the date across the board
         old = pd.read_excel(f'{file}', skiprows=1)
         date = old.iloc[0, 4]
@@ -179,12 +183,6 @@ class TransformData():
         A = datetime.strptime(date, '%m/%d/%Y')
         store_year = A.year
 
-        # this is finding the current week for the stores
-        # day = A.day
-        # month = A.month
-        # year = A.year
-
-        # current_week = date(A).isocalendar()[1]
 
         # recreating data frame so I don't have to redefine the column names
         old = pd.read_excel(f'{file}', skiprows=3)
@@ -459,8 +457,9 @@ class TransformData():
 
         return inventory
 
-    def date_to_week_number_conversion(self,old):
+    def date_to_week_number_conversion(self, old):
         """
+        Takes in Dataframe
 
         This is the reason why we are adding 8 days to the current day to find the weeknumber
         Pythons isocalender() function is used to calculate the week number and it has an atribute of week
@@ -492,6 +491,46 @@ class TransformData():
 
         return code
 
+    def find_winwin_year(self):
+
+        today_date = dt.datetime.now()
+
+        # assigns dt attributes to variable that way you can convert to np.datetime64
+        # which is what dtype the winwincalender is
+
+        year = today_date.year
+        month = today_date.month
+        day = today_date.day
+
+        # for months and days that are < 10 they need to have a 0 in front of it otherwise they will not work when
+        # forming the datetime64 type
+
+        if month < 10:
+
+            month = '0' + f'{month}'
+
+        if day < 10:
+
+            day = '0' + f'{day}'
+
+        # creating the datetime64 data type
+        search_date = np.datetime64(f'{year}-{month}-{day}')
+
+        # using the search date to filter the winwin calender
+        filter_date = self.winwin_calender[self.winwin_calender['date'] == search_date]
+
+        if len(filter_date) < 1:
+            raise Exception(f"""\nError: Need to update 'Store Weeks Calender' excel file.
+            \t File: '{self.store_weeks_calender_file}'
+            Update the WinWin Fiscal Year tab""")
+        else:
+
+            filter_date = filter_date.reset_index(drop=True)
+            year = filter_date.loc[0, 'winwin year']
+
+        return year
+
+
 connection = psycopg2.connect(database=f"test", user="postgres", password="winwin", host="localhost")
 store_type_input = 'kroger_central'
 transition_year = 2022
@@ -501,9 +540,8 @@ a = TransformData(store_type_input,transition_year, transition_season, connectio
 
 file = r'C:\Users\User1\OneDrive\WinWin Staff Folders\Michael\Replenishment program\Replenishment\support document\sales\Sherlock Store Matrix.csv'
 
-# qb = a.quickbooks_code_finder(959, '81031202111')
-
 
 
 trans = a.kroger_transform(file)
+
 
