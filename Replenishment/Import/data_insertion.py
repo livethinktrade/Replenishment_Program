@@ -252,24 +252,25 @@ def item_support_update(season,
     connection_pool.putconn(connection)
 
 
-
-def store_insert(store_id, initial, notes, connection_pool, store_type_input):
+def store_insert(store_id, initial, notes, store_type, connection_pool, store_type_input):
 
     connection = connection_pool.getconn()
     cursor = connection.cursor()
-    cursor.execute(f"INSERT INTO {store_type_input}.store (store_id, initial, notes) values (%s,%s,%s)",
-           (store_id, initial, notes))
+    cursor.execute(f"INSERT INTO {store_type_input}.store (store_id, initial, notes, store_type) values (%s,%s,%s,%s)",
+           (store_id, initial, notes, store_type))
 
     connection.commit()
     cursor.close()
     connection_pool.putconn(connection)
 
-def store_update(store_id, initial, notes, connection_pool, store_type_input):
+
+def store_update(store_id, initial, notes, store_type, connection_pool, store_type_input):
     connection = connection_pool.getconn()
     cursor = connection.cursor()
     cursor.execute(
         f"""update {store_type_input}.store set initial = '{initial}',
-                                     notes = '{notes}'
+                                     notes = '{notes}',
+                                     store_type = '{store_type}'
              where store_id = '{store_id}'""")
 
     connection.commit()
@@ -277,26 +278,26 @@ def store_update(store_id, initial, notes, connection_pool, store_type_input):
     connection_pool.putconn(connection)
 
 
-
-def store_program_insert(store_program_id,store_id, program_id, activity, connection_pool, store_type_input):
+def store_program_insert(store_program_id,store_id, program_id, activity, store_type, connection_pool, store_type_input):
 
     connection = connection_pool.getconn()
     cursor = connection.cursor()
-    cursor.execute(f"INSERT INTO {store_type_input}.store_program (store_program_id, store_id, program_id, activity) values (%s,%s,%s,%s)",
-           (store_program_id,store_id, program_id, activity))
+    cursor.execute(f"INSERT INTO {store_type_input}.store_program (store_program_id, store_id, program_id, activity,store_type) values (%s,%s,%s,%s,%s)",
+           (store_program_id,store_id, program_id, activity, store_type))
 
     connection.commit()
     cursor.close()
     connection_pool.putconn(connection)
 
-def store_program_update(store_program_id,store_id, program_id, activity, connection_pool, store_type_input):
+def store_program_update(store_program_id,store_id, program_id, activity, store_type, connection_pool, store_type_input):
 
     connection = connection_pool.getconn()
     cursor = connection.cursor()
     cursor.execute(
         f"""update {store_type_input}.store_program set store_id = '{store_id}',
                                     program_id = '{program_id}',
-                                    activity = '{activity}'
+                                    activity = '{activity}',
+                                    store_type = '{store_type}'
             where store_program_id = '{store_program_id}'""")
 
     connection.commit()

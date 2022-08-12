@@ -13,7 +13,8 @@ create table store (
 	
 store_id integer PRIMARY KEY,
 initial varchar(10) NOT NULL,
-notes varchar(50) NOT NULL
+notes varchar(50) NOT NULL,
+store_type character varying(20) NOT NULL
 
 );
 
@@ -24,6 +25,7 @@ store_program_id serial PRIMARY KEY,
 store_id integer NOT NULL,
 program_id varchar(15) NOT NULL,
 activity varchar(10),
+store_type character varying(20) NOT NULL,
 
 FOREIGN KEY (program_id) REFERENCES master_planogram (program_id),
 FOREIGN KEY (store_id) REFERENCES store(store_id)
@@ -95,7 +97,7 @@ CREATE TABLE delivery2
 
 
 
-CREATE TABLE texas_division.sales2
+CREATE TABLE sales2
 (
     id serial NOT NULL PRIMARY KEY,
     transition_year integer,

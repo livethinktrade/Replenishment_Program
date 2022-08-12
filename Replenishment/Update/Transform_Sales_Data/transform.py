@@ -404,7 +404,7 @@ class TransformData():
                 store_number = old.loc[i, 'store_number']
                 date = old.loc[i, 'date']
 
-                week_number = self.date_to_week_number_conversion(date)
+                week_number = int(self.date_to_week_number_conversion(date))
 
                 year = self.find_winwin_year(date)
 
@@ -419,6 +419,11 @@ class TransformData():
                 old.loc[i, 'current_year'] = year
 
                 i += 1
+
+            old['current_week'] = old['current_week'].astype('int64')
+            old['store_week'] = old['store_week'].astype('int64')
+            old['store_year'] = old['store_year'].astype('int64')
+            old['current_year'] = old['current_year'].astype('int64')
 
             sales_data = old[['transition_year',
                               'transition_season',
@@ -648,18 +653,6 @@ class TransformData():
         return year
 
 
-connection = psycopg2.connect(database=f"test", user="postgres", password="winwin", host="localhost")
-store_type_input = 'safeway_denver'
-transition_year = 2022
-transition_season = 'SS'
-
-a = TransformData(store_type_input,transition_year, transition_season, connection)
-
-file = r'C:\Users\User1\OneDrive\WinWin Staff Folders\Michael\Replenishment program\Replenishment\support document\sales\jewel_sales.xlsx'
-
-
-
-trans = a.jewel_transform(file)
 
 
 

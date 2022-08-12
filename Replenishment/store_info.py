@@ -6,7 +6,6 @@ from Sales_Report.Reports.reports import *
 from Sales_Report.Replenishment.replenishment import *
 
 
-
 class Replenishment():
 
     def __init__(self, store_type_input):
@@ -14,24 +13,24 @@ class Replenishment():
         self.store_type_input = store_type_input
         
         self.connection_pool = pool.SimpleConnectionPool(1, 10000, 
-                                            database= "test",
-                                            user="postgres", 
-                                            password="winwin", 
-                                            host="localhost")
+                                                         database= "test",
+                                                         user="postgres",
+                                                         password="winwin",
+                                                         host="localhost")
 
         self.connection = psycopg2.connect(database=f"test", user="postgres", password="winwin", host="localhost")
 
         # self.store_setting = pd.read_excel(rf'C:\Users\User1\OneDrive\WinWin Staff Folders\Michael\Groccery Store Program\{self.store_type_input}\{self.store_type_input}_store_setting.xlsm',
         #                                    sheet_name='Sheet2',
         #                                    header=None)
-        self.store_setting= pd.read_excel(rf'C:\Users\User1\OneDrive - winwinproducts.com\Groccery Store Program\{self.store_type_input}\{self.store_type_input}_store_setting.xlsm',
-                                            sheet_name='Sheet2',
-                                            header=None,
-                                            index_col=0,
-                                            names=('setting', 'values'))
+        self.store_setting = pd.read_excel(rf'C:\Users\User1\OneDrive - winwinproducts.com\Groccery Store Program\{self.store_type_input}\{self.store_type_input}_store_setting.xlsm',
+                                           sheet_name='Sheet2',
+                                           header=None,
+                                           index_col=0,
+                                           names=('setting', 'values'))
 
         self.transition_year = self.store_setting.loc['Transition_year', 'values']
-        self.transition_season = self.store_setting.loc['Transition_Season','values']
+        self.transition_season = self.store_setting.loc['Transition_Season', 'values']
 
         self.store_programs = pd.read_excel(rf'C:\Users\User1\OneDrive - winwinproducts.com\Groccery Store Program\{self.store_type_input}\{self.store_type_input}_store_setting.xlsm',
                                             sheet_name='Store Programs')
@@ -40,7 +39,7 @@ class Replenishment():
                                          sheet_name='Store Notes')
 
         self.master_planogram = pd.read_excel(rf'C:\Users\User1\OneDrive\WinWin Staff Folders\Michael\Replenishment program\Replenishment\support document\MASTER PLANOGRAM.xlsx',
-                                         sheet_name='MASTER PLANOGRAM')
+                                              sheet_name='MASTER PLANOGRAM')
 
     def delivery_import(self, file):
 
@@ -67,8 +66,8 @@ class Replenishment():
             code = new_deliv.iloc[i,9]
 
             if store_type != self.store_type_input:
-                print(f'Data Validation Failed Inserted {store_type} for {self.store_type_input} database')
-                break
+                raise Exception(f'Data Validation Failed Inserted {store_type} for {self.store_type_input} database')
+
 
             # note to self: last line was comment out bc i needed the old version of the deliv insert not the new one.
 
@@ -87,24 +86,22 @@ class Replenishment():
 
             i += 1
 
-        if store_type == self.store_type_input:
-
-            print(f'\n {self.store_type_input} Delivery Data Imported')
+        print(f'\n {self.store_type_input} Delivery Data Imported')
 
     def delivery_update(self, file):
 
-        '''Takes in csv file of delivery data from qb and converts it to proper formating so it can be
-        imported into postgres'''
+        """Takes in csv file of delivery data from qb and converts it to proper formating so it can be
+        imported into postgres"""
 
         connection = self.connection_pool.getconn()
 
         df = pd.read_csv(f'{file}')
 
-        # drops uneccesary columns
+        # drops unnecessary columns
         df = df.drop(columns=['Unnamed: 0', 'U/M', 'Sales Price', 'Amount', 'Balance'])
         df = df.dropna()
 
-        # filters out unnecesary qb types only invoice or credit memo
+        # filters out unnecessary qb types only invoice or credit memo
         invoice = df[df.Type == 'Invoice']
         credits = df[df.Type == 'Credit Memo']
         df = pd.concat([invoice, credits])
@@ -266,7 +263,7 @@ class Replenishment():
     def sales_import(self, file):
 
         """'This takes in an excel file and inserts sales data into postgres
-         Data collumns must be in this order
+         Data columns must be in this order
 
          (transition_year, transition_season, store_year, store_week, store_number,
          upc, sales, qty, current_year, current_week, store_type)"""
@@ -291,8 +288,7 @@ class Replenishment():
             store_type = new_sales.loc[i, 'store_type']
 
             if store_type != self.store_type_input:
-                print(f'Data Validation Failed Inserted data for {store_type} for {self.store_type_input} database')
-                break
+                raise Exception(f'Data Validation Failed Inserted data for {store_type} for {self.store_type_input} database')
 
             sales_insert(transition_year, transition_season, store_year, date,
                          store_week, store_number, upc, sales,
@@ -300,8 +296,7 @@ class Replenishment():
                          self.connection_pool, self.store_type_input)
             i += 1
 
-        if store_type == self.store_type_input:
-            print(f'\n {self.store_type_input} Sales Data Imported')
+        print(f'\n {self.store_type_input} Sales Data Imported')
 
     def sales_update(self, file):
 
@@ -561,16 +556,16 @@ class Replenishment():
 
     def store_import(self):
 
-        new_len = len(self.store_notes)
         i = 0
         update = 0
         insert = 0
 
-        while i < new_len:
+        while i < len(self.store_notes):
 
             store_id = self.store_notes.iloc[i, 0]
             initial = self.store_notes.iloc[i, 1]
             notes = self.store_notes.iloc[i, 2]
+            store_type = self.store_notes.iloc[i, 3]
 
             duplicate_check = psql.read_sql(f"""select * from {self.store_type_input}.store
                                                             where store_id = '{store_id}' 
@@ -578,13 +573,13 @@ class Replenishment():
 
             if len(duplicate_check) == 1:
 
-                store_update(store_id, initial, notes, self.connection_pool, self.store_type_input)
+                store_update(store_id, initial, notes, store_type, self.connection_pool, self.store_type_input)
 
                 update += 1
 
             else:
 
-                store_insert(store_id, initial, notes, self.connection_pool, self.store_type_input)
+                store_insert(store_id, initial, notes, store_type, self.connection_pool, self.store_type_input)
 
                 insert += 1
 
@@ -596,16 +591,16 @@ class Replenishment():
 
     def store_program_import(self):
 
-        new_len = len(self.store_programs)
         i = 0
         update = 0
         insert = 0
-        while i < new_len:
+        while i < len(self.store_programs):
 
             store_program_id = self.store_programs.iloc[i, 0]
-            store_id = self.store_programs.iloc[i, 1]
-            program_id = self.store_programs.iloc[i, 2]
-            activity = self.store_programs.iloc[i, 3]
+            store_id = self.store_programs.loc[i, 'STORE']
+            program_id = self.store_programs.loc[i, 'PROGRAM']
+            activity = self.store_programs.loc[i, 'ACTIVITY']
+            store_type = self.store_programs.loc[i, 'Store Program']
 
             duplicate_check = psql.read_sql(f"""select * from {self.store_type_input}.store_program
                                                 where store_program_id = '{store_program_id}' 
@@ -613,12 +608,12 @@ class Replenishment():
 
             if len(duplicate_check) == 1:
 
-                store_program_update(store_program_id,store_id, program_id, activity,self.connection_pool, self.store_type_input)
+                store_program_update(store_program_id,store_id, program_id, activity, store_type, self.connection_pool, self.store_type_input)
                 update += 1
 
             else:
 
-                store_program_insert(store_program_id, store_id, program_id, activity, self.connection_pool, self.store_type_input)
+                store_program_insert(store_program_id, store_id, program_id, activity, store_type, self.connection_pool, self.store_type_input)
                 insert += 1
 
             i += 1
@@ -638,7 +633,6 @@ class Replenishment():
             carded = self.master_planogram.iloc[i, 1]
             long_hanging_top = self.master_planogram.iloc[i, 2]
             long_hanging_dress = self.master_planogram.iloc[i, 3]
-
 
             duplicate_check = psql.read_sql(f"""select * from master_planogram
                                                 where program_id = '{program_id}' 
@@ -663,9 +657,9 @@ class Replenishment():
 
     def store_approval_import(self, file):
 
-        transform = TransformData(self.store_type_input, self.transition_year, self.transition_season, connection)
+        transform = TransformData(self.store_type_input, self.transition_year, self.transition_season, self.connection)
 
-        store_approval_df = transform.approval_transform(self.store_type_input, file)
+        store_approval_df = transform.approval_transform(file)
 
         store_approval_df_len = len(store_approval_df)
 
@@ -712,7 +706,7 @@ class Replenishment():
 
     def inventory_import(self, file):
 
-        transform = TransformData(self.store_type_input, self.transition_year, self.transition_season, connection)
+        transform = TransformData(self.store_type_input, self.transition_year, self.transition_season, self.connection)
 
         inventory_df = transform.inventory_transform(file)
 
@@ -764,15 +758,15 @@ class Replenishment():
 
             if len(duplicate_check) == 1:
 
-                size_table_update(code,size,self.connection_pool)
-                update+=1
+                size_table_update(code, size, self.connection_pool)
+                update += 1
 
             else:
 
-                size_table_insert(code,size,self.connection_pool)
-                insert+=1
+                size_table_insert(code, size, self.connection_pool)
+                insert += 1
 
-            i+=1
+            i += 1
 
         print(f"Updated: {update}\nInserted: {insert}\n Store Table Updated")
 
