@@ -8,7 +8,6 @@ long_hanging_dress numeric NOT NULL
 
 );
 
-
 create table store (
 	
 store_id integer PRIMARY KEY,
@@ -17,7 +16,6 @@ notes varchar(50) NOT NULL,
 store_type character varying(20) NOT NULL
 
 );
-
 
 create table store_program (
 	
@@ -31,7 +29,6 @@ FOREIGN KEY (program_id) REFERENCES master_planogram (program_id),
 FOREIGN KEY (store_id) REFERENCES store(store_id)
 
 );
-
 
 create table item_support2 (
 
@@ -95,8 +92,6 @@ CREATE TABLE delivery2
 
 );
 
-
-
 CREATE TABLE sales2
 (
     id serial NOT NULL PRIMARY KEY,
@@ -135,7 +130,6 @@ CREATE TABLE item_size
 )
 
 
-
 /*sameple data
 insert into program (program_id,carded,long_hanging_top,long_hanging_dress)
 values ('4W',2,1,1);
@@ -156,3 +150,14 @@ Create view as midwest_mask (
    FROM fresh_encounter.sales2
   WHERE (sales2.store_number < 400 OR sales2.store_number > 499) AND sales2.store_year = 2022);
 
+Create Table store_program_history
+(
+    store_program_id serial PRIMARY KEY,
+    store_id integer NOT NULL,
+    program_id varchar(15) NOT NULL,
+    activity varchar(10),
+    store_type character varying(20) NOT NULL,
+
+    FOREIGN KEY (store_id) REFERENCES store(store_id)
+
+)

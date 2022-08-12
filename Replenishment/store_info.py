@@ -2,6 +2,7 @@
 
 from Import.data_insertion import *
 from Update.Transform_Sales_Data.transform import *
+from Update.Transform_Sales_Data.history_tracking import *
 from Sales_Report.Reports.reports import *
 from Sales_Report.Replenishment.replenishment import *
 
@@ -594,13 +595,17 @@ class Replenishment():
         i = 0
         update = 0
         insert = 0
+        history_inserted = 0
+
+        history = HistoryTracking(self.store_type_input, self.transition_year, self.transition_season, self.connection, self.connection_pool)
+
         while i < len(self.store_programs):
 
             store_program_id = self.store_programs.iloc[i, 0]
             store_id = self.store_programs.loc[i, 'STORE']
             program_id = self.store_programs.loc[i, 'PROGRAM']
             activity = self.store_programs.loc[i, 'ACTIVITY']
-            store_type = self.store_programs.loc[i, 'Store Program']
+            store_type = self.store_programs.iloc[i, 4]
 
             duplicate_check = psql.read_sql(f"""select * from {self.store_type_input}.store_program
                                                 where store_program_id = '{store_program_id}' 
@@ -608,18 +613,25 @@ class Replenishment():
 
             if len(duplicate_check) == 1:
 
-                store_program_update(store_program_id,store_id, program_id, activity, store_type, self.connection_pool, self.store_type_input)
+                add_history = history.existing_program(store_program_id, store_id, program_id, activity, store_type, duplicate_check)
+                store_program_update(store_program_id, store_id, program_id, activity, store_type, self.connection_pool, self.store_type_input)
+
                 update += 1
+                history_inserted += add_history
 
             else:
 
+                add_history = history.new_program(store_program_id,store_id,program_id, activity,store_type)
                 store_program_insert(store_program_id, store_id, program_id, activity, store_type, self.connection_pool, self.store_type_input)
+
                 insert += 1
+                history_inserted += add_history
 
             i += 1
-        print('\n Store Program Data Imported')
+        print('\nStore Program Data Imported')
         print('Updated:', update, 'Records')
         print('Inserted:', insert, 'Records')
+        print('Program History Insert:', history_inserted, 'Records')
 
     def master_planogram_import(self):
 
