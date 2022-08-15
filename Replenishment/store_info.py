@@ -200,6 +200,53 @@ class Replenishment():
 
         new_deliv_transform = new_deliv_transform.reset_index(drop=True)
 
+        # Transition Setting Verification
+        # This section is here to make sure each item being inserted into the table is
+        # contains the correct transition settings
+
+        verification = new_deliv_transform.copy()
+        verification[['code', 'season']] = verification.code.str.split('-', n=1, expand=True)
+
+        if self.transition_season == 'SS' and self.store_setting.loc['SS_Season', 'values'] == 1:
+
+            check = verification[(verification['type'] == 'Invoice') & (verification['season'] == 'FW')]
+
+            if len(check) >= 1:
+                raise Exception("""
+                FW Delivery Item is trying to be inserted into the transition_season column under "SS" transition setting
+                Items that are Invoices and are FW should be inserted with "FW" for the transition_season column
+                
+                To fix this switch the transition setting to FW_season or Rolling_SS_FW and set transition_season to 'FW'
+                
+                This is important because the on hands program filters based off of the transition_year and 
+                transition_season columns. If not set properly, some items will not make it to the on hands
+                """)
+
+        elif self.transition_season == "FW" and self.store_setting.loc['FW_Season', 'values'] == 1:
+
+            check = verification[(verification['type'] == 'Invoice') & (verification['season'] == 'SS')]
+
+            if len(check) >= 1:
+                raise Exception("""
+                SS Delivery Item is trying to be inserted into the transition_season column under "FW" transition setting
+                Items that are Invoices and are SS should be inserted with "SS" for the transition_season column
+
+                To fix this switch the transition setting to SS_season or Rolling_FW_SS and set transition_season to 'SS'
+
+                This is important because the on hands program filters based off of the transition_year and 
+                transition_season columns. If not set properly, some items will not make it to the on hands  
+                """)
+
+        # will add warning for the next 2 elifs down the road. Potential risk of selecting the wrong setting.
+        elif self.transition_season == 'FW' and self.store_setting.loc['Rolling_SS_FW', 'values'] == 1:
+            pass
+
+        elif self.transition_season == 'SS' and self.store_setting.loc['Rolling_FW_SS', 'values'] == 1:
+            pass
+
+        else:
+            raise Exception(f"Error: transition Season should only be SS or FW. Currently Set to {self.transition_season}")
+
         ######LOADING DATA INTO POSTGRES WITH PYTHON #########
 
         new_deliv_transform_length = len(new_deliv_transform)

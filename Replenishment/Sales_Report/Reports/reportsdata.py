@@ -3,6 +3,7 @@ import pandas as pd
 import pandas.io.sql as psql
 from datetime import timedelta, date
 import numpy as np
+import datetime as dt
 
 
 class ReportsData:
@@ -12,6 +13,14 @@ class ReportsData:
         self.store_type_input = store_type_input
 
         self.store_setting = store_setting
+
+        self.fw_season = self.store_setting.loc['FW_Season', 'values']
+        self.ss_season = self.store_setting.loc['SS_Season', 'values']
+        self.rolling_ss_fw = self.store_setting.loc['Rolling_SS_FW', 'values']
+        self.rolling_fw_ss = self.store_setting.loc['Rolling_FW_SS', 'values']
+        self.transition_year = self.store_setting.loc['Transition_year', 'values']
+        self.transition_season = self.store_setting.loc['Transition_Season', 'values']
+
 
         self.connection = psycopg2.connect(database=f"test",
                                            user="postgres",
@@ -31,7 +40,7 @@ class ReportsData:
                                 'kroger_nashville']:
 
             self.week = 'store_week'
-        elif store_type_input in ['intermountain', 'acme','texas_division', 'kvat', 'safeway_denver', 'jewel', 'fresh_encounter','follett']:
+        elif store_type_input in ['intermountain', 'acme', 'texas_division', 'kvat', 'safeway_denver', 'jewel', 'fresh_encounter','follett']:
             self.week = 'current_week'
 
         else:
@@ -550,7 +559,80 @@ class ReportsData:
 
     def on_hands(self):
 
-        """new on hands sheet using new support sheet"""
+        """On Hands For Each Item in Each store based on Transition Season"""
+
+        # finding the max date so I can find the current year.
+        # Current year needed to we can see set a point of ref to subtract for ay items
+        max_year = psql.read_sql(f"select max(date) from {self.store_type_input}.delivery2", self.connection)
+
+        max_year = max_year.iloc[0, 0]
+        max_year = max_year.year
+
+        min_year = max_year - self.store_setting.loc['AY_time', 'values']
+
+        # verifying that only one transition setting is selected. also verifies that
+        # no has messed with "sheet 2" in store setting file
+        if (self.fw_season + self.ss_season + self.rolling_ss_fw + self.rolling_fw_ss) > 1:
+
+            transition_setting = []
+
+            if self.fw_season >= 1:
+                transition_setting.append('fw_season')
+
+            if self.ss_season >= 1:
+                transition_setting.append('ss_season')
+
+            if self.rolling_fw_ss >= 1:
+                transition_setting.append('rolling_fw_ss')
+
+            if self.rolling_ss_fw >= 1:
+                transition_setting.append('rolling_ss_fw')
+
+            raise Exception(
+                f"More than one Transitions Store Setting selected({transition_setting}).Only one is allowed")
+
+        # filter all items within the transition setting season
+        # Season 1 is used to set for the current season Season 2 is used to filter out the previous season.
+
+        if self.fw_season == 1:
+
+            season1 = "FW"
+            season2 = 'FW'
+            transition_year1 = self.transition_year
+            transition_year2 = self.transition_year
+            transition_season1 = 'FW'
+            transition_season2 = 'FW'
+
+        elif self.ss_season == 1:
+
+            season1 = "SS"
+            season2 = 'SS'
+            transition_year1 = self.transition_year
+            transition_year2 = self.transition_year
+            transition_season1 = 'SS'
+            transition_season2 = 'SS'
+
+
+        elif self.rolling_ss_fw == 1:
+
+            season1 = "SS"
+            season2 = 'FW'
+            transition_year1 = self.transition_year
+            transition_year2 = self.transition_year
+            transition_season1 = 'SS'
+            transition_season2 = 'FW'
+
+        elif self.rolling_fw_ss == 1:
+
+            season1 = "SS"
+            season2 = 'FW'
+            transition_year1 = self.transition_year
+            transition_year2 = self.transition_year-1
+            transition_season1 = 'SS'
+            transition_season2 = 'FW'
+
+        else:
+            raise Exception("No Transition Store Setting has been selected")
 
         on_hand = psql.read_sql(f"""
 
@@ -559,10 +641,11 @@ class ReportsData:
             delivery_table as (
 
                 /*This table is basically the delivery table with the support sheet lined up */
-                select distinct(id), transition_year, transition_season, delivery2.type, date, delivery2.upc, store,
+                select id, transition_year, transition_season, delivery2.type, date, delivery2.upc, store,
                 qty, season, category, item_group_desc, display_size, case_size
                 from {self.store_type_input}.delivery2
-                inner join item_support2 on {self.store_type_input}.delivery2.upc = item_support2.upc),
+                inner join item_support2 on {self.store_type_input}.delivery2.code = item_support2.code
+                where date >= '01-01-{min_year}'),
 
             deliv_pivot_credit as (
 
@@ -590,13 +673,24 @@ class ReportsData:
 
                          or
 
-                        /*this next line should be dynamic using python keep in mind that rolling transition will include SS and FW items */
+                        /*filtering out the current seasonal items */
                         (
-                            season = 'SS'
+                            season = '{season1}'
                             and type = 'Credit Memo'
                             and (category != 'Accessory' and category != 'GM' and category != 'Scrub' and category != 'Rack')
-                            and transition_year = 2022
-                            and transition_season = 'SS'
+                            and transition_year = {transition_year1}
+                            and transition_season = '{transition_season1}'
+                        )
+
+                        or
+                        
+                        /*this next section is only applicable if using rolling transition. will filter all of the prev seasonal items*/
+                        (
+                            season = '{season2}'
+                            and type = 'Credit Memo'
+                            and (category != 'Accessory' and category != 'GM' and category != 'Scrub' and category != 'Rack')
+                            and transition_year = {transition_year2}
+                            and transition_season = '{transition_season2}'
                         )
 
                       )
@@ -630,11 +724,21 @@ class ReportsData:
 
                         /*this next line should be dynamic using python keep in mind that rolling transition will include SS and FW items */
                         (
-                            season = 'SS'
+                            season = '{season1}'
                             and (type = 'Invoice' or type = 'BandAid' or type = 'Reset')
                             and (category != 'Accessory' and category != 'GM' and category != 'Scrub' and category != 'Rack')
-                            and transition_year = 2022
-                            and transition_season = 'SS'
+                            and transition_year = {transition_year1}
+                            and transition_season = '{transition_season1}'
+                        )
+                        
+                        or
+                        
+                        (
+                            season = '{season2}'
+                            and (type = 'Invoice' or type = 'BandAid' or type = 'Reset')
+                            and (category != 'Accessory' and category != 'GM' and category != 'Scrub' and category != 'Rack')
+                            and transition_year = {transition_year2}
+                            and transition_season = '{transition_season2}'
                         )
 
                       )
@@ -658,7 +762,7 @@ class ReportsData:
 
             sales_table as (
 
-                SELECT DISTINCT sales2.id,
+                SELECT sales2.id,
                     sales2.transition_year,
                     sales2.transition_season,
                     sales2.store_year,
@@ -676,7 +780,8 @@ class ReportsData:
                     item_support2.case_size,
                     item_support2.item_group_desc
                 FROM {self.store_type_input}.sales2
-                inner JOIN item_support2 ON {self.store_type_input}.sales2.upc = item_support2.upc_11_digit),
+                inner JOIN item_support2 ON {self.store_type_input}.sales2.code = item_support2.code
+                where date >= '01-01-{min_year}'),
 
             sales_pivot_AY as (
 
@@ -689,22 +794,24 @@ class ReportsData:
                 GROUP BY store_number,item_group_desc
                 ORDER BY store_number, item_group_desc),
 
-            sales_pivot_FW as (
+            /*sales for the current season*/
+            sales_pivot_current_season as (
                 SELECT store_number,
                         item_group_desc,
                         sum(qty) AS sales
                 FROM sales_table
-                where season = 'FW' and (category != 'Accessory' and category != 'GM' and category != 'Rack') and transition_year = 2021 and transition_season = 'FW'
+                where season = '{season1}' and (category != 'Accessory' and category != 'GM' and category != 'Rack') and transition_year = {transition_year1} and transition_season = '{transition_season1}'
                 GROUP BY store_number, item_group_desc
                 ORDER BY store_number),
 
-            sales_pivot_SS as (
+            /*sales for the previous season*/
+            sales_pivot_previous_season as (
 
                 SELECT store_number,
                         item_group_desc,
                         sum(qty) AS sales
                 FROM sales_table
-                where season = 'SS' and (category != 'Accessory' and category != 'GM' and category != 'Rack') and transition_year = 2022 and transition_season = 'SS'
+                where season = '{season2}' and (category != 'Accessory' and category != 'GM' and category != 'Rack') and transition_year = {transition_year2} and transition_season = '{transition_season2}'
                 GROUP BY store_number, item_group_desc
                 ORDER BY store_number),
 
@@ -720,16 +827,16 @@ class ReportsData:
                        deliveries,
                        credit,
                        sales_pivot_AY.item_group_desc as AY_Desc,
-                       sales_pivot_FW.item_group_desc as FW_Desc,
-                       sales_pivot_SS.item_group_desc as SS_Desc
+                       sales_pivot_current_season.item_group_desc as FW_Desc,
+                       sales_pivot_previous_season.item_group_desc as SS_Desc
 
                 from delivery_pivot
-                full join sales_pivot_fw on sales_pivot_fw.store_number = delivery_pivot.store and
-                           sales_pivot_fw.item_group_desc = delivery_pivot.item_group_desc
+                full join sales_pivot_current_season on sales_pivot_current_season.store_number = delivery_pivot.store and
+                           sales_pivot_current_season.item_group_desc = delivery_pivot.item_group_desc
                 full join sales_pivot_ay on sales_pivot_ay.store_number = delivery_pivot.store and
                            sales_pivot_ay.item_group_desc = delivery_pivot.item_group_desc
-                full join sales_pivot_ss on sales_pivot_ss.store_number = delivery_pivot.store and
-                           sales_pivot_ss.item_group_desc = delivery_pivot.item_group_desc
+                full join sales_pivot_previous_season on sales_pivot_previous_season.store_number = delivery_pivot.store and
+                           sales_pivot_previous_season.item_group_desc = delivery_pivot.item_group_desc
 
                 group by
                         delivery_pivot.store,
@@ -740,8 +847,8 @@ class ReportsData:
                        deliveries,
                        credit,
                        sales_pivot_AY.item_group_desc,
-                       sales_pivot_FW.item_group_desc,
-                       sales_pivot_SS.item_group_desc
+                       sales_pivot_current_season.item_group_desc,
+                       sales_pivot_previous_season.item_group_desc
 
 
                 order by delivery_pivot.store asc, item_group_desc asc)
@@ -755,31 +862,26 @@ class ReportsData:
                case_size,
                deliveries,
                credit,
-               coalesce(sales_pivot_ss.sales,0) + coalesce(sales_pivot_fw.sales,0) + coalesce(sales_pivot_ay.sales,0) as total_sales,
-               (deliveries + credit - coalesce(sales_pivot_fw.sales,0) - coalesce(sales_pivot_ay.sales,0)-coalesce(sales_pivot_ss.sales,0)) as on_hand,
+               coalesce(sales_pivot_previous_season.sales,0) + coalesce(sales_pivot_current_season.sales,0) + coalesce(sales_pivot_ay.sales,0) as total_sales,
+               (deliveries + credit - coalesce(sales_pivot_current_season.sales,0) - coalesce(sales_pivot_ay.sales,0)-coalesce(sales_pivot_previous_season.sales,0)) as on_hand,
                case
-                    when (deliveries + credit - coalesce(sales_pivot_fw.sales,0) - coalesce(sales_pivot_ay.sales,0)-coalesce(sales_pivot_ss.sales,0)) <= 0
+                    when (deliveries + credit - coalesce(sales_pivot_current_season.sales,0) - coalesce(sales_pivot_ay.sales,0)-coalesce(sales_pivot_previous_season.sales,0)) <= 0
                         then 0
-                    when (deliveries + credit - coalesce(sales_pivot_fw.sales,0) - coalesce(sales_pivot_ay.sales,0)-coalesce(sales_pivot_ss.sales,0)) > 0
-                        then (deliveries + credit - coalesce(sales_pivot_fw.sales,0) - coalesce(sales_pivot_ay.sales,0)-coalesce(sales_pivot_ss.sales,0))/case_size
+                    when (deliveries + credit - coalesce(sales_pivot_current_season.sales,0) - coalesce(sales_pivot_ay.sales,0)-coalesce(sales_pivot_previous_season.sales,0)) > 0
+                        then (deliveries + credit - coalesce(sales_pivot_current_season.sales,0) - coalesce(sales_pivot_ay.sales,0)-coalesce(sales_pivot_previous_season.sales,0))/case_size
                     end as case_qty
 
         from combine_sd
-        full join sales_pivot_fw on sales_pivot_fw.store_number = combine_sd.store and
-                   sales_pivot_fw.item_group_desc = combine_sd.item_group_desc
+        full join sales_pivot_current_season on sales_pivot_current_season.store_number = combine_sd.store and
+                   sales_pivot_current_season.item_group_desc = combine_sd.item_group_desc
         full join sales_pivot_ay on sales_pivot_ay.store_number = combine_sd.store and
                    sales_pivot_ay.item_group_desc = combine_sd.item_group_desc
-        full join sales_pivot_ss on sales_pivot_ss.store_number = combine_sd.store and
-                   sales_pivot_ss.item_group_desc = combine_sd.item_group_desc
+        full join sales_pivot_previous_season on sales_pivot_previous_season.store_number = combine_sd.store and
+                   sales_pivot_previous_season.item_group_desc = combine_sd.item_group_desc
 
         order by store asc, item_group_desc asc
 
         """, self.connection)
-
-        on_hand = on_hand.dropna()
-        on_hand = on_hand.sort_values(by=['store', 'display_size', 'case_qty'])
-        on_hand['store'] = on_hand['store'].astype(int)
-        on_hand = on_hand.reset_index(drop=True)
 
         return on_hand
 
@@ -1176,6 +1278,22 @@ class ReportsData:
         # inventory_age = inventory_age[inventory_age['season'] == 'AY']
 
         return inventory_age
+
+
+store_type_input = 'safeway_denver'
+
+store_setting = pd.read_excel(
+    rf'C:\Users\User1\OneDrive - winwinproducts.com\Groccery Store Program\{store_type_input}\{store_type_input}_store_setting.xlsm',
+    sheet_name='Sheet2',
+    header=None,
+    index_col=0,
+    names=('setting', 'values'))
+
+
+a = ReportsData(store_type_input, store_setting)
+test = a.on_hands()
+test.to_excel(f'{store_type_input}.xlsx')
+
 
 
 
