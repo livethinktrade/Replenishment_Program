@@ -887,6 +887,11 @@ class ReportsData:
 
         """, self.connection)
 
+        on_hand = on_hand.dropna()
+        on_hand = on_hand.sort_values(by=['store', 'display_size', 'case_qty'])
+        on_hand['store'] = on_hand['store'].astype(int)
+        on_hand = on_hand.reset_index(drop=True)
+
         return on_hand
 
     def no_scan(self, on_hands):

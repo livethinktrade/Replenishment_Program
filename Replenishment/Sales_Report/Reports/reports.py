@@ -4,6 +4,7 @@ from Sales_Report.Replenishment.replenishment import *
 from Sales_Report.Replenishment.initial_order import *
 from Sales_Report.Report_Format.weekly_sales_report_format import ReportFormat
 from openpyxl import load_workbook
+import numpy as np
 
 class Reports:
 
@@ -57,6 +58,16 @@ class Reports:
 
             writer.book = ExcelWorkbook
 
+            replen_pivot = pd.pivot_table(self.replenishment_report,
+                                          values='case',
+                                          index=['initial', 'store'],
+                                          columns='item',
+                                          aggfunc=np.sum,
+                                          fill_value= 0,
+                                          margins= True)
+            replen_pivot = replen_pivot.reset_index()
+
+            replen_pivot.to_excel(writer, sheet_name='GIRLS', index=False)
 
             #calls for replenishment df and inserts to excel then formats it
             self.replenishment_reasons.to_excel(writer, sheet_name="Replenishment Reasons", index=False)
