@@ -598,6 +598,7 @@ class ReportsData:
 
             season1 = "FW"
             season2 = 'FW'
+            sales_season2 = 'SS'
             transition_year1 = self.transition_year
             transition_year2 = self.transition_year
             transition_season1 = 'FW'
@@ -607,6 +608,7 @@ class ReportsData:
 
             season1 = "SS"
             season2 = 'SS'
+            sales_season2 = 'FW'
             transition_year1 = self.transition_year
             transition_year2 = self.transition_year
             transition_season1 = 'SS'
@@ -617,6 +619,7 @@ class ReportsData:
 
             season1 = "SS"
             season2 = 'FW'
+            sales_season2 = 'FW'
             transition_year1 = self.transition_year
             transition_year2 = self.transition_year
             transition_season1 = 'SS'
@@ -626,6 +629,7 @@ class ReportsData:
 
             season1 = "SS"
             season2 = 'FW'
+            sales_season2 = 'FW'
             transition_year1 = self.transition_year
             transition_year2 = self.transition_year-1
             transition_season1 = 'SS'
@@ -811,7 +815,7 @@ class ReportsData:
                         item_group_desc,
                         sum(qty) AS sales
                 FROM sales_table
-                where season = '{season2}' and (category != 'Accessory' and category != 'GM' and category != 'Rack') and transition_year = {transition_year2} and transition_season = '{transition_season2}'
+                where season = '{sales_season2}' and (category != 'Accessory' and category != 'GM' and category != 'Rack') and transition_year = {transition_year2} and transition_season = '{transition_season2}'
                 GROUP BY store_number, item_group_desc
                 ORDER BY store_number),
 
@@ -1280,19 +1284,19 @@ class ReportsData:
         return inventory_age
 
 
-store_type_input = 'safeway_denver'
-
-store_setting = pd.read_excel(
-    rf'C:\Users\User1\OneDrive - winwinproducts.com\Groccery Store Program\{store_type_input}\{store_type_input}_store_setting.xlsm',
-    sheet_name='Sheet2',
-    header=None,
-    index_col=0,
-    names=('setting', 'values'))
-
-
-a = ReportsData(store_type_input, store_setting)
-test = a.on_hands()
-test.to_excel(f'{store_type_input}.xlsx')
+# store_type_input = 'kvat'
+#
+# store_setting = pd.read_excel(
+#     rf'C:\Users\User1\OneDrive - winwinproducts.com\Groccery Store Program\{store_type_input}\{store_type_input}_store_setting.xlsm',
+#     sheet_name='Sheet2',
+#     header=None,
+#     index_col=0,
+#     names=('setting', 'values'))
+#
+#
+# a = ReportsData(store_type_input, store_setting)
+# test = a.on_hands()
+# test.to_excel(f'{store_type_input}.xlsx')
 
 
 
