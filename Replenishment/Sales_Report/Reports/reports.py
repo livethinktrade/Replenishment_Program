@@ -47,29 +47,41 @@ class Reports:
 
     def internal_report(self,filename):
 
-        self.external_report(filename)
-
-        ExcelWorkbook = load_workbook(filename)
-        writer = pd.ExcelWriter(filename, engine='openpyxl')
-        writer.book = ExcelWorkbook
-
+        # self.external_report(filename)
+        #
+        # ExcelWorkbook = load_workbook(filename)
+        # writer = pd.ExcelWriter(filename, engine='openpyxl')
+        # writer.book = ExcelWorkbook
 
         with pd.ExcelWriter(filename, engine='openpyxl') as writer:
 
-            writer.book = ExcelWorkbook
+            # writer.book = ExcelWorkbook
 
-            replen_pivot = pd.pivot_table(self.replenishment_report,
-                                          values='case',
-                                          index=['initial', 'store'],
-                                          columns='item',
-                                          aggfunc=np.sum,
-                                          fill_value= 0,
-                                          margins= True)
-            replen_pivot = replen_pivot.reset_index()
+            self.replenishment_report.to_excel(writer, sheet_name="Replenishment",
+                                               index=False,
+                                               columns=('store_name', 'item', 'case',
+                                                        'notes', 'case_qty', 'display_size'))
 
-            replen_pivot.to_excel(writer, sheet_name='GIRLS', index=False)
+            try:
 
-            #calls for replenishment df and inserts to excel then formats it
+                replen_pivot = pd.pivot_table(self.replenishment_report,
+                                              values='case',
+                                              index=['initial', 'store'],
+                                              columns='item',
+                                              aggfunc=np.sum,
+                                              fill_value= '',
+                                              margins= True)
+                replen_pivot = replen_pivot.reset_index()
+
+                replen_pivot.to_excel(writer, sheet_name='GIRLS', index=False)
+
+            except Exception as e:
+                print(f'Error: {e}')
+                pass
+
+            self.on_hand.to_excel(writer, sheet_name="On Hand", index=False)
+
+            # calls for replenishment df and inserts to excel then formats it
             self.replenishment_reasons.to_excel(writer, sheet_name="Replenishment Reasons", index=False)
 
             if self.initial_orders == 1:
@@ -88,7 +100,7 @@ class Reports:
             if self.size_build_up == 1:
                 pass
 
-            if self.high_return ==1:
+            if self.high_return == 1:
 
                 on_hands = self.on_hand
 
@@ -100,7 +112,7 @@ class Reports:
 
                 on_hands.to_excel(writer, sheet_name="High Return", index=False)
 
-            if self.store_sales_rank ==1:
+            if self.store_sales_rank == 1:
 
                 store_sales_rank = self.reports.store_sales_rank()
 
@@ -108,13 +120,13 @@ class Reports:
 
                 store_sales_rank.to_excel(writer, sheet_name="Store Ranks", index=False, startcol=1)
 
-            if self.item_approval ==1:
+            if self.item_approval == 1:
 
                 item_approval = self.reports.item_approval()
 
                 item_approval.to_excel(writer, sheet_name="Items Approved", index=False)
 
-            if self.store_program ==1:
+            if self.store_program == 1:
 
                 store_program = self.reports.store_program()
 
@@ -122,11 +134,9 @@ class Reports:
 
             writer.save()
 
-        format = ReportFormat(filename, 1,1,store_sales_rank_len, self.store_setting)
+        format = ReportFormat(filename, 1, 1, store_sales_rank_len, self.store_setting)
 
         format.internal_report()
-
-
 
     def external_report(self, filename):
 
@@ -134,15 +144,12 @@ class Reports:
 
         with pd.ExcelWriter(filename) as writer:
 
-
-
             # replenishment tab
             self.replenishment_report.to_excel(writer, sheet_name="Replenishment",
                                                index=False,
-                                               columns=(
-                                               'store_name', 'item', 'case', 'notes', 'case_qty', 'display_size'))
+                                               columns=('store_name', 'item', 'case'))
 
-            #sales report tab
+            # sales report tab
 
             if self.ytd_mask_sales_table == 1:
 
@@ -209,7 +216,6 @@ class Reports:
                                       'Sales ($) 2022 Current Week', 'Sales ($) 2021 Current Week', '% +/- Change YOY',
                                       'Sales ($) 2022 YTD', 'Sales ($) 2021 YTD', '% +/- Change (YOY)')
                                       )
-
 
             if self.item_sales_rank == 1:
 

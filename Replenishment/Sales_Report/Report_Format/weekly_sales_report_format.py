@@ -595,7 +595,7 @@ class ReportFormat:
             for cell in row:
                 cell.border = self.border
 
-        ws.auto_filter.ref = f"A1:J10000"
+        ws.auto_filter.ref = f"A1:J500"
 
         self.wb.save(self.filename)
 
@@ -735,7 +735,7 @@ class ReportFormat:
                 cell.border = self.border
 
 
-        ws.auto_filter.ref = f"A1:H10000"
+        ws.auto_filter.ref = f"A1:H300"
 
         self.wb.save(self.filename)
 
@@ -752,7 +752,7 @@ class ReportFormat:
         ws.column_dimensions['E'].width = 30
         ws.column_dimensions['F'].width = 20
 
-        ws.auto_filter.ref = f"A1:F10000"
+        ws.auto_filter.ref = f"A1:F500"
 
         for row in ws.iter_rows(min_row=1, max_row=500, min_col=1, max_col=6):
             for cell in row:
@@ -786,6 +786,10 @@ class ReportFormat:
 
     def internal_report(self):
 
+        self.replenishment(self.replenishment_len)
+
+        self.on_hands()
+
         self.replenishment_reasons()
 
         if self.initial_orders == 1:
@@ -797,10 +801,10 @@ class ReportFormat:
         if self.store_sales_rank == 1:
             self.store_rank()
 
-        if self.item_approval ==1:
+        if self.item_approval == 1:
             self.items_approved()
 
-        if self.store_program ==1:
+        if self.store_program == 1:
             self.store_programs()
 
 def weekly_sales_report_format(filename, replenishment_len, sales_report_len):

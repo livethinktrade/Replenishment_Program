@@ -42,7 +42,7 @@ def replenishment(store_type_input, store_setting):
                                                              2,
                                                              3])
 
-    connection = psycopg2.connect(database=f"Grocery", user="postgres", password="winwin", host="localhost")
+    connection = psycopg2.connect(database=f"test", user="postgres", password="winwin", host="localhost")
 
     # this section of the code establishes the on hands by display size
 

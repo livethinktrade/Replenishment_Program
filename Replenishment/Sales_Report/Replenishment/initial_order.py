@@ -3,7 +3,7 @@ from Sales_Report.Replenishment.replenishment import *
 
 def initial_order(store_type_input, store_setting):
 
-    connection = psycopg2.connect(database=f"Grocery", user="postgres", password="winwin", host="localhost")
+    connection = psycopg2.connect(database=f"test", user="postgres", password="winwin", host="localhost")
 
     # getting the on hands after replenishment
     replenishments, on_hands_after_replen, replen_reasons = replenishment(store_type_input, store_setting)
