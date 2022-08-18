@@ -5,6 +5,7 @@ from Update.Transform_Sales_Data.transform import *
 from Update.Transform_Sales_Data.history_tracking import *
 from Sales_Report.Reports.reports import *
 from Sales_Report.Replenishment.replenishment import *
+import os
 
 
 class Replenishment():
@@ -39,8 +40,8 @@ class Replenishment():
         self.store_notes = pd.read_excel(rf'C:\Users\User1\OneDrive - winwinproducts.com\Groccery Store Program\{self.store_type_input}\{self.store_type_input}_store_setting.xlsm',
                                          sheet_name='Store Notes')
 
-        self.master_planogram = pd.read_excel(rf'C:\Users\User1\OneDrive\WinWin Staff Folders\Michael\Replenishment program\Replenishment\support document\MASTER PLANOGRAM.xlsx',
-                                              sheet_name='MASTER PLANOGRAM')
+        self.master_planogram = pd.read_excel(os.getcwd()+'\support document\MASTER PLANOGRAM.xlsx',
+                                              sheet_name='MASTER PLANOGRAM UPDATED', skiprows=1, )
 
     def delivery_import(self, file):
 
@@ -501,7 +502,7 @@ class Replenishment():
 
     def support_import(self, file):
 
-        itemsupport = pd.read_excel(f'{file}.xlsx')
+        itemsupport = pd.read_excel(f'{file}')
 
         update = 0
         insert = 0
@@ -688,10 +689,15 @@ class Replenishment():
 
         while i < len(self.master_planogram):
 
-            program_id = self.master_planogram.iloc[i, 0]
-            carded = self.master_planogram.iloc[i, 1]
-            long_hanging_top = self.master_planogram.iloc[i, 2]
-            long_hanging_dress = self.master_planogram.iloc[i, 3]
+            program_id = self.master_planogram.loc[i, 'Programs']
+            cd_ay = self.master_planogram.loc[i, 'CD-AY']
+            cd_sn = self.master_planogram.loc[i, 'CD-SN']
+            lht_ay = self.master_planogram.loc[i, 'LHT-AY']
+            lht_sn = self.master_planogram.loc[i, 'LHT-SN']
+            lhd_ay = self.master_planogram.loc[i, 'LHD-AY']
+            lhd_sn = self.master_planogram.loc[i, 'LHD-SN']
+            lhp_ay = self.master_planogram.loc[i, 'LHP-AY']
+            lhp_sn = self.master_planogram.loc[i, 'LHP-SN']
 
             duplicate_check = psql.read_sql(f"""select * from master_planogram
                                                 where program_id = '{program_id}' 
@@ -699,14 +705,14 @@ class Replenishment():
 
             if len(duplicate_check) == 1:
 
-                master_planogram_update(program_id, carded, long_hanging_top, long_hanging_dress, self.connection_pool)
+                master_planogram_update(program_id, cd_ay, cd_sn, lht_ay, lht_sn, lhd_ay, lhd_sn, lhp_ay, lhp_sn, self.connection_pool)
 
-                update+=1
+                update += 1
 
             else:
 
-                master_planogram_insert(program_id, carded, long_hanging_top, long_hanging_dress, self.connection_pool)
-                insert+=1
+                master_planogram_insert(program_id, cd_ay, cd_sn, lht_ay, lht_sn, lhd_ay, lhd_sn, lhp_ay, lhp_sn, self.connection_pool)
+                insert += 1
 
             i += 1
 
@@ -830,6 +836,5 @@ class Replenishment():
         print(f"Updated: {update}\nInserted: {insert}\n Store Table Updated")
 
 
-
-
-
+A = Replenishment('kvat')
+A.master_planogram_import()

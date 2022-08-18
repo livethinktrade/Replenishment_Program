@@ -304,26 +304,33 @@ def store_program_update(store_program_id,store_id, program_id, activity, store_
     cursor.close()
     connection_pool.putconn(connection)
 
-def master_planogram_insert(program_id, carded, long_hanging_top, long_hanging_dress, connection_pool):
+
+def master_planogram_insert(program_id, cd_ay, cd_sn, lht_ay, lht_sn, lhd_ay, lhd_sn, lhp_ay, lhp_sn, connection_pool):
 
     connection = connection_pool.getconn()
     cursor = connection.cursor()
-    cursor.execute("""INSERT INTO master_planogram (program_id, carded, long_hanging_top, long_hanging_dress) 
-                    values (%s,%s,%s,%s)""",
-           (program_id, carded, long_hanging_top, long_hanging_dress))
+    cursor.execute("""INSERT INTO master_planogram (program_id, cd_ay, cd_sn, lht_ay, lht_sn, lhd_ay, lhd_sn, lhp_ay, lhp_sn) 
+                    values (%s,%s,%s,%s,%s,%s,%s,%s,%s)""",
+           (program_id, cd_ay, cd_sn, lht_ay, lht_sn, lhd_ay, lhd_sn, lhp_ay, lhp_sn))
 
     connection.commit()
     cursor.close()
     connection_pool.putconn(connection)
 
-def master_planogram_update(program_id, carded, long_hanging_top, long_hanging_dress, connection_pool):
+
+def master_planogram_update(program_id, cd_ay, cd_sn, lht_ay, lht_sn, lhd_ay, lhd_sn, lhp_ay, lhp_sn, connection_pool):
 
     connection = connection_pool.getconn()
     cursor = connection.cursor()
     cursor.execute(
-        f"""update master_planogram set carded = '{carded}',
-                                    long_hanging_top = '{long_hanging_top}',
-                                    long_hanging_dress = '{long_hanging_dress}'
+        f"""update master_planogram set cd_ay = '{cd_ay}',
+                                    cd_sn= '{cd_sn}',
+                                    lht_ay = '{lht_ay}',
+                                    lht_sn = '{lht_sn}',
+                                    lhd_ay = '{lhd_ay}',
+                                    lhd_sn = '{lhd_sn}',
+                                    lhp_ay = '{lhp_ay}',
+                                    lhp_sn = '{lhp_sn}'
             where program_id = '{program_id}'""")
 
 
