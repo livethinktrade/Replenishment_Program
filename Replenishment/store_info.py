@@ -1,5 +1,3 @@
-
-
 from Import.data_insertion import *
 from Update.Transform_Sales_Data.transform import *
 from Update.Transform_Sales_Data.history_tracking import *
@@ -40,7 +38,7 @@ class Replenishment():
         self.store_notes = pd.read_excel(rf'C:\Users\User1\OneDrive - winwinproducts.com\Groccery Store Program\{self.store_type_input}\{self.store_type_input}_store_setting.xlsm',
                                          sheet_name='Store Notes')
 
-        self.master_planogram = pd.read_excel(os.getcwd()+'\support document\MASTER PLANOGRAM.xlsx',
+        self.master_planogram = pd.read_excel(r'C:\Users\User1\OneDrive\WinWin Staff Folders\Michael\Replenishment program\Replenishment\support document\MASTER PLANOGRAM.xlsx',
                                               sheet_name='MASTER PLANOGRAM UPDATED', skiprows=1, )
 
     def delivery_import(self, file):
@@ -600,7 +598,6 @@ class Replenishment():
         filename = f'{self.store_type_input}_internal_sales_report_{date}.xlsx'
         reports.internal_report(filename)
 
-
         print("\nSales Report Generated")
 
     def store_import(self):
@@ -698,6 +695,7 @@ class Replenishment():
             lhd_sn = self.master_planogram.loc[i, 'LHD-SN']
             lhp_ay = self.master_planogram.loc[i, 'LHP-AY']
             lhp_sn = self.master_planogram.loc[i, 'LHP-SN']
+            total_cases = self.master_planogram.loc[i, 'Total Cases']
 
             duplicate_check = psql.read_sql(f"""select * from master_planogram
                                                 where program_id = '{program_id}' 
@@ -705,13 +703,13 @@ class Replenishment():
 
             if len(duplicate_check) == 1:
 
-                master_planogram_update(program_id, cd_ay, cd_sn, lht_ay, lht_sn, lhd_ay, lhd_sn, lhp_ay, lhp_sn, self.connection_pool)
+                master_planogram_update(program_id, cd_ay, cd_sn, lht_ay, lht_sn, lhd_ay, lhd_sn, lhp_ay, lhp_sn, total_cases, self.connection_pool)
 
                 update += 1
 
             else:
 
-                master_planogram_insert(program_id, cd_ay, cd_sn, lht_ay, lht_sn, lhd_ay, lhd_sn, lhp_ay, lhp_sn, self.connection_pool)
+                master_planogram_insert(program_id, cd_ay, cd_sn, lht_ay, lht_sn, lhd_ay, lhd_sn, lhp_ay, lhp_sn, total_cases, self.connection_pool)
                 insert += 1
 
             i += 1
@@ -793,12 +791,12 @@ class Replenishment():
             if len(duplicate_check) == 1:
 
                 inventory_update(code, on_hand, self.connection_pool)
-                update+=1
+                update += 1
 
             else:
 
                 inventory_insert(code, on_hand, self.connection_pool)
-                insert+=1
+                insert += 1
 
             i += 1
 
@@ -835,6 +833,6 @@ class Replenishment():
 
         print(f"Updated: {update}\nInserted: {insert}\n Store Table Updated")
 
-
-A = Replenishment('kvat')
-A.master_planogram_import()
+#
+# A = Replenishment('jewel')
+# A.sales_report()

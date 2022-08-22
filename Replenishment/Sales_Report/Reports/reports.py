@@ -17,7 +17,15 @@ class Reports:
         # reports for both internal and external
         self.reports = ReportsData(self.store_type_input, self.store_setting)
 
-        self.replenishment_report, self.on_hands_after_replen, self.replenishment_reasons = replenishment(self.store_type_input, self.store_setting)
+        restock = Restock(self.store_type_input, self.store_setting)
+
+        replen = restock.replenishment()
+
+        self.replenishment_report = replen['replenishment']
+        self.on_hands_after_replen = replen['on_hands_after_replenishment']
+        self.replenishment_reasons = replen['replenishment_reasons']
+        self.on_hands_store = replen['on_hands_store_case_total']
+        self.on_hands_display_size_season = replen['on_hands_display_size_season']
 
         self.replenishment_len = len(self.replenishment_report) + 1
         #
@@ -27,23 +35,19 @@ class Reports:
         self.sales_report = self.reports.sales_table()
         self.sales_report_len = self.reports.sales_report_len(self.sales_report)
 
-        #reports for internal only
-        self.on_hands_store, self.on_hands_display_size = initial_order(self.store_type_input, self.store_setting)
-
-
         #internal report variables
-        self.initial_orders = self.store_setting.loc['initial_orders','values']
-        self.size_build_up = self.store_setting.loc['size_build_up','values']
-        self.high_return = self.store_setting.loc['high_return','values']
-        self.store_sales_rank = self.store_setting.loc['store_sales_rank','values']
-        self.item_approval = self.store_setting.loc['item_approval','values']
-        self.store_program = self.store_setting.loc['store_program','values']
+        self.initial_orders = self.store_setting.loc['initial_orders', 'values']
+        self.size_build_up = self.store_setting.loc['size_build_up', 'values']
+        self.high_return = self.store_setting.loc['high_return', 'values']
+        self.store_sales_rank = self.store_setting.loc['store_sales_rank', 'values']
+        self.item_approval = self.store_setting.loc['item_approval', 'values']
+        self.store_program = self.store_setting.loc['store_program', 'values']
 
         # external report variables
-        self.ytd_mask_sales_table = self.store_setting.loc['ytd_mask_sales_table','values']
-        self.ytd_womask_sales_table = self.store_setting.loc['ytd_womask_sales_table','values']
-        self.item_sales_rank = self.store_setting.loc['item_sales_rank','values']
-        self.top20 = self.store_setting.loc['top20','values']
+        self.ytd_mask_sales_table = self.store_setting.loc['ytd_mask_sales_table', 'values']
+        self.ytd_womask_sales_table = self.store_setting.loc['ytd_womask_sales_table', 'values']
+        self.item_sales_rank = self.store_setting.loc['item_sales_rank', 'values']
+        self.top20 = self.store_setting.loc['top20', 'values']
 
     def internal_report(self,filename):
 
@@ -92,7 +96,7 @@ class Reports:
                                                     startcol=6,
                                                     startrow=1)
 
-                self.on_hands_display_size.to_excel(writer, sheet_name="Potential Initial Orders",
+                self.on_hands_display_size_season.to_excel(writer, sheet_name="Potential Initial Orders",
                                                     index=False,
                                                     startcol=12,
                                                     startrow=1)
@@ -134,7 +138,7 @@ class Reports:
 
             writer.save()
 
-        format = ReportFormat(filename, 1, 1, store_sales_rank_len, self.store_setting)
+        format = ReportFormat(filename, self.replenishment_len, 1, store_sales_rank_len, self.store_setting)
 
         format.internal_report()
 

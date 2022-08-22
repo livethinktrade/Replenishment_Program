@@ -305,20 +305,20 @@ def store_program_update(store_program_id,store_id, program_id, activity, store_
     connection_pool.putconn(connection)
 
 
-def master_planogram_insert(program_id, cd_ay, cd_sn, lht_ay, lht_sn, lhd_ay, lhd_sn, lhp_ay, lhp_sn, connection_pool):
+def master_planogram_insert(program_id, cd_ay, cd_sn, lht_ay, lht_sn, lhd_ay, lhd_sn, lhp_ay, lhp_sn, total_cases, connection_pool):
 
     connection = connection_pool.getconn()
     cursor = connection.cursor()
-    cursor.execute("""INSERT INTO master_planogram (program_id, cd_ay, cd_sn, lht_ay, lht_sn, lhd_ay, lhd_sn, lhp_ay, lhp_sn) 
-                    values (%s,%s,%s,%s,%s,%s,%s,%s,%s)""",
-           (program_id, cd_ay, cd_sn, lht_ay, lht_sn, lhd_ay, lhd_sn, lhp_ay, lhp_sn))
+    cursor.execute("""INSERT INTO master_planogram (program_id, cd_ay, cd_sn, lht_ay, lht_sn, lhd_ay, lhd_sn, lhp_ay, lhp_sn, total_cases) 
+                    values (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)""",
+           (program_id, cd_ay, cd_sn, lht_ay, lht_sn, lhd_ay, lhd_sn, lhp_ay, lhp_sn, total_cases))
 
     connection.commit()
     cursor.close()
     connection_pool.putconn(connection)
 
 
-def master_planogram_update(program_id, cd_ay, cd_sn, lht_ay, lht_sn, lhd_ay, lhd_sn, lhp_ay, lhp_sn, connection_pool):
+def master_planogram_update(program_id, cd_ay, cd_sn, lht_ay, lht_sn, lhd_ay, lhd_sn, lhp_ay, lhp_sn, total_cases, connection_pool):
 
     connection = connection_pool.getconn()
     cursor = connection.cursor()
@@ -330,8 +330,13 @@ def master_planogram_update(program_id, cd_ay, cd_sn, lht_ay, lht_sn, lhd_ay, lh
                                     lhd_ay = '{lhd_ay}',
                                     lhd_sn = '{lhd_sn}',
                                     lhp_ay = '{lhp_ay}',
-                                    lhp_sn = '{lhp_sn}'
+                                    lhp_sn = '{lhp_sn}',
+                                    total_cases = '{total_cases}'
             where program_id = '{program_id}'""")
+
+    connection.commit()
+    cursor.close()
+    connection_pool.putconn(connection)
 
 
 def item_approval_insert(code, store_price, connection_pool, store_type_input):

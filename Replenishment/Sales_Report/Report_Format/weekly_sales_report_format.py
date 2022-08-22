@@ -744,21 +744,50 @@ class ReportFormat:
         ws = self.wb['Store Program']
 
         ws['A1'].value = 'Store'
-        ws['C1'].value = 'Long Hanging Top'
-        ws['D1'].value = 'Long Hanging Dress'
+        # ws['C1'].value = 'Long Hanging Top'
+        # ws['D1'].value = 'Long Hanging Dress'
 
         ws.column_dimensions['C'].width = 16
-        ws.column_dimensions['D'].width = 18
-        ws.column_dimensions['E'].width = 30
-        ws.column_dimensions['F'].width = 20
+        ws.column_dimensions['D'].width = 9
+        ws.column_dimensions['E'].width = 9
+        ws.column_dimensions['F'].width = 9
+        ws.column_dimensions['G'].width = 9
+        ws.column_dimensions['H'].width = 9
+        ws.column_dimensions['I'].width = 9
+        ws.column_dimensions['J'].width = 9
+        ws.column_dimensions['K'].width = 30
+        ws.column_dimensions['L'].width = 20
 
-        ws.auto_filter.ref = f"A1:F500"
 
-        for row in ws.iter_rows(min_row=1, max_row=500, min_col=1, max_col=6):
+        ws.auto_filter.ref = f"A1:L500"
+
+        for row in ws.iter_rows(min_row=1, max_row=500, min_col=1, max_col=12):
             for cell in row:
                 cell.border = self.border
 
         self.wb.save(self.filename)
+
+    def replenishment_pivot(self):
+
+        # ws = self.wb['GIRLS']
+        #
+        # ws['A1'].value = 'Store'
+        # ws['C1'].value = 'Long Hanging Top'
+        # ws['D1'].value = 'Long Hanging Dress'
+        #
+        # ws.column_dimensions['C'].width = 16
+        # ws.column_dimensions['D'].width = 18
+        # ws.column_dimensions['E'].width = 30
+        # ws.column_dimensions['F'].width = 20
+        #
+        # ws.auto_filter.ref = f"A1:L500"
+        #
+        # for row in ws.iter_rows(min_row=1, max_row=500, min_col=1, max_col=6):
+        #     for cell in row:
+        #         cell.border = self.border
+        #
+        # self.wb.save(self.filename)
+        pass
 
     def external_report(self):
 

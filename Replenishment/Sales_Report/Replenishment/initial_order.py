@@ -6,7 +6,12 @@ def initial_order(store_type_input, store_setting):
     connection = psycopg2.connect(database=f"test", user="postgres", password="winwin", host="localhost")
 
     # getting the on hands after replenishment
-    replenishments, on_hands_after_replen, replen_reasons = replenishment(store_type_input, store_setting)
+
+    restock = Restock(store_type_input, store_setting)
+
+    replen = restock.replenishment()
+
+    on_hands_after_replen = replen['on_hands_after_replenishment']
 
     # establish on hands for display size for each store
     on_hands = on_hands_after_replen.reset_index()

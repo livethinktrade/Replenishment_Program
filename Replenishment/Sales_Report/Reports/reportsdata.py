@@ -1149,10 +1149,9 @@ class ReportsData:
         store_program = f"""
         
         select store_program.store_id, 
-                carded,
-                long_hanging_top,
-                long_hanging_dress,
-                notes
+                cd_ay,cd_sn,lht_ay, 
+                lht_sn,lhd_ay, lhd_sn,
+                lhp_ay, lhp_sn, total_cases, notes
         from {self.store_type_input}.store_program
         inner join master_planogram on {self.store_type_input}.store_program.program_id = master_planogram.program_id
         inner join {self.store_type_input}.store on {self.store_type_input}.store_program.store_id = {self.store_type_input}.store.store_id
@@ -1162,12 +1161,13 @@ class ReportsData:
 
         store_program = psql.read_sql(f'{store_program}', self.connection)
 
-        store_program = store_program.fillna(0)
         store_program = store_program.groupby(['store_id','notes']).sum()
 
         store_program = store_program.reset_index()
 
-        store_program = store_program[['store_id', 'carded', 'long_hanging_top', 'long_hanging_dress', 'notes']]
+        store_program = store_program[['store_id', 'cd_ay','cd_sn','lht_ay',
+                                        'lht_sn', 'lhd_ay', 'lhd_sn', 'lhp_ay',
+                                       'lhp_sn', 'total_cases', 'notes']]
 
         i = 0
 
@@ -1288,8 +1288,292 @@ class ReportsData:
 
         return inventory_age
 
+    def sales_table_qty(self):
 
-# store_type_input = 'kvat'
+        sales_sql = f"""
+
+               with
+
+                   sales_table as (
+
+
+                       SELECT distinct sales2.id,
+                           sales2.transition_year,
+                           sales2.transition_season,
+                           sales2.store_year,
+                           sales2.store_week,
+                           sales2.store_number,
+                           sales2.upc AS upc_11_digit,
+                           sales2.sales,
+                           sales2.qty,
+                           sales2.current_year,
+                           sales2.current_week,
+                           sales2.store_type,
+                           item_support2.season,
+                           item_support2.category,
+                           item_support2.upc,
+                           item_support2.display_size,
+                           item_support2.case_size,
+                           item_support2.item_group_desc
+                       FROM {self.store_type_input}.sales2
+                       inner JOIN item_support2 ON sales2.upc = item_support2.upc_11_digit),
+
+                   date as (
+
+                       select distinct store_number
+                       from sales_table
+                       order by store_number asc),
+
+
+                   current_week as (
+
+                       select store_number, store_year, {self.week}, sum(qty) as sales
+                       from sales_table
+                       where store_year = {self.store_year} and
+                           {self.week} = {self.week_num} and
+                           (season = 'FW' or season = 'AY' or season = 'SS') and
+                           (category != 'GM' and category != 'Accessory' and category != 'Scrub')
+
+                       group by store_number, store_year, {self.week}
+
+                       order by store_number asc),
+
+
+                   previous_week as (
+
+                       select store_number, store_year, {self.week}, sum(qty) as sales
+                       from sales_table
+
+                       where store_year = {self.store_year} and
+                           {self.week} = {self.week_num}-1 and
+                           (category != 'GM' or category != 'Accessory' or category != 'Scrub') and
+                           (category != 'GM' and category != 'Accessory' and category != 'Scrub')
+
+                       group by store_number, store_year, {self.week}
+
+                       order by store_number asc),
+
+                   previous_year_week as (
+
+                       select store_number, store_year, {self.week}, sum(qty) as sales
+                       from sales_table
+
+                       where store_year = {self.store_year}-1 and
+                           {self.week} = {self.week_num} and
+                           (season = 'FW' or season = 'AY' or season = 'SS') and
+                           (category != 'GM' and category != 'Accessory' and category != 'Scrub')
+
+                       group by store_number, store_year, {self.week}
+
+                       order by store_number asc),
+
+                   current_ytd_week as (
+
+                       select store_number, store_year, sum(qty) as sales
+                       from sales_table
+
+                       where store_year = {self.store_year} and
+                           {self.week} <= {self.week_num} and
+                           (season = 'FW' or season = 'AY' or season = 'SS') and
+                           (category != 'GM' and category != 'Accessory' and category != 'Scrub')
+
+                       group by store_number, store_year
+
+                       order by store_number asc),
+
+
+                   previous_ytd_week as (
+
+
+                       select store_number, store_year, sum(qty) as sales
+                       from sales_table
+                       /*looks for previous year so maybe max -1 when finding innitial start for python program*/
+                       where store_year = {self.store_year}-1 and
+                           {self.week} <= {self.week_num} and
+                           (season = 'FW' or season = 'AY' or season = 'SS') and
+                           (category != 'GM' and category != 'Accessory' and category != 'Scrub')
+
+                       group by store_number, store_year
+
+                       order by store_number asc)
+
+               select
+                   date.store_number,
+                   current_week.sales as current_week,
+                   previous_week.sales as previous_week,
+                   /*WOW sales % */
+                   case
+                       when current_week.sales < 0 or previous_week.sales <= 0
+                           then NULL
+                       when current_week.sales >= 0 or previous_week.sales > 0
+                           then round(((current_week.sales-previous_week.sales)/(previous_week.sales)),2)
+                       end as WOW_sales_percentage,
+
+
+
+                   current_week.sales as current_week,
+                   previous_year_week.sales as previous_year_week,
+                   case
+                       when current_week.sales < 0 or previous_year_week.sales <= 0
+                           then NULL
+                       when current_week.sales >= 0 or previous_year_week.sales > 0
+                           then round(((current_week.sales-previous_year_week.sales)/(previous_year_week.sales)),2)
+                       end as YoY_sales_percentage,
+
+
+                   current_ytd_week.sales as YTD_2022,
+                   previous_ytd_week.sales as YTD_2021,
+                   case
+                       when current_ytd_week.sales < 0 or previous_ytd_week.sales <= 0
+                           then NULL
+                       when current_ytd_week.sales >= 0 or previous_ytd_week.sales > 0
+                           then round(((current_ytd_week.sales-previous_ytd_week.sales)/(previous_ytd_week.sales)),2)
+                       end as YoY_sales_percentage
+
+
+               from date
+               full join current_week on date.store_number = current_week.store_number
+               full join previous_week on date.store_number = previous_week.store_number
+               full join previous_year_week on date. store_number = previous_year_week.store_number
+               full join current_ytd_week on date.store_number = current_ytd_week.store_number
+               full join previous_ytd_week on date.store_number = previous_ytd_week.store_number
+
+               order by current_ytd_week.sales desc
+
+               """
+
+        sales_report = psql.read_sql(f'{sales_sql}', self.connection)
+
+        return sales_report
+
+    def item_sales_rank_qty(self):
+
+        """Generates a table that gives you the qty sold for each item group desc ranked"""
+
+        item_sales_rank = f"""
+
+        with
+
+            sales_table as (
+
+
+                SELECT distinct sales2.id,
+                    sales2.transition_year,
+                    sales2.transition_season,
+                    sales2.store_year,
+                    sales2.store_week,
+                    sales2.store_number,
+                    sales2.upc AS upc_11_digit,
+                    sales2.sales,
+                    sales2.qty,
+                    sales2.current_year,
+                    sales2.current_week,
+                    sales2.store_type,
+                    item_support2.season,
+                    item_support2.category,
+                    item_support2.upc,
+                    item_support2.display_size,
+                    item_support2.case_size,
+                    item_support2.item_group_desc
+                FROM {self.store_type_input}.sales2
+                inner JOIN item_support2 ON sales2.upc = item_support2.upc_11_digit),
+
+            year_total as(
+                        Select sum(sales) as year_sales, sum(qty) as year_total_unit
+                        from sales_table
+                        where store_year = {self.store_year}),
+
+            item_sales_rank as (
+                        Select item_group_desc, round(sum(sales),2) as sales, sum(qty) as units_sold,season
+                        from sales_table
+                        where store_year = {self.store_year}
+                        group by item_group_desc, season
+                        order by sum(sales) desc)
+
+        select item_group_desc,
+                sales,
+                units_sold,
+                round((sales/year_sales),3) as percent_of_total_sales,
+                season
+            from item_sales_rank, year_total
+
+        """
+
+
+        # this SQL statement prduces a query that shows all of the items that was sold for a given year.
+        # Provides a table with item group desc, season, sum sales, sum qty, % of total sales
+
+
+        rank = psql.read_sql(f'{item_sales_rank}', self.connection)
+
+        i = 0
+
+        # using the previous query, python selects the item group desc and finds how many stores carried that particular item during
+        # that time. Columns will consist of item_group_desc,sales,units_sold,percent_of_total_sales,season,active,stores,sales per active store
+
+        while i < len(rank):
+            item = rank.loc[i, 'item_group_desc']
+
+            store_count = f"""
+
+            with
+
+            sales_table as (
+
+
+                SELECT distinct sales2.id,
+                    sales2.transition_year,
+                    sales2.transition_season,
+                    sales2.store_year,
+                    sales2.store_week,
+                    sales2.store_number,
+                    sales2.upc AS upc_11_digit,
+                    sales2.sales,
+                    sales2.qty,
+                    sales2.current_year,
+                    sales2.current_week,
+                    sales2.store_type,
+                    item_support2.season,
+                    item_support2.category,
+                    item_support2.upc,
+                    item_support2.display_size,
+                    item_support2.case_size,
+                    item_support2.item_group_desc
+                FROM {self.store_type_input}.sales2
+                inner JOIN item_support2 ON sales2.upc = item_support2.upc_11_digit),
+
+
+                store_with_item as (
+
+                select * from sales_table where item_group_desc = '{item}' and store_year = {self.store_year})
+
+            select count(distinct(store_number)) from store_with_item
+
+            """
+
+            store_count = psql.read_sql(f'{store_count}', self.connection)
+
+            store_count = store_count.iloc[0, 0]
+
+            rank.loc[i, 'active stores'] = store_count
+
+            i += 1
+
+        rank['units sold per active store'] = round(rank['units_sold'] / rank['active stores'], 2)
+
+        rank['active stores'] = rank['active stores'].astype(int)
+
+        rank = rank.sort_values(by='units sold per active store', ascending=False)
+
+        rank = rank[['item_group_desc', 'units_sold', 'units sold per active store', 'active stores', 'percent_of_total_sales']]
+
+        item_sales_rank = rank.head(10)
+
+
+        return item_sales_rank
+
+
+# store_type_input = 'kroger_cincinatti'
 #
 # store_setting = pd.read_excel(
 #     rf'C:\Users\User1\OneDrive - winwinproducts.com\Groccery Store Program\{store_type_input}\{store_type_input}_store_setting.xlsm',
@@ -1298,10 +1582,12 @@ class ReportsData:
 #     index_col=0,
 #     names=('setting', 'values'))
 #
+# test = ReportsData(store_type_input, store_setting)
+# a = test.sales_table_qty()
+# b = test.item_sales_rank_qty()
 #
-# a = ReportsData(store_type_input, store_setting)
-# test = a.on_hands()
-# test.to_excel(f'{store_type_input}.xlsx')
+# a.to_excel('sales-qty.xlsx')
+# b.to_excel('item-qty.xlsx')
 
 
 
