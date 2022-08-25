@@ -12,17 +12,11 @@ def size_table_insert(store_type_input, connection_pool):
     connection = connection_pool.getconn()
     cursor = connection.cursor()
     cursor.execute(
-        f"""Create Table {store_type_input}.store_program_history
-(
-            store_program_id serial PRIMARY KEY,
-            store_id integer NOT NULL,
-            program_id varchar(15) NOT NULL,
-            activity varchar(10),
-            store_type character varying(20) NOT NULL,
-            date_updated date NOT NULL,
+        f"""
 
-            FOREIGN KEY (store_id) REFERENCES {store_type_input}.store(store_id)
-)
+            ALTER TABLE {store_type_input}.store_program_history drop constraint store_program_history_pkey;
+            ALTER TABLE {store_type_input}.store_program_history ADD PRIMARY KEY (history_id)
+            
 """)
 
     connection.commit()
@@ -37,7 +31,7 @@ store_list = [
     'intermountain',
     'jewel',
     'kroger_atlanta',
-    'kroger_central',
+    # 'kroger_central',
     'kroger_cincinatti',
     'kroger_columbus',
     'kroger_dallas',
@@ -47,7 +41,7 @@ store_list = [
     'kroger_louisville',
     'kroger_michigan',
     'kroger_nashville',
-    'kvat',
+    # 'kvat',
     'safeway_denver',
     'texas_division'
 ]

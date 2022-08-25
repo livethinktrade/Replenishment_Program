@@ -3,7 +3,7 @@ from Update.Transform_Sales_Data.transform import *
 from Update.Transform_Sales_Data.history_tracking import *
 from Sales_Report.Reports.reports import *
 from Sales_Report.Replenishment.replenishment import *
-import os
+import DbConfig
 
 
 class Replenishment():
@@ -12,17 +12,10 @@ class Replenishment():
         
         self.store_type_input = store_type_input
         
-        self.connection_pool = pool.SimpleConnectionPool(1, 10000, 
-                                                         database= "test",
-                                                         user="postgres",
-                                                         password="winwin",
-                                                         host="localhost")
+        self.connection_pool = DbConfig.create_pool_dbconnection()
 
-        self.connection = psycopg2.connect(database=f"test", user="postgres", password="winwin", host="localhost")
+        self.connection = DbConfig.engine_pool_connection()
 
-        # self.store_setting = pd.read_excel(rf'C:\Users\User1\OneDrive\WinWin Staff Folders\Michael\Groccery Store Program\{self.store_type_input}\{self.store_type_input}_store_setting.xlsm',
-        #                                    sheet_name='Sheet2',
-        #                                    header=None)
         self.store_setting = pd.read_excel(rf'C:\Users\User1\OneDrive - winwinproducts.com\Groccery Store Program\{self.store_type_input}\{self.store_type_input}_store_setting.xlsm',
                                            sheet_name='Sheet2',
                                            header=None,
@@ -63,11 +56,10 @@ class Replenishment():
             qty = new_deliv.iloc[i, 6]
             store_type = new_deliv.iloc[i, 7]
             num = new_deliv.iloc[i, 8]
-            code = new_deliv.iloc[i,9]
+            code = new_deliv.iloc[i, 9]
 
             if store_type != self.store_type_input:
                 raise Exception(f'Data Validation Failed Inserted {store_type} for {self.store_type_input} database')
-
 
             # note to self: last line was comment out bc i needed the old version of the deliv insert not the new one.
 
@@ -121,12 +113,14 @@ class Replenishment():
         df['transition_year'] = self.transition_year
         df['transition_season'] = self.transition_season
 
-        # takes hyphens out of up column extracts numbers only to prevent any rows that include freight or other non item sales (ie sales signs)
+        # takes hyphens out of up column extracts numbers only to prevent any rows that include
+        # freight or other non-item sales (ie sales signs)
         df['upc'] = df["upc"].str.replace("-", "")
         df['upc'] = df.upc.str.extract('(\d+)')
         df = df.dropna()
 
-        # filters out and rows that doesn't have 12 digits in the UPC column this will eliminate any data with POG in the orignal UPC column
+        # filters out and rows that doesn't have 12 digits in the UPC column this will
+        # eliminate any data with POG in the orignal UPC column
         df['upc_len'] = df['upc'].str.len()
         df = df[df.upc_len == 12]
         df.pop('upc_len')
@@ -246,7 +240,7 @@ class Replenishment():
         else:
             raise Exception(f"Error: transition Season should only be SS or FW. Currently Set to {self.transition_season}")
 
-        ######LOADING DATA INTO POSTGRES WITH PYTHON #########
+        # Loading Data into DB
 
         new_deliv_transform_length = len(new_deliv_transform)
         i = 0
@@ -508,56 +502,34 @@ class Replenishment():
         item_support = len(itemsupport)
         i = 0
 
-        while i < item_support:
+        with DbConfig.EnginePoolDB() as connection_pool:
 
-            season = itemsupport.loc[i, 'season']
-            category = itemsupport.loc[i, 'category']
-            type = itemsupport.loc[i, 'type']
-            style = itemsupport.loc[i, 'style']
-            additional = itemsupport.loc[i, 'additional']
-            display_size = itemsupport.loc[i, 'display_size']
-            pog_type = itemsupport.loc[i, 'pog_type']
-            upc = itemsupport.loc[i, 'upc']
-            code = itemsupport.loc[i, 'code']
-            code_qb = itemsupport.loc[i, 'code_qb']
-            unique_replen_code = itemsupport.loc[i, 'unique_replen_code']
-            case_size = itemsupport.loc[i, 'case_size']
-            item_group_desc = itemsupport.loc[i, 'item_group_desc']
-            item_desc = itemsupport.loc[i, 'item_desc']
-            packing = itemsupport.loc[i, 'packing']
-            upc_11_digit = str(int(itemsupport.loc[i, 'upc_11_digit']))
+            while i < item_support:
 
-            duplicate_check = psql.read_sql(f"""
-                                                select * from item_support2
-                                                where code = '{code}' 
-                                                """, self.connection)
+                season = itemsupport.loc[i, 'season']
+                category = itemsupport.loc[i, 'category']
+                type = itemsupport.loc[i, 'type']
+                style = itemsupport.loc[i, 'style']
+                additional = itemsupport.loc[i, 'additional']
+                display_size = itemsupport.loc[i, 'display_size']
+                pog_type = itemsupport.loc[i, 'pog_type']
+                upc = itemsupport.loc[i, 'upc']
+                code = itemsupport.loc[i, 'code']
+                code_qb = itemsupport.loc[i, 'code_qb']
+                unique_replen_code = itemsupport.loc[i, 'unique_replen_code']
+                case_size = itemsupport.loc[i, 'case_size']
+                item_group_desc = itemsupport.loc[i, 'item_group_desc']
+                item_desc = itemsupport.loc[i, 'item_desc']
+                packing = itemsupport.loc[i, 'packing']
+                upc_11_digit = str(int(itemsupport.loc[i, 'upc_11_digit']))
 
-            if len(duplicate_check) == 1:
+                duplicate_check = psql.read_sql(f"""
+                                                    select * from item_support2
+                                                    where code = '{code}' 
+                                                    """, connection_pool)
+                if len(duplicate_check) == 1:
 
-                item_support_update(season,
-                                    category,
-                                    type,
-                                    style,
-                                    additional,
-                                    display_size,
-                                    pog_type,
-                                    upc,
-                                    code,
-                                    code_qb,
-                                    unique_replen_code,
-                                    case_size,
-                                    item_group_desc,
-                                    item_desc,
-                                    packing,
-                                    upc_11_digit,
-                                    self.connection_pool)
-                update += 1
-
-            else:
-
-                try:
-
-                    item_support_insert(season,
+                    item_support_update(season,
                                         category,
                                         type,
                                         style,
@@ -574,13 +546,36 @@ class Replenishment():
                                         packing,
                                         upc_11_digit,
                                         self.connection_pool)
+                    update += 1
 
-                except Exception as e:
-                    print("\nERROR : " + str(e) + f'Quickbook Item:  {code}' )
+                else:
 
-                insert += 1
+                    try:
 
-            i += 1
+                        item_support_insert(season,
+                                            category,
+                                            type,
+                                            style,
+                                            additional,
+                                            display_size,
+                                            pog_type,
+                                            upc,
+                                            code,
+                                            code_qb,
+                                            unique_replen_code,
+                                            case_size,
+                                            item_group_desc,
+                                            item_desc,
+                                            packing,
+                                            upc_11_digit,
+                                            self.connection_pool)
+
+                    except Exception as e:
+                        print("\nERROR : " + str(e) + f'Quickbook Item:  {code}')
+
+                    insert += 1
+
+                i += 1
 
         print('\nSupport Sheet Imported')
         print(f'Updated: {update}\nInserted: {insert}')

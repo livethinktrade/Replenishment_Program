@@ -4,6 +4,7 @@ import pandas.io.sql as psql
 from datetime import timedelta, date
 import numpy as np
 import datetime as dt
+import DbConfig
 
 
 class ReportsData:
@@ -1401,7 +1402,7 @@ class ReportsData:
                    date.store_number,
                    current_week.sales as current_week,
                    previous_week.sales as previous_week,
-                   /*WOW sales % */
+                   /*WOW sales percentage */
                    case
                        when current_week.sales < 0 or previous_week.sales <= 0
                            then NULL
@@ -1573,8 +1574,8 @@ class ReportsData:
         return item_sales_rank
 
 
-# store_type_input = 'kroger_cincinatti'
-#
+# store_type_input = 'fresh_encounter'
+
 # store_setting = pd.read_excel(
 #     rf'C:\Users\User1\OneDrive - winwinproducts.com\Groccery Store Program\{store_type_input}\{store_type_input}_store_setting.xlsm',
 #     sheet_name='Sheet2',
@@ -1583,9 +1584,11 @@ class ReportsData:
 #     names=('setting', 'values'))
 #
 # test = ReportsData(store_type_input, store_setting)
-# a = test.sales_table_qty()
-# b = test.item_sales_rank_qty()
+# # a = test.sales_table_qty()
+# # b = test.item_sales_rank_qty()
 #
+# onhand = test.on_hands()
+
 # a.to_excel('sales-qty.xlsx')
 # b.to_excel('item-qty.xlsx')
 

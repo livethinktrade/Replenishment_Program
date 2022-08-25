@@ -152,11 +152,12 @@ Create view as midwest_mask (
 
 Create Table store_program_history
 (
-    store_program_id serial PRIMARY KEY,
+    store_program_id integer NOT NULL,
     store_id integer NOT NULL,
     program_id varchar(15) NOT NULL,
     activity varchar(10),
     store_type character varying(20) NOT NULL,
+    history_id serial primary key,
 
     FOREIGN KEY (store_id) REFERENCES store(store_id)
 

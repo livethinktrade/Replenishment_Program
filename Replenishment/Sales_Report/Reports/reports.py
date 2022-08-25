@@ -6,6 +6,7 @@ from Sales_Report.Report_Format.weekly_sales_report_format import ReportFormat
 from openpyxl import load_workbook
 import numpy as np
 
+
 class Reports:
 
     def __init__(self, store_type_input, store_setting):
@@ -49,7 +50,7 @@ class Reports:
         self.item_sales_rank = self.store_setting.loc['item_sales_rank', 'values']
         self.top20 = self.store_setting.loc['top20', 'values']
 
-    def internal_report(self,filename):
+    def internal_report(self, filename):
 
         # self.external_report(filename)
         #
