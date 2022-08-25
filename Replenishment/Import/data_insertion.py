@@ -1,9 +1,6 @@
 # STEP 2 IMPORT DATA FUNCTIONS
 
 import psycopg2
-import pandas as pd
-import pandas.io.sql as psql
-from psycopg2 import pool
 import numpy as np
 
 from psycopg2.extensions import register_adapter, AsIs
@@ -11,37 +8,33 @@ psycopg2.extensions.register_adapter(np.int64, psycopg2._psycopg.AsIs)
 
 
 def casecapacity_insert(store_type,
-                    store,
-                    rack_4w,
-                    rack_1w,
-                    rack_2w,
-                    rack_pw,
-                    carded,
-                    long_hanging_top,
-                    long_hanging_dress,
-                    case_capacity,notes,
-                    initial,
-                    connection_pool):
+                        store,
+                        rack_4w,
+                        rack_1w,
+                        rack_2w,
+                        rack_pw,
+                        carded,
+                        long_hanging_top,
+                        long_hanging_dress,
+                        case_capacity,notes,
+                        initial,
+                        connection_pool):
  
     connection = connection_pool.getconn()
     cursor = connection.cursor()
-    cursor.execute("INSERT INTO case_capacity (store_type, store, rack_4w, rack_1w, rack_2w,rack_pw,carded,long_hanging_top,long_hanging_dress,case_capacity,notes, initial) values (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)",
-           (store_type,
-           store,
-           rack_4w,
-           rack_1w,
-           rack_2w,
-           rack_pw,
-           carded,
-           long_hanging_top,
-           long_hanging_dress,
-           case_capacity,
-           notes,
-           initial))
+    cursor.execute("""
+    INSERT INTO case_capacity (store_type, store, rack_4w, rack_1w, rack_2w,rack_pw,carded,
+                               long_hanging_top,long_hanging_dress,case_capacity,notes, initial) 
+    values (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)""", (
+            store_type, store, rack_4w,
+            rack_1w, rack_2w, rack_pw,
+            carded, long_hanging_top, long_hanging_dress,
+            case_capacity, notes, initial))
 
     connection.commit()
     cursor.close()
     connection_pool.putconn(connection)
+
 
 def delivery_update(transition_year, transition_season,
                    type, date, upc, store, qty,
@@ -66,8 +59,6 @@ def delivery_update(transition_year, transition_season,
     connection_pool.putconn(connection)
 
 
-
-#new code for deliv insert
 def delivery_insert(transition_year,
                     transition_season,
                     type, date, upc, store, qty, store_type,
@@ -78,8 +69,9 @@ def delivery_insert(transition_year,
     connection = connection_pool.getconn()
     cursor = connection.cursor()
     cursor.execute(
-        f"""INSERT INTO {store_type_input}.delivery2 (transition_year, transition_season,type, date, upc, store, qty, store_type, num, code)
-                                values (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)""",
+        f"""INSERT INTO {store_type_input}.delivery2 (transition_year, transition_season,type, date, upc, store, 
+                                                      qty, store_type, num, code)
+            values (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)""",
         (transition_year, transition_season, type, date, upc, store, qty, store_type, num, code))
 
     connection.commit()
@@ -183,24 +175,12 @@ def item_support_insert(season,
     cursor.execute("""INSERT INTO item_support2 (season, category, type, style, additional, display_size, pog_type, 
                                                  upc, code, code_qb, unique_replen_code, case_size, item_group_desc,
                                                 item_desc, packing, upc_11_digit) 
-                    values (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)""",
-
-                    (season,
-                      category,
-                      type,
-                      style,
-                      additional,
-                      display_size,
-                      pog_type,
-                      upc,
-                      code,
-                      code_qb,
-                      unique_replen_code,
-                      case_size,
-                      item_group_desc,
-                      item_desc,
-                      packing,
-                      upc_11_digit)
+                    values (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)""", (
+                    season, category, type, style,
+                    additional, display_size, pog_type,
+                    upc, code, code_qb, unique_replen_code,
+                    case_size, item_group_desc,
+                    item_desc, packing, upc_11_digit)
 
                   )
 
@@ -282,12 +262,15 @@ def store_program_insert(store_program_id,store_id, program_id, activity, store_
 
     connection = connection_pool.getconn()
     cursor = connection.cursor()
-    cursor.execute(f"INSERT INTO {store_type_input}.store_program (store_program_id, store_id, program_id, activity,store_type) values (%s,%s,%s,%s,%s)",
-           (store_program_id,store_id, program_id, activity, store_type))
+    cursor.execute(f""""
+    
+    INSERT INTO {store_type_input}.store_program (store_program_id, store_id, program_id, activity,store_type) 
+    values (%s,%s,%s,%s,%s)""", (store_program_id, store_id, program_id, activity, store_type))
 
     connection.commit()
     cursor.close()
     connection_pool.putconn(connection)
+
 
 def store_program_update(store_program_id,store_id, program_id, activity, store_type, connection_pool, store_type_input):
 
@@ -309,9 +292,10 @@ def master_planogram_insert(program_id, cd_ay, cd_sn, lht_ay, lht_sn, lhd_ay, lh
 
     connection = connection_pool.getconn()
     cursor = connection.cursor()
-    cursor.execute("""INSERT INTO master_planogram (program_id, cd_ay, cd_sn, lht_ay, lht_sn, lhd_ay, lhd_sn, lhp_ay, lhp_sn, total_cases) 
-                    values (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)""",
-           (program_id, cd_ay, cd_sn, lht_ay, lht_sn, lhd_ay, lhd_sn, lhp_ay, lhp_sn, total_cases))
+    cursor.execute("""
+    INSERT INTO master_planogram (program_id, cd_ay, cd_sn, lht_ay, lht_sn, lhd_ay, lhd_sn, lhp_ay, lhp_sn, total_cases) 
+    values (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)""", (program_id, cd_ay, cd_sn, lht_ay, lht_sn,
+                                                lhd_ay, lhd_sn, lhp_ay, lhp_sn, total_cases))
 
     connection.commit()
     cursor.close()
@@ -374,6 +358,7 @@ def inventory_insert(code, on_hand, connection_pool):
     cursor.close()
     connection_pool.putconn(connection)
 
+
 def inventory_update(code, on_hand, connection_pool):
     connection = connection_pool.getconn()
     cursor = connection.cursor()
@@ -384,7 +369,8 @@ def inventory_update(code, on_hand, connection_pool):
     cursor.close()
     connection_pool.putconn(connection)
 
-def size_table_insert(code,size,connection_pool):
+
+def size_table_insert(code, size, connection_pool):
     connection = connection_pool.getconn()
     cursor = connection.cursor()
     cursor.execute(
@@ -395,7 +381,8 @@ def size_table_insert(code,size,connection_pool):
     cursor.close()
     connection_pool.putconn(connection)
 
-def size_table_update(code,size,connection_pool):
+
+def size_table_update(code, size, connection_pool):
     connection = connection_pool.getconn()
     cursor = connection.cursor()
     cursor.execute(

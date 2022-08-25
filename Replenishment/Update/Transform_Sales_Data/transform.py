@@ -18,21 +18,21 @@ class TransformData():
         self.store_weeks_calender_file = r'C:\Users\User1\OneDrive\WinWin Staff Folders\Michael\Replenishment program\Replenishment\support document\Store Weeks Calender.xlsx'
 
         self.winwin_calender = pd.read_excel(f'{self.store_weeks_calender_file}',
-                                      sheet_name=f'WinWin Fiscal Year',
-                                      names=('week_number', 'date', 'winwin year'))
+                                             sheet_name=f'WinWin Fiscal Year',
+                                             names=('week_number', 'date', 'winwin year'))
 
         self.cvs_calender = pd.read_excel(f'{self.store_weeks_calender_file}',
-                                      sheet_name=f'CVS Fiscal Year',
-                                      names=('week_number', 'date', 'winwin year'))
+                                          sheet_name=f'CVS Fiscal Year',
+                                          names=('week_number', 'date', 'winwin year'))
 
         self.kroger_calender = pd.read_excel(f'{self.store_weeks_calender_file}',
-                                      sheet_name=f'Kroger Fiscal Year',
-                                      index_col= 0,
-                                      names=('kroger_week_number', 'date', 'winwin_week_number', 'winwin year'))
+                                             sheet_name=f'Kroger Fiscal Year',
+                                             index_col= 0,
+                                             names=('kroger_week_number', 'date', 'winwin_week_number', 'winwin year'))
 
         self.albertson_calender = pd.read_excel(f'{self.store_weeks_calender_file}',
-                                      sheet_name=f'Albertson Fiscal Year',
-                                      names=('albertson_week_number', 'date', 'winwin_week_number', 'winwin year'))
+                                                sheet_name=f'2022 Albertson Fiscal Year',
+                                                names=('albertson_week_number', 'date', 'winwin_week_number', 'winwin year'))
 
         self.connection = connection
 
@@ -445,6 +445,60 @@ class TransformData():
 
         return sales_data
 
+    def alba_transform(self, df):
+
+        store_type_input_dict = {'acme': 'MID-ATLANTIC'}
+
+        store_verify = store_type_input_dict[self.store_type_input]
+
+        # dropping the last column where the total is located
+        df.drop(index=df.index[-1],
+                axis=0,
+                inplace=True)
+
+        # verify if data is all from the same division
+        i = 0
+        while i < len(df):
+
+            division = df.loc[i, 'DIVISION']
+            if division != store_verify:
+                raise Exception(f"""
+                Store Division Does not Match. Possible mixing of data
+                Division should be {store_verify} but showing {division}
+                on line {i + 1}""")
+            i += 1
+
+        start = (2021, 45)
+
+        start_verify = df.loc[2, '&GOLD']
+        year_verify = int(start_verify[-6:-2])
+        week_verify = int(start_verify[-2:])
+
+        store_year_week = df.loc[3, '&GOLD']
+        store_year = int(store_year_week[-6:-2])
+        store_week = int(store_year_week[-2:])
+
+        # verifying data
+        if year_verify != start[0]:
+            raise Exception(f'Sales Data Does Not Start With The Same Year: currently at {year_verify}')
+
+        if week_verify != start[1]:
+            raise Exception(f"""
+
+            Sales Data Does Not Start With The Same Week: 
+            Alba Stores start with WK 45 week for file shows {week_verify}""")
+
+        df['store_year'] = store_year
+        df['store_week'] = store_week
+        date = self.alba_week_number_to_date(store_year, store_week)
+        df['date'] = date
+
+        cols = ['store_year', 'date', 'store_week', 'STORE', 'UPC', 'SALES TY', 'UNITS TY']
+
+        filtered_columns = df[cols]
+
+        return filtered_columns
+
     def approval_transform(self, file):
 
         approval = pd.read_csv(f'{file}')
@@ -652,8 +706,35 @@ class TransformData():
 
         return year
 
+    def alba_week_number_to_date(self, store_year, store_week):
+
+        calender_2021 = pd.read_excel((r'C:\Users\User1\OneDrive\WinWin Staff Folders\Michael\Replenishment program\Replenishment\support document\Store Weeks Calender.xlsx'),
+                                      sheet_name='2021 Albertson Fiscal Year')
+
+        calender_2022 = pd.read_excel((r'C:\Users\User1\OneDrive\WinWin Staff Folders\Michael\Replenishment program\Replenishment\support document\Store Weeks Calender.xlsx'),
+                                      sheet_name='2022 Albertson Fiscal Year')
+
+        date = None
+
+        if store_year == 2021:
+
+            filtered_calender = calender_2021[calender_2021['Week Number'] == store_week]
+            date = filtered_calender.iloc[0, 1]
+            return date
+
+        elif store_year == 2022:
+
+            filtered_calender = calender_2022[calender_2022['Week Number'] == store_week]
+            date = filtered_calender.iloc[0, 1]
+            return date
+        else:
+            return date
 
 
+acme = TransformData('acme', 2022, 'FW', 'no connect')
+
+current_week = pd.read_excel(r'C:\Users\User1\OneDrive\WinWin Staff Folders\Michael\Replenishment program\Replenishment\Albertsons Sales Data\Acme\08-25-22.xlsx')
 
 
+test =acme.alba_transform(current_week)
 
