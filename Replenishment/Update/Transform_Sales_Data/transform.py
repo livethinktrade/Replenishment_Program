@@ -31,7 +31,7 @@ class TransformData():
                                       names=('kroger_week_number', 'date', 'winwin_week_number', 'winwin year'))
 
         self.albertson_calender = pd.read_excel(f'{self.store_weeks_calender_file}',
-                                      sheet_name=f'Albertson Fiscal Year',
+                                      sheet_name=f'2022 Albertson Fiscal Year',
                                       names=('albertson_week_number', 'date', 'winwin_week_number', 'winwin year'))
 
         self.connection = connection
