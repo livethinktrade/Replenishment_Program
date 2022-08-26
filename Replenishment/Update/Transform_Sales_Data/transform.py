@@ -9,7 +9,8 @@ import re
 import pandas as pd
 from datetime import datetime
 import datetime as dt
-
+from DbConfig import engine_pool_connection
+import warnings
 
 class TransformData():
 
@@ -470,6 +471,7 @@ class TransformData():
 
         start = (2021, 45)
 
+        # establish variables to verify if the data is coming from the right year.
         start_verify = df.loc[2, '&GOLD']
         year_verify = int(start_verify[-6:-2])
         week_verify = int(start_verify[-2:])
@@ -496,6 +498,18 @@ class TransformData():
         cols = ['store_year', 'date', 'store_week', 'STORE', 'UPC', 'SALES TY', 'UNITS TY']
 
         filtered_columns = df[cols]
+
+        # rename columns so it can be in the proper format to be used find_difference_bewtween_tables method
+        filtered_columns = filtered_columns.rename(columns={
+                                                            'STORE': 'store',
+                                                            'UPC': 'upc',
+                                                            'SALES TY': 'sales',
+                                                            'UNITS TY': 'units'
+                                                           })
+
+        filtered_columns['upc'] = filtered_columns['upc'].astype(np.int64).astype(str)
+
+        filtered_columns['store'] = filtered_columns['store'].astype(np.int64).astype(str)
 
         return filtered_columns
 
@@ -545,7 +559,7 @@ class TransformData():
 
         return approval
 
-    def inventory_transform(self,file):
+    def inventory_transform(self, file):
 
         inventory = pd.read_csv(f'{file}')
 
@@ -565,6 +579,8 @@ class TransformData():
     def date_to_week_number_conversion(self, date):
         """
         Takes in Dataframe
+
+        note may be not relevant anymore. will need to review later.
 
         This is the reason why we are adding 8 days to the current day to find the weeknumber
         Pythons isocalender() function is used to calculate the week number and it has an atribute of week
@@ -730,11 +746,149 @@ class TransformData():
         else:
             return date
 
+    def find_difference_between_tables(self, current_week_sales_data, previous_week_sales_data):
+        
+        """
 
-acme = TransformData('acme', 2022, 'FW', 'no connect')
+        :param current_week_sales_data: dataframe
+        :param previous_week_sales_data: dataframe
+        :return: dataframe sales_data in the proper format for insertion into the designated division sales table
+
+        """
+
+        # verify data to see if the week difference is greater than one
+        current_week_number = current_week_sales_data.loc[0, 'store_week']
+        previous_week_number = previous_week_sales_data.loc[0, 'store_week']
+        current_store_year = current_week_sales_data.loc[0, 'store_year']
+        previous_store_year = previous_week_sales_data.loc[0, 'store_year']
+
+        if current_store_year-previous_store_year == 0:
+
+            if current_week_number < previous_week_number:
+                raise Exception("""
+                Data Verification Failed: "END WK" for current week is < than the previous week
+                
+                The store week number from the current week sales data is less the previous weeks sales data""")
+            elif (current_week_number-previous_week_number) == 1:
+                # pass verification test. Showing that the YTD sales data is 1 week apart.
+                pass
+            elif (current_week_number-previous_week_number) > 1:
+                warnings.warn(f"""
+                
+                The 2 files from the sales data is showing that it is {(current_week_number-previous_week_number)} weeks
+                apart.
+                
+                Ideally the sales data imported should be from week to week. However if more than a weeks of sales data
+                was missed being sent, it is still ok to import the sales data.
+                 
+                If this is the case, enter 'VERIFIED' if not enter 'CANCEL'""")
+
+                user_input = str(input()).upper()
+
+                i = False
+
+                while not i:
+
+                    if user_input == 'VERIFIED':
+
+                        i = True
+
+                    elif user_input == 'CANCEL':
+                        raise Exception("Import Canceled")
+
+                    else:
+                        user_input = str(input()).upper()
+            else:
+                raise Exception('ERROR')
+
+        elif current_store_year-previous_store_year == 1:
+            pass
+        else:
+            raise Exception(f"""
+            
+            Data Verification Failed: Trying to import data from 2 different years. 
+            
+            Data from the first file is showing END WK: {current_store_year}
+            Data form teh second file is showing END WK: {previous_store_year}""")
+
+
+        # creating a primary key in the two tables that way we can do a left join on them. Will left join on the current
+        # weeks data.
+        
+        current_week_sales_data['unique'] = current_week_sales_data['store'].astype(str) \
+                                          + current_week_sales_data['upc'].astype(str)
+
+        previous_week_sales_data['unique'] = previous_week_sales_data['store'].astype(str) \
+                                           + previous_week_sales_data['upc'].astype(str)
+
+        left_joined_sales_table = current_week_sales_data.merge(previous_week_sales_data, on='unique', how='left')
+        
+        # fill all data with na with the value of zero for the sales and units columns. necessary because sometimes the 
+        # previous week that was join does not contain the primary key from the current week. possibility that a new 
+        # item has been shipped.
+
+        left_joined_sales_table = left_joined_sales_table.fillna(0)
+
+        # find difference between the sales table
+        left_joined_sales_table['sales'] = left_joined_sales_table['sales_x'] - left_joined_sales_table['sales_y']
+        left_joined_sales_table['qty'] = left_joined_sales_table['units_x'] - left_joined_sales_table['units_y']
+
+        # reorganizing columns & renaming
+        column_names = left_joined_sales_table.columns.to_list()
+        filtered_columns = column_names[:5] + column_names[-2:]
+        left_joined_sales_table = left_joined_sales_table[filtered_columns]
+
+        left_joined_sales_table = left_joined_sales_table.rename(columns={
+                                                                          'store_year_x': 'store_year',
+                                                                          'date_x': 'date',
+                                                                          'store_week_x': 'store_week',
+                                                                          'store_x': 'store_number',
+                                                                          'upc_x': 'upc'
+                                                                         })
+
+        # filtering all data that has 0 sales and units
+        left_joined_sales_table = left_joined_sales_table[(left_joined_sales_table['sales'] != 0)
+                                                          | (left_joined_sales_table['qty'] != 0)]
+
+        left_joined_sales_table = left_joined_sales_table.reset_index(drop=True)
+
+        # adding transition year, season, current year, current_week,
+        left_joined_sales_table['transition_year'] = self.transition_year
+        left_joined_sales_table['transition_season'] = f'{self.transition_season}'
+
+        date = left_joined_sales_table.loc[0, 'date']
+        left_joined_sales_table['current_year'] = self.find_winwin_year(date)
+        left_joined_sales_table['current_week'] = self.date_to_week_number_conversion(date)
+
+        i = 0
+        while i < len(left_joined_sales_table):
+
+            store = left_joined_sales_table.loc[i, 'store_number']
+
+            upc_11_digit = left_joined_sales_table.loc[i, 'upc']
+
+            left_joined_sales_table.loc[i, 'code'] = self.quickbooks_code_finder(upc_11_digit, store)
+
+            i += 1
+
+        sales_data = left_joined_sales_table[['transition_year', 'transition_season', 'store_year', 'date',
+                                              'store_week', 'store_number', 'upc', 'sales', 'qty',  'current_year',
+                                              'current_week', 'code']]
+
+        return sales_data
+
+
+connection = engine_pool_connection()
+
+acme = TransformData('acme', 2022, 'FW', connection)
 
 current_week = pd.read_excel(r'C:\Users\User1\OneDrive\WinWin Staff Folders\Michael\Replenishment program\Replenishment\Albertsons Sales Data\Acme\08-25-22.xlsx')
 
+previous_week = pd.read_excel(r'C:\Users\User1\OneDrive\WinWin Staff Folders\Michael\Replenishment program\Replenishment\Albertsons Sales Data\Acme\08-10-22.xlsx')
 
-test =acme.alba_transform(current_week)
 
+current_week_sales_data = acme.alba_transform(current_week)
+
+previous_week_sales_data = acme.alba_transform(previous_week)
+
+left_joined_salestable = acme.find_difference_between_tables(current_week_sales_data, previous_week_sales_data)
