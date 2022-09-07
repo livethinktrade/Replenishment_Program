@@ -78,7 +78,7 @@ class Reports:
                                               margins= True)
                 replen_pivot = replen_pivot.reset_index()
 
-                replen_pivot.to_excel(writer, sheet_name='GIRLS', index=False)
+                replen_pivot.to_excel(writer, sheet_name='Front Desk', index=False)
 
             except Exception as e:
                 print(f'Error: {e}')
