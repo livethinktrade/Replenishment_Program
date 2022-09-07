@@ -391,3 +391,15 @@ def size_table_update(code, size, connection_pool):
     connection.commit()
     cursor.close()
     connection_pool.putconn(connection)
+
+
+def year_week_verify_insert(store_year, store_week, store_type_input, connection_pool):
+    connection = connection_pool.getconn()
+    cursor = connection.cursor()
+    cursor.execute(
+        f"INSERT INTO {store_type_input}.year_week_verify (store_year, store_week) values (%s,%s)",
+        (store_year, store_week))
+
+    connection.commit()
+    cursor.close()
+    connection_pool.putconn(connection)

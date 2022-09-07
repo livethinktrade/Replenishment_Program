@@ -9,8 +9,11 @@ import re
 import pandas as pd
 from datetime import datetime
 import datetime as dt
-from DbConfig import engine_pool_connection
+from DbConfig import engine_pool_connection, PsycoPoolDB
 import warnings
+from Import.data_insertion import year_week_verify_insert
+
+
 
 class TransformData():
 
@@ -480,7 +483,7 @@ class TransformData():
         store_year = int(store_year_week[-6:-2])
         store_week = int(store_year_week[-2:])
 
-        # verifying data
+        # verifying store year and week
         if year_verify != start[0]:
             raise Exception(f'Sales Data Does Not Start With The Same Year: currently at {year_verify}')
 
@@ -507,9 +510,13 @@ class TransformData():
                                                             'UNITS TY': 'units'
                                                            })
 
+        filtered_columns['sales'] = round(filtered_columns['sales'], 2)
+
         filtered_columns['upc'] = filtered_columns['upc'].astype(np.int64).astype(str)
 
         filtered_columns['store'] = filtered_columns['store'].astype(np.int64).astype(str)
+
+        filtered_columns['store_type'] = self.store_type_input
 
         return filtered_columns
 
@@ -750,17 +757,20 @@ class TransformData():
         
         """
 
+        This function is used for raw sales data that is given for YTD Format.
+
         :param current_week_sales_data: dataframe
         :param previous_week_sales_data: dataframe
         :return: dataframe sales_data in the proper format for insertion into the designated division sales table
 
         """
 
-        # verify data to see if the week difference is greater than one
         current_week_number = current_week_sales_data.loc[0, 'store_week']
         previous_week_number = previous_week_sales_data.loc[0, 'store_week']
         current_store_year = current_week_sales_data.loc[0, 'store_year']
         previous_store_year = previous_week_sales_data.loc[0, 'store_year']
+
+        # verify data to see if the week difference is greater than one
 
         if current_store_year-previous_store_year == 0:
 
@@ -783,7 +793,7 @@ class TransformData():
                  
                 If this is the case, enter 'VERIFIED' if not enter 'CANCEL'""")
 
-                user_input = str(input()).upper()
+                user_input = str(input('\n\n\nREAD STATEMENT ABOVE:\t')).upper()
 
                 i = False
 
@@ -797,7 +807,8 @@ class TransformData():
                         raise Exception("Import Canceled")
 
                     else:
-                        user_input = str(input()).upper()
+                        user_input = str(input('READ STATEMENT ABOVE:\t')).upper()
+
             else:
                 raise Exception('ERROR')
 
@@ -811,6 +822,48 @@ class TransformData():
             Data from the first file is showing END WK: {current_store_year}
             Data form teh second file is showing END WK: {previous_store_year}""")
 
+        # verifying to check if either of the weeks sales data has already been imported or the weeks in between the
+        # current week or the previous week
+
+        # check to see if the current week store year is in the system  or the weeks in between the previous week sales
+        # data not done with this verification process. need to fix because the data will not check for multiple years
+
+        # create a list of all the numbers in between that 2 sales date
+
+        week_number_list = list(range(previous_week_number, current_week_number))
+
+        year_week_list = []
+
+        # creating the year week tuple list. list will be used later to check if the store year is in the db or not yet.
+
+        for x in week_number_list:
+
+            if (x >= 45 and x <= 53):
+                year_week_list.append((previous_store_year, x))
+            else:
+                year_week_list.append((current_store_year, x))
+
+        i = 0
+
+        while i < len(year_week_list):
+
+            year_week_verify = psql.read_sql(f"""select * from {self.store_type_input}.year_week_verify
+                                                  where store_year = {year_week_list[i][0]} and
+                                                        store_week = {year_week_list[i][1]} """, self.connection)
+
+            # if the store_year and store_week is already in the table, then the data is already in the sales table.
+            # passing this if statement would indicate that the data for the weeks in between is not in the sales table.
+
+            if len(year_week_verify) >= 1:
+                raise Exception(f'''
+                Error: Import failed. 
+                                    
+                Tried to import duplication of same weeks. 
+                Store Year:{year_week_list[i][0]}  Week:{year_week_list[i][1]}  sales data already in sales table''')
+            else:
+                pass
+
+            i += 1
 
         # creating a primary key in the two tables that way we can do a left join on them. Will left join on the current
         # weeks data.
@@ -835,7 +888,7 @@ class TransformData():
 
         # reorganizing columns & renaming
         column_names = left_joined_sales_table.columns.to_list()
-        filtered_columns = column_names[:5] + column_names[-2:]
+        filtered_columns = column_names[:5] + column_names[-3:]
         left_joined_sales_table = left_joined_sales_table[filtered_columns]
 
         left_joined_sales_table = left_joined_sales_table.rename(columns={
@@ -843,7 +896,8 @@ class TransformData():
                                                                           'date_x': 'date',
                                                                           'store_week_x': 'store_week',
                                                                           'store_x': 'store_number',
-                                                                          'upc_x': 'upc'
+                                                                          'upc_x': 'upc',
+                                                                          'store_type_y': 'store_type'
                                                                          })
 
         # filtering all data that has 0 sales and units
@@ -860,6 +914,8 @@ class TransformData():
         left_joined_sales_table['current_year'] = self.find_winwin_year(date)
         left_joined_sales_table['current_week'] = self.date_to_week_number_conversion(date)
 
+        left_joined_sales_table['store_type'] = self.store_type_input
+
         i = 0
         while i < len(left_joined_sales_table):
 
@@ -873,22 +929,41 @@ class TransformData():
 
         sales_data = left_joined_sales_table[['transition_year', 'transition_season', 'store_year', 'date',
                                               'store_week', 'store_number', 'upc', 'sales', 'qty',  'current_year',
-                                              'current_week', 'code']]
+                                              'current_week', 'code', 'store_type']]
+
+        with PsycoPoolDB() as connection_pool:
+
+            for x in year_week_list:
+
+                store_year = x[0]
+                store_week = x[1]
+                year_week_verify_insert(store_year, store_week, self.store_type_input, connection_pool)
+
+        return sales_data
+
+    def ytd_transform(self, current_week_sales_data, previous_week_sales_data):
+
+        current_week = pd.read_excel(current_week_sales_data)
+
+        previous_week = pd.read_excel(previous_week_sales_data)
+
+        if self.store_type_input in ['intermountain', 'acme', 'texas_division']:
+
+            current_week_sales_data = self.alba_transform(current_week)
+
+            previous_week_sales_data = self.alba_transform(previous_week)
+
+            sales_data = self.find_difference_between_tables(current_week_sales_data, previous_week_sales_data)
+
+        else:
+            raise Exception(f"No YTD data pipeline established for {self.store_type_input}")
 
         return sales_data
 
 
-connection = engine_pool_connection()
-
-acme = TransformData('acme', 2022, 'FW', connection)
-
-current_week = pd.read_excel(r'C:\Users\User1\OneDrive\WinWin Staff Folders\Michael\Replenishment program\Replenishment\Albertsons Sales Data\Acme\08-25-22.xlsx')
-
-previous_week = pd.read_excel(r'C:\Users\User1\OneDrive\WinWin Staff Folders\Michael\Replenishment program\Replenishment\Albertsons Sales Data\Acme\08-10-22.xlsx')
 
 
-current_week_sales_data = acme.alba_transform(current_week)
 
-previous_week_sales_data = acme.alba_transform(previous_week)
 
-left_joined_salestable = acme.find_difference_between_tables(current_week_sales_data, previous_week_sales_data)
+
+

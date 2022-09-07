@@ -162,3 +162,10 @@ Create Table store_program_history
     FOREIGN KEY (store_id) REFERENCES store(store_id)
 
 )
+
+
+Create Table acme.year_week_verify (
+    store_year integer not null,
+    store_week integer not null,
+    PRIMARY KEY(store_year, store_week)
+)
