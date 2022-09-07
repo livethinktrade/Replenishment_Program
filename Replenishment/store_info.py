@@ -339,9 +339,7 @@ class Replenishment():
 
         print(f'\n {self.store_type_input} Sales Data Imported')
 
-    def sales_update(self, file):
-
-        connection = self.connection_pool.getconn()
+    def sales_update(self, current_weeks_sales=None, previous_weeks_sales=None):
 
         kroger = [
                   'kroger_atlanta',
@@ -355,26 +353,34 @@ class Replenishment():
                   'kroger_louisville',
                   'kroger_nashville',
                   'kroger_michigan']
+        
+        albertson = ['intermountain', 'acme', 'texas_division']
 
-        transform = TransformData(self.store_type_input, self.transition_year, self.transition_season, connection)
+        with DbConfig.EnginePoolDB() as connection:
+
+            transform = TransformData(self.store_type_input, self.transition_year, self.transition_season, connection)
 
         # series of if statement used to determine which program to use to transform the data to the proper format.
 
         if self.store_type_input in kroger:
 
-            sales_data = transform.kroger_transform(file)
+            sales_data = transform.kroger_transform(current_weeks_sales)
 
         elif self.store_type_input == 'kvat':
 
-            sales_data = transform.kvat_transform(file)
+            sales_data = transform.kvat_transform(current_weeks_sales)
 
         elif self.store_type_input == 'safeway_denver':
 
-            sales_data = transform.safeway_denver_transform(file)
+            sales_data = transform.safeway_denver_transform(current_weeks_sales)
 
         elif self.store_type_input == 'jewel':
 
-            sales_data = transform.jewel_transform(file)
+            sales_data = transform.jewel_transform(current_weeks_sales)
+        
+        elif self.store_type_input in albertson:
+            
+            sales_data = transform.ytd_transform(current_weeks_sales, previous_weeks_sales)
 
         else:
             raise Exception('Error: Sales update method is not established for this store')
@@ -384,82 +390,82 @@ class Replenishment():
         insert = 0
         inserted_list = []
 
-        while i < len(sales_data):
+        with DbConfig.PsycoPoolDB() as connection_pool:
 
-            transition_year = sales_data.loc[i, 'transition_year']
-            transition_season = sales_data.loc[i, 'transition_season']
-            store_year = sales_data.loc[i, 'store_year']
-            date = sales_data.loc[i, 'date']
-            store_week = sales_data.loc[i, 'store_week']
-            store_number = sales_data.loc[i, 'store_number']
-            upc = sales_data.loc[i, 'upc']
-            sales = sales_data.loc[i, 'sales']
-            qty = sales_data.loc[i, 'qty']
-            current_year = sales_data.loc[i, 'current_year']
-            current_week = sales_data.loc[i, 'current_week']
-            code = sales_data.loc[i, 'code']
-            store_type = sales_data.loc[i, 'store_type']
+            with DbConfig.EnginePoolDB() as engine:
 
-            #verifying data to make sure correct data is being inserted into the correct database
-            if store_type == self.store_type_input:
-                pass
-            else:
-                raise Exception(f'Error: {store_type} is trying to be inserted into the {self.store_type_input} table')
+                while i < len(sales_data):
 
-            duplicate_check = psql.read_sql(f"""
-                                                SELECT * FROM {self.store_type_input}.SALES2 
-                                                WHERE store_year ={store_year} and 
-                                                    store_week = '{store_week}' and
-                                                    date = '{date}' and 
-                                                    store_number = {store_number} and 
-                                                    upc = '{upc}' and 
-                                                    store_type = '{store_type}'
-                                            """, connection)
+                    transition_year = sales_data.loc[i, 'transition_year']
+                    transition_season = sales_data.loc[i, 'transition_season']
+                    store_year = sales_data.loc[i, 'store_year']
+                    date = sales_data.loc[i, 'date']
+                    store_week = sales_data.loc[i, 'store_week']
+                    store_number = sales_data.loc[i, 'store_number']
+                    upc = sales_data.loc[i, 'upc']
+                    sales = sales_data.loc[i, 'sales']
+                    qty = sales_data.loc[i, 'qty']
+                    current_year = sales_data.loc[i, 'current_year']
+                    current_week = sales_data.loc[i, 'current_week']
+                    code = sales_data.loc[i, 'code']
+                    store_type = sales_data.loc[i, 'store_type']
 
-            duplicate_check_len = len(duplicate_check)
+                    # verifying data to make sure correct data is being inserted into the correct database
+                    if store_type == self.store_type_input:
+                        pass
+                    else:
+                        raise Exception(f'Error: {store_type} is trying to be inserted into the {self.store_type_input} table')
 
-            if duplicate_check_len == 1:
+                    duplicate_check = psql.read_sql(f"""
+                                                        SELECT * FROM {self.store_type_input}.SALES2 
+                                                        WHERE store_year ={store_year} and 
+                                                            store_week = '{store_week}' and
+                                                            date = '{date}' and 
+                                                            store_number = {store_number} and 
+                                                            upc = '{upc}' and 
+                                                            store_type = '{store_type}'
+                                                    """, engine)
 
-                salesupdate(transition_year,
-                            transition_season,
-                            store_year,
-                            date,
-                            store_week,
-                            store_number,
-                            upc,
-                            sales,
-                            qty,
-                            current_year,
-                            current_week,
-                            code,
-                            store_type,
-                            self.connection_pool,
-                            self.store_type_input)
-                update += 1
-            else:
-                sales_insert(transition_year,
-                             transition_season,
-                             store_year,
-                             date,
-                             store_week,
-                             store_number,
-                             upc,
-                             sales,
-                             qty,
-                             current_year,
-                             current_week,
-                             code,
-                             store_type,
-                             self.connection_pool,
-                             self.store_type_input)
-                insert += 1
-                inserted_list.append(i)
+                    duplicate_check_len = len(duplicate_check)
 
-            i += 1
+                    if duplicate_check_len == 1:
 
-            connection.commit()
+                        salesupdate(transition_year,
+                                    transition_season,
+                                    store_year,
+                                    date,
+                                    store_week,
+                                    store_number,
+                                    upc,
+                                    sales,
+                                    qty,
+                                    current_year,
+                                    current_week,
+                                    code,
+                                    store_type,
+                                    connection_pool,
+                                    self.store_type_input)
+                        update += 1
+                    else:
+                        sales_insert(transition_year,
+                                     transition_season,
+                                     store_year,
+                                     date,
+                                     store_week,
+                                     store_number,
+                                     upc,
+                                     sales,
+                                     qty,
+                                     current_year,
+                                     current_week,
+                                     code,
+                                     store_type,
+                                     connection_pool,
+                                     self.store_type_input)
+                        insert += 1
+                        inserted_list.append(i)
 
-        self.connection_pool.putconn(connection)
+                    i += 1
 
         print(f'\n {self.store_type_input} Sales Data Updated')
         print('Updated:', update, 'Records')
