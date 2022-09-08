@@ -295,7 +295,6 @@ class Replenishment():
 
             i += 1
 
-        self.connection.commit()
 
         print(f'\n {self.store_type_input} Delivery Data Updated')
         print('Updated:', update, 'Records')
