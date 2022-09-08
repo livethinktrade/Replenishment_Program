@@ -451,7 +451,8 @@ class TransformData():
 
     def alba_transform(self, df):
 
-        store_type_input_dict = {'acme': 'MID-ATLANTIC'}
+        store_type_input_dict = {'acme': 'MID-ATLANTIC',
+                                 'texas_division': 'SOUTHERN'}
 
         store_verify = store_type_input_dict[self.store_type_input]
 
@@ -472,7 +473,7 @@ class TransformData():
                 on line {i + 1}""")
             i += 1
 
-        start = (2021, 45)
+        start = (2020, 45)
 
         # establish variables to verify if the data is coming from the right year.
         start_verify = df.loc[2, '&GOLD']
@@ -492,6 +493,13 @@ class TransformData():
 
             Sales Data Does Not Start With The Same Week: 
             Alba Stores start with WK 45 week for file shows {week_verify}""")
+
+        # filtering out UPC's that are not winwin products. The number that is used to be subtracted from the upc's
+        # column is chosen because all of winwin products upc starts with the numbers 810312
+
+        df['dif'] = df['UPC'] - 81031200000
+
+        df = df[(df['dif'] <= 99999) & (df['dif'] >= 0)]
 
         df['store_year'] = store_year
         df['store_week'] = store_week
@@ -739,13 +747,13 @@ class TransformData():
 
         date = None
 
-        if store_year == 2021:
+        if store_year == 2021 and (store_week < 45):
 
             filtered_calender = calender_2021[calender_2021['Week Number'] == store_week]
             date = filtered_calender.iloc[0, 1]
             return date
 
-        elif store_year == 2022:
+        elif store_year == 2022 or (store_year == 2021 and (store_week <=52 and store_week >= 45)):
 
             filtered_calender = calender_2022[calender_2022['Week Number'] == store_week]
             date = filtered_calender.iloc[0, 1]

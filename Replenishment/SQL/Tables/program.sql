@@ -164,8 +164,10 @@ Create Table store_program_history
 )
 
 
-Create Table acme.year_week_verify (
+Create Table fresh_encounter.year_week_verify (
     store_year integer not null,
     store_week integer not null,
     PRIMARY KEY(store_year, store_week)
 )
+
+commit;
