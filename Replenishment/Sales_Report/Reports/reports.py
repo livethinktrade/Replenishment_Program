@@ -189,9 +189,10 @@ class Reports:
                                           startrow=0,
                                           startcol=12)
 
-            if self.top20 == 1:   #stores that have ytd data will usually use top 20 stores that get weekly data will get normal sales table
+            if self.top20 == 1:
+                # stores that have ytd data will usually use top 20 stores that get weekly data will get normal sales table
 
-                #grabs the sales table that was generated and gets the top 20 stores with the highest ytd
+                # grabs the sales table that was generated and gets the top 20 stores with the highest ytd
                 sales_report = self.sales_report.drop(columns=['current_week',
                                                           'previous_week',
                                                           'wow_sales_percentage',

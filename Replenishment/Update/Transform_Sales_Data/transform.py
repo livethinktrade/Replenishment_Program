@@ -1,21 +1,19 @@
 # KROGER SALES DATA TRANSFORM transform df for aproprite store
-
+from datetime import datetime
+from Import.data_insertion import year_week_verify_insert
 import psycopg2
+import re
 import pandas.io.sql as psql
 import numpy as np
 from psycopg2.extensions import register_adapter, AsIs
 psycopg2.extensions.register_adapter(np.int64, psycopg2._psycopg.AsIs)
-import re
 import pandas as pd
-from datetime import datetime
 import datetime as dt
 from DbConfig import engine_pool_connection, PsycoPoolDB
 import warnings
-from Import.data_insertion import year_week_verify_insert
 
 
-
-class TransformData():
+class TransformData:
 
     def __init__(self, store_type_input, transition_year, transition_season, connection):
 
@@ -472,8 +470,8 @@ class TransformData():
                 Division should be {store_verify} but showing {division}
                 on line {i + 1}""")
             i += 1
-
-        start = (2020, 45)
+        # need to not make this static
+        start = (2021, 45)
 
         # establish variables to verify if the data is coming from the right year.
         start_verify = df.loc[2, '&GOLD']
@@ -782,46 +780,11 @@ class TransformData():
 
         if current_store_year-previous_store_year == 0:
 
-            if current_week_number < previous_week_number:
-                raise Exception("""
-                Data Verification Failed: "END WK" for current week is < than the previous week
-                
-                The store week number from the current week sales data is less the previous weeks sales data""")
-            elif (current_week_number-previous_week_number) == 1:
-                # pass verification test. Showing that the YTD sales data is 1 week apart.
-                pass
-            elif (current_week_number-previous_week_number) > 1:
-                warnings.warn(f"""
-                
-                The 2 files from the sales data is showing that it is {(current_week_number-previous_week_number)} weeks
-                apart.
-                
-                Ideally the sales data imported should be from week to week. However if more than a weeks of sales data
-                was missed being sent, it is still ok to import the sales data.
-                 
-                If this is the case, enter 'VERIFIED' if not enter 'CANCEL'""")
-
-                user_input = str(input('\n\n\nREAD STATEMENT ABOVE:\t')).upper()
-
-                i = False
-
-                while not i:
-
-                    if user_input == 'VERIFIED':
-
-                        i = True
-
-                    elif user_input == 'CANCEL':
-                        raise Exception("Import Canceled")
-
-                    else:
-                        user_input = str(input('READ STATEMENT ABOVE:\t')).upper()
-
-            else:
-                raise Exception('ERROR')
+            self.store_week_verify(current_week_number, previous_week_number, year_diff=True)
 
         elif current_store_year-previous_store_year == 1:
-            pass
+            self.store_week_verify(current_week_number, previous_week_number, year_diff=False)
+
         else:
             raise Exception(f"""
             
@@ -967,6 +930,72 @@ class TransformData():
             raise Exception(f"No YTD data pipeline established for {self.store_type_input}")
 
         return sales_data
+
+    def store_week_verify(self, current_week_number, previous_week_number, year_diff=None):
+
+        """
+
+        :param current_week_number: integer
+        :param previous_week_number: integer
+
+        :param year_diff: Boolean (if the differnce betweeen 2 years is )
+
+        :return:
+        """
+
+        if year_diff:
+
+            if current_week_number < previous_week_number:
+                raise Exception("""
+                Data Verification Failed: "END WK" for current week is < than the previous week
+    
+                The store week number from the current week sales data is less the previous weeks sales data""")
+            elif (current_week_number - previous_week_number) == 1:
+                # pass verification test. Showing that the YTD sales data is 1 week apart.
+                pass
+            elif (current_week_number - previous_week_number) > 1:
+                warnings.warn(f"""
+    
+                The 2 files from the sales data is showing that it is {(current_week_number - previous_week_number)} weeks
+                apart.
+    
+                Ideally the sales data imported should be from week to week. However if more than a weeks of sales data
+                was missed being sent, it is still ok to import the sales data.
+    
+                If this is the case, enter 'VERIFIED' if not enter 'CANCEL'""")
+
+                user_input = str(input('\n\n\nREAD STATEMENT ABOVE:\t')).upper()
+
+                i = False
+
+                while not i:
+
+                    if user_input == 'VERIFIED':
+
+                        i = True
+
+                    elif user_input == 'CANCEL':
+                        raise Exception("Import Canceled")
+
+                    else:
+                        user_input = str(input('READ STATEMENT ABOVE:\t')).upper()
+
+            else:
+                raise Exception('ERROR')
+
+        elif year_diff == False:
+
+            # if the year differnce is = 1 then
+            # find how many weeks are the two weeks apart from each other.
+            # after you find the diffence then proceed
+
+            raise Exception('ERROR Code has not been establish for this part yet for now just do it manually')
+
+        else:
+
+            raise Exception("This should never happen. will need to investigate")
+
+
 
 
 

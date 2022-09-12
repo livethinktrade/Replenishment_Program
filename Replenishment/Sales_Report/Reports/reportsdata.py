@@ -38,10 +38,12 @@ class ReportsData:
                                 'kroger_dillons',
                                 'kroger_king_soopers',
                                 'kroger_louisville',
-                                'kroger_nashville']:
+                                'kroger_nashville',
+                                'acme',
+                                'texas_division']:
 
             self.week = 'store_week'
-        elif store_type_input in ['intermountain', 'acme', 'texas_division', 'kvat', 'safeway_denver', 'jewel', 'fresh_encounter','follett']:
+        elif store_type_input in ['intermountain', 'kvat', 'safeway_denver', 'jewel', 'fresh_encounter','follett']:
             self.week = 'current_week'
 
         else:
@@ -1574,8 +1576,8 @@ class ReportsData:
         return item_sales_rank
 
 
-# store_type_input = 'fresh_encounter'
-
+# store_type_input = 'kroger_cincinatti'
+#
 # store_setting = pd.read_excel(
 #     rf'C:\Users\User1\OneDrive - winwinproducts.com\Groccery Store Program\{store_type_input}\{store_type_input}_store_setting.xlsm',
 #     sheet_name='Sheet2',
@@ -1584,11 +1586,11 @@ class ReportsData:
 #     names=('setting', 'values'))
 #
 # test = ReportsData(store_type_input, store_setting)
-# # a = test.sales_table_qty()
-# # b = test.item_sales_rank_qty()
+# a = test.sales_table_qty()
+# b = test.item_sales_rank_qty()
 #
-# onhand = test.on_hands()
-
+# # onhand = test.on_hands()
+#
 # a.to_excel('sales-qty.xlsx')
 # b.to_excel('item-qty.xlsx')
 
