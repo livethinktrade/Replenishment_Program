@@ -64,7 +64,7 @@ class ReportsData:
         # Sunday marks the beginning of the new week
         # which meesses up the weekly reporting
 
-        if store_type_input == 'jewel':
+        if store_type_input in ['jewel','fresh_encounter']:
             self.week_num -= 1
 
         # finds the number of weeks the store has been active in the current year.
