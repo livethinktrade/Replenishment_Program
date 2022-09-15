@@ -535,7 +535,7 @@ class TransformData:
 
         return filtered_columns
 
-    def intermountain_transform(self, file):
+    def intermountain_transform(self, df, date_list):
 
         """
 
@@ -547,18 +547,10 @@ class TransformData:
 
          """
 
-        raw_data = file
+        start_date = datetime.strptime(date_list[0], '%m.%d.%y')
+        end_date = datetime.strptime(date_list[1], '%m.%d.%y')
 
-        sheet_name = raw_data.sheet_names
-
-        sheet_name = sheet_name[0]
-
-        dates = sheet_name.split(' - ')
-
-        start_date = datetime.strptime(dates[0], '%m.%d.%y')
-        end_date = datetime.strptime(dates[1], '%m.%d.%y')
-
-        raw_data = pd.read_excel(file, sheet_name=sheet_name)
+        raw_data = df
 
         # dropping the last row where the total is located
 
@@ -629,6 +621,8 @@ class TransformData:
         columns = ['store_year', 'date', 'store_week', 'store', 'upc', 'sales', 'units', 'store_type']
 
         transformed_data = raw_data[columns]
+
+        transformed_data['upc'] = transformed_data['upc'].astype(np.int64).astype(str)
 
         # store_year, date, store_week, store, upc, sales, qty, store_type
 
@@ -1038,9 +1032,30 @@ class TransformData:
 
         elif self.store_type_input in ['intermountain']:
 
-            current_week_sales_data = self.intermountain_transform(current_week)
+            # the files for
 
-            previous_week_sales_data = self.intermountain_transform(previous_week)
+            def get_date_from_sheet(file):
+
+                # param:
+                # function is intended to open the sheet and grab the name of the sheet and turn it into a list
+
+                raw_data = pd.ExcelFile(file)
+
+                sheet_name = raw_data.sheet_names
+
+                sheet_name = sheet_name[0]
+
+                dates = sheet_name.split(' - ')
+
+                return dates
+
+            date_list = get_date_from_sheet(current_week_sales_data)
+
+            current_week_sales_data = self.intermountain_transform(current_week, date_list)
+
+            date_list = get_date_from_sheet(previous_week_sales_data)
+
+            previous_week_sales_data = self.intermountain_transform(previous_week, date_list)
 
             sales_data = self.find_difference_between_tables(current_week_sales_data, previous_week_sales_data)
 
