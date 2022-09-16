@@ -1210,61 +1210,66 @@ class ReportsData:
 
         i = 0
 
-        while i < len(on_hands):
+        with DbConfig.EnginePoolDB() as connection:
 
-            store = on_hands.loc[i, 'store']
+            while i < len(on_hands):
 
-            item_group_desc = on_hands.loc[i, 'item_group_desc']
+                store = on_hands.loc[i, 'store']
 
-            # grab the last date the item was sold
+                item_group_desc = on_hands.loc[i, 'item_group_desc']
 
-            date = psql.read_sql(f'''
+                # grab the last date the item was sold
 
-            select store_year, store_week from {self.store_type_input}.sales2
-            inner join item_support2 on {self.store_type_input}.sales2.upc = item_support2.upc_11_digit
-            where store_number = {store} and item_group_desc = '{item_group_desc}'
-            order by store_week desc
+                date = psql.read_sql(f'''
+    
+                select store_year, date from {self.store_type_input}.sales2
+                inner join item_support2 on {self.store_type_input}.sales2.upc = item_support2.upc_11_digit
+                where store_number = {store} and item_group_desc = '{item_group_desc}'
+                order by date desc
+    
+                ''', connection)
 
-            ''', self.connection)
+                try:
 
-            try:
+                    last_ship_date = date.loc[0, 'date']
+                    last_ship_year = date.loc[0, 'store_year']
 
-                last_ship_week = date.loc[0, 'store_week']
-                last_ship_year = date.loc[0, 'store_year']
+                    inventory_age.loc[i, 'last sale date'] = last_ship_date
+                    inventory_age.loc[i, 'last sale year'] = last_ship_year
 
-                inventory_age.loc[i, 'last sale date'] = last_ship_week
-                inventory_age.loc[i, 'last sale year'] = last_ship_year
+                except KeyError:
 
-            except KeyError:
+                    inventory_age.loc[i, 'last sale date'] = 'No Sales'
+                    inventory_age.loc[i, 'last sale year'] = 'No Sales'
 
-                inventory_age.loc[i, 'last sale date'] = 'No Sales'
-                inventory_age.loc[i, 'last sale year'] = 'No Sales'
+                # grabs the last date the item was shipped
 
-            # grabs the last date the item was shipped
+                date = psql.read_sql(f'''
+    
+                select store, date, item_group_desc from {self.store_type_input}.delivery2
+                inner join item_support2 on {self.store_type_input}.delivery2.code = item_support2.code
+                where store = {store} and item_group_desc = '{item_group_desc}'
+                order by date desc
+    
+    
+                ''', connection)
 
-            date = psql.read_sql(f'''
+                last_ship_week = date.loc[0, 'date']
 
-            select store, date, item_group_desc from {self.store_type_input}.delivery2
-            inner join item_support2 on {self.store_type_input}.delivery2.code = item_support2.code
-            where store = {store} and item_group_desc = '{item_group_desc}'
-            order by date desc
+                inventory_age.loc[i, 'last delivery date'] = last_ship_week
 
-
-            ''', self.connection)
-
-            last_ship_week = date.loc[0, 'date']
-
-            inventory_age.loc[i, 'last delivery date'] = last_ship_week
-
-            i += 1
+                i += 1
 
         store_program = reports.store_program()
 
         store_program = store_program.set_index('store_id')
 
-        store_program = store_program.rename(columns={'carded': 'Carded',
-                                                      'long_hanging_top': 'Long Hanging Top',
-                                                      'long_hanging_dress': 'Long Hanging Dress'})
+
+        store_program['Carded']= store_program['cd_ay'] + store_program['cd_sn']
+        store_program['Long Hanging Top']= store_program['lht_ay'] + store_program['lht_sn']
+        store_program['Long Hanging Dress']= store_program['lhd_ay'] + store_program['lhd_sn']
+        store_program['Long Hanging Pant']= store_program['lhp_ay'] + store_program['lhp_sn']
+
 
         i = 0
 
@@ -1576,16 +1581,16 @@ class ReportsData:
         return item_sales_rank
 
 
-# store_type_input = 'kroger_cincinatti'
-#
-# store_setting = pd.read_excel(
-#     rf'C:\Users\User1\OneDrive - winwinproducts.com\Groccery Store Program\{store_type_input}\{store_type_input}_store_setting.xlsm',
-#     sheet_name='Sheet2',
-#     header=None,
-#     index_col=0,
-#     names=('setting', 'values'))
-#
-# test = ReportsData(store_type_input, store_setting)
+store_type_input = 'texas_division'
+
+store_setting = pd.read_excel(
+    rf'C:\Users\User1\OneDrive - winwinproducts.com\Groccery Store Program\{store_type_input}\{store_type_input}_store_setting.xlsm',
+    sheet_name='Sheet2',
+    header=None,
+    index_col=0,
+    names=('setting', 'values'))
+
+test = ReportsData(store_type_input, store_setting)
 # a = test.sales_table_qty()
 # b = test.item_sales_rank_qty()
 #
@@ -1594,6 +1599,7 @@ class ReportsData:
 # a.to_excel('sales-qty.xlsx')
 # b.to_excel('item-qty.xlsx')
 
-
+a = test.ghost_inventory()
+a.to_excel(f'ghost_{store_type_input}.xlsx', index=False)
 
 
