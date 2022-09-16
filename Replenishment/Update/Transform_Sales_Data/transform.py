@@ -449,12 +449,21 @@ class TransformData:
 
     def alba_transform(self, df):
 
+        """
+
+        Take the raw sales file, verifies, and transform data with additional needed info
+
+        :param: df of the raw albertson sales data
+        :return: a transformed dataframe  columns concist of:
+                store_year, date, store_week, store, upc, sales, qty, store_type
+        """
+
         store_type_input_dict = {'acme': 'MID-ATLANTIC',
                                  'texas_division': 'SOUTHERN'}
 
         store_verify = store_type_input_dict[self.store_type_input]
 
-        # dropping the last column where the total is located
+        # dropping the last row where the total is located
         df.drop(index=df.index[-1],
                 axis=0,
                 inplace=True)
@@ -525,6 +534,105 @@ class TransformData:
         filtered_columns['store_type'] = self.store_type_input
 
         return filtered_columns
+
+    def intermountain_transform(self, df, date_list):
+
+        """
+
+         Take the raw sales file, verifies, and transform data with additional needed info
+
+         :param: df of the raw albertson sales data
+         :return: a transformed dataframe  columns concist of:
+                 store_year, date, store_week, store, upc, sales, qty, store_type
+
+         """
+
+        start_date = datetime.strptime(date_list[0], '%m.%d.%y')
+        end_date = datetime.strptime(date_list[1], '%m.%d.%y')
+
+        raw_data = df
+
+        # dropping the last row where the total is located
+
+        raw_data.drop(index=raw_data.index[-1],
+                      axis=0,
+                      inplace=True)
+
+        # verify all stores are from the same division
+
+        store_type_input_dict = {'intermountain': 'GM/HBC'}
+
+        store_verify = store_type_input_dict[self.store_type_input]
+
+        i = 0
+        while i < len(raw_data):
+
+            division = raw_data.loc[i, 'DEPARTMENT']
+            if division != store_verify:
+                raise Exception(f"""
+                 Store Division Does not Match. Possible mixing of data
+                 Division should be {store_verify} but showing {division}
+                 on line {i + 1}""")
+            i += 1
+
+        # verify start date needs to start on January 01 on any given year
+
+        if start_date.day == 1 and start_date.month == 1:
+            pass
+        elif start_date.day != 1 or start_date.month != 1:
+            raise Exception(f"""
+            
+            Error: Start data did not start on January 1. Must be this date for intermountain
+            
+            Currently showing start date of Month: {start_date.month} Day: {start_date.day}
+            
+            """)
+        else:
+            raise Exception("""Error: Not Suppose to happen. Investigate""")
+
+        # add date column
+
+        raw_data['date'] = end_date
+
+        # add store year
+
+        raw_data['store_year'] = start_date.year
+
+        # add store week. Intermountain is on the same calendar year as winwin
+
+        store_week = self.date_to_week_number_conversion(end_date)
+        raw_data['store_week'] = store_week
+
+        # add store type
+
+        raw_data['store_type'] = self.store_type_input
+
+        # rename columns
+
+        raw_data = raw_data.rename(columns={
+                                            'STORE #': 'store',
+                                            'UPC': 'upc',
+                                            'SALES': 'sales',
+                                            'QTY SOLD': 'units'
+                                           })
+
+        # reorganize data
+
+        columns = ['store_year', 'date', 'store_week', 'store', 'upc', 'sales', 'units', 'store_type']
+
+        transformed_data = raw_data[columns]
+
+        transformed_data['upc'] = transformed_data['upc'].astype(np.int64).astype(str)
+
+        # store_year, date, store_week, store, upc, sales, qty, store_type
+
+        # grouping all upcs per store together in the event a store has multiple records for an individual item.
+        group = transformed_data.groupby(by=['store_year', 'date', 'store_week', 'store', 'upc', 'store_type']).sum()
+
+        transformed_data = group.reset_index()
+
+
+        return transformed_data
 
     def approval_transform(self, file):
 
@@ -762,8 +870,9 @@ class TransformData:
     def find_difference_between_tables(self, current_week_sales_data, previous_week_sales_data):
         
         """
-
-        This function is used for raw sales data that is given for YTD Format.
+        This method is used to find the sales units and sales qty WoW using the YTD data
+        it does this by taking the transformed YTD dataset from one week and the previous and finds
+        which stores and upc's have sales
 
         :param current_week_sales_data: dataframe
         :param previous_week_sales_data: dataframe
@@ -918,11 +1027,40 @@ class TransformData:
 
         previous_week = pd.read_excel(previous_week_sales_data)
 
-        if self.store_type_input in ['intermountain', 'acme', 'texas_division']:
+        if self.store_type_input in ['acme', 'texas_division']:
 
             current_week_sales_data = self.alba_transform(current_week)
 
             previous_week_sales_data = self.alba_transform(previous_week)
+
+            sales_data = self.find_difference_between_tables(current_week_sales_data, previous_week_sales_data)
+
+        elif self.store_type_input in ['intermountain']:
+
+            # the files for
+
+            def get_date_from_sheet(file):
+
+                # param:
+                # function is intended to open the sheet and grab the name of the sheet and turn it into a list
+
+                raw_data = pd.ExcelFile(file)
+
+                sheet_name = raw_data.sheet_names
+
+                sheet_name = sheet_name[0]
+
+                dates = sheet_name.split(' - ')
+
+                return dates
+
+            date_list = get_date_from_sheet(current_week_sales_data)
+
+            current_week_sales_data = self.intermountain_transform(current_week, date_list)
+
+            date_list = get_date_from_sheet(previous_week_sales_data)
+
+            previous_week_sales_data = self.intermountain_transform(previous_week, date_list)
 
             sales_data = self.find_difference_between_tables(current_week_sales_data, previous_week_sales_data)
 

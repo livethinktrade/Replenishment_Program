@@ -20,9 +20,9 @@ with
 	retail_price as (select distinct(item_group_desc), "retail price" from retail)
 
 
-select store_number, item_sales.item_group_desc, round((sales/qty),2) as "average sales", "retail price", round("retail price"-(sales/qty),2)
+select store_number, item_sales.item_group_desc, round((sales/qty),2) as "average sales", "retail price", round("retail price"-(sales/qty),2) as price_diff
 from item_sales
-inner join retail_price on retail_price.item_group_desc = item_sales.item_group_desc
+left join retail_price on retail_price.item_group_desc = item_sales.item_group_desc
 group by store_number, item_sales.item_group_desc, (sales/qty), "retail price"
 having "retail price"-(sales/qty) >= 1
 order by store_number
