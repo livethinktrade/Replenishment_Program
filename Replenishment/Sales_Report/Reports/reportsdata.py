@@ -1581,25 +1581,25 @@ class ReportsData:
         return item_sales_rank
 
 
-store_type_input = 'texas_division'
-
-store_setting = pd.read_excel(
-    rf'C:\Users\User1\OneDrive - winwinproducts.com\Groccery Store Program\{store_type_input}\{store_type_input}_store_setting.xlsm',
-    sheet_name='Sheet2',
-    header=None,
-    index_col=0,
-    names=('setting', 'values'))
-
-test = ReportsData(store_type_input, store_setting)
-# a = test.sales_table_qty()
-# b = test.item_sales_rank_qty()
+# store_type_input = 'texas_division'
 #
-# # onhand = test.on_hands()
+# store_setting = pd.read_excel(
+#     rf'C:\Users\User1\OneDrive - winwinproducts.com\Groccery Store Program\{store_type_input}\{store_type_input}_store_setting.xlsm',
+#     sheet_name='Sheet2',
+#     header=None,
+#     index_col=0,
+#     names=('setting', 'values'))
 #
-# a.to_excel('sales-qty.xlsx')
-# b.to_excel('item-qty.xlsx')
-
-a = test.ghost_inventory()
-a.to_excel(f'ghost_{store_type_input}.xlsx', index=False)
+# test = ReportsData(store_type_input, store_setting)
+# # a = test.sales_table_qty()
+# # b = test.item_sales_rank_qty()
+# #
+# # # onhand = test.on_hands()
+# #
+# # a.to_excel('sales-qty.xlsx')
+# # b.to_excel('item-qty.xlsx')
+#
+# a = test.ghost_inventory()
+# a.to_excel(f'ghost_{store_type_input}.xlsx', index=False)
 
 
