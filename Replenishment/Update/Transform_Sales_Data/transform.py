@@ -626,8 +626,13 @@ class TransformData:
 
         # store_year, date, store_week, store, upc, sales, qty, store_type
 
-        return transformed_data
+        # grouping all upcs per store together in the event a store has multiple records for an individual item.
+        group = transformed_data.groupby(by=['store_year', 'date', 'store_week', 'store', 'upc', 'store_type']).sum()
 
+        transformed_data = group.reset_index()
+
+
+        return transformed_data
 
     def approval_transform(self, file):
 
