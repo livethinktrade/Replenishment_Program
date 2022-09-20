@@ -49,30 +49,37 @@ class ReportsData:
         else:
             print('\n Store has not been established in list')
 
+        with DbConfig.EnginePoolDB() as connection:
 
-        # finds the current year per winwin company year
-        year = psql.read_sql(f"select max(current_year) from {store_type_input}.sales2;", self.connection)
+            # finds the current year per winwin company year
+            year = psql.read_sql(f"select max(current_year) from {store_type_input}.sales2;", connection)
 
-        # finds the current week the store is on
-        self.store_year = year.iloc[0, 0]
+            # finds the current week the store is on
+            self.store_year = year.iloc[0, 0]
 
-        num = psql.read_sql(f"select max({self.week}) from {store_type_input}.sales2 where store_year = {self.store_year}", self.connection)
-        self.week_num = num.iloc[0, 0]
+            num = psql.read_sql(f"select max({self.week}) from {store_type_input}.sales2 where store_year = {self.store_year}", connection)
+            self.week_num = num.iloc[0, 0]
 
-        # This line is neccesary for jewel because when the sales data comes in on monday it usually
-        # includes sales that were made the previous day on Sunday. This is a problem because
-        # Sunday marks the beginning of the new week
-        # which meesses up the weekly reporting
+            """ 
+            This line is neccesary for jewel because when the sales data comes in on monday it usually
+            includes sales that were made the previous day on Sunday. This is a problem because
+            Sunday marks the beginning of the new week which meesses up the weekly reporting
+            
+            """
 
-        if store_type_input in ['jewel','fresh_encounter']:
-            self.week_num -= 1
+            if store_type_input in ['jewel','fresh_encounter']:
+                self.week_num -= 1
 
-        # finds the number of weeks the store has been active in the current year.
-        # more important for new stores rather than old.
-        # helps calculate the avg store sales
+            """
+            
+            finds the number of weeks the store has been active in the current year.
+            more important for new stores rather than old.
+            helps calculate the avg store sales
+            
+            """
 
-        num = psql.read_sql(f"select distinct({self.week}) from {self.store_type_input}.sales2 where store_year = {self.store_year}", self.connection)
-        self.num = len(num)
+            num = psql.read_sql(f"select distinct({self.week}) from {self.store_type_input}.sales2 where store_year = {self.store_year}", connection)
+            self.num = len(num)
 
     def sales_table(self):
 
@@ -1580,8 +1587,305 @@ class ReportsData:
 
         return item_sales_rank
 
+    def kroger_division_sales(self):
 
-# store_type_input = 'texas_division'
+        '''
+
+        :return: df
+
+        returns a table that concist of sales $ for each store for a particular division.
+        table contains columns such:
+
+        ytd_sales.store_number, ytd_dollar, ytd_qty, current_wk_sales, prev_wk_sales from ytd_sales
+
+        '''
+
+        with DbConfig.EnginePoolDB() as connection:
+
+            sales_report = psql.read_sql(f"""
+    
+                    with
+                        ytd_sales as (
+                                select store_number, round(sum(sales)) as ytd_dollar, sum(qty) as ytd_qty
+                                from {self.store_type_input}.sales2
+                                where store_year = {self.store_year}
+                                group by store_number
+                                order by store_number
+                                ),
+    
+                        current_wk_sales as (
+                                select store_number,  round(sum(sales)) as current_wk_sales
+                                from {self.store_type_input}.sales2
+                                where store_year = {self.store_year} and store_week = {self.week_num}
+                                group by store_number
+                                order by store_number
+                                ),
+    
+                        prev_wk_sales as (
+                                select store_number, round(sum(sales)) as prev_wk_sales
+                                from {self.store_type_input}.sales2
+                                where store_year = {self.store_year} and store_week = {self.week_num}-1
+                                group by store_number
+                                order by store_number
+                        )
+    
+                    select ytd_sales.store_number, ytd_dollar as ytd_dollar, ytd_qty, 
+                           current_wk_sales, prev_wk_sales from ytd_sales
+                    left join current_wk_sales on ytd_sales.store_number = current_wk_sales.store_number
+                    left join prev_wk_sales on ytd_sales.store_number =  prev_wk_sales.store_number
+    
+                """, connection)
+
+            sales_report = sales_report.fillna(0)
+
+            return sales_report
+
+    def kroger_sales_by_period(self):
+
+        '''
+        takes all of the stores and finds the sales per period
+
+        :return: df
+
+        '''
+
+        with DbConfig.EnginePoolDB() as connection:
+
+            period_table =pd.read_sql(f"""
+                with 
+
+                    grocery_sales as (
+                
+                            select kroger_atlanta.sales2.*
+                            from kroger_atlanta.sales2
+                
+                            union all
+                
+                
+                            select kroger_central.sales2.*
+                            from kroger_central.sales2
+                
+                            union all
+                
+                
+                            select kroger_cincinatti.sales2.*
+                            from kroger_cincinatti.sales2
+                
+                            union all
+                
+                
+                            select kroger_columbus.sales2.*
+                            from kroger_columbus.sales2
+                
+                            union all
+                
+                
+                            select kroger_dallas.sales2.*
+                            from kroger_dallas.sales2
+                
+                            union all
+                
+                
+                            select kroger_delta.sales2.*
+                            from kroger_delta.sales2
+                
+                            union all
+                
+                
+                            select kroger_dillons.sales2.*
+                            from kroger_dillons.sales2
+                
+                            union all
+                
+                
+                            select kroger_king_soopers.sales2.*
+                            from kroger_king_soopers.sales2
+                
+                            union all
+                
+                
+                            select kroger_louisville.sales2.*
+                            from kroger_louisville.sales2
+                
+                            union all
+                
+                
+                            select kroger_michigan.sales2.*
+                            from kroger_michigan.sales2
+                
+                            union all
+                
+                
+                            select kroger_nashville.sales2.*
+                            from kroger_nashville.sales2
+                
+                            )
+                            
+                    select kroger_period, round(sum(sales)) as sales, sum(qty) as qty_sold from grocery_sales
+                    inner join kroger_periods on grocery_sales.store_week = kroger_periods.store_week
+                    where store_year={self.store_year}
+                    group by kroger_period
+                    order by kroger_period
+                
+                """, connection)
+
+        return period_table
+
+    def kroger_division_sales_by_period(self):
+
+        '''
+
+        :return: df object
+
+        table that shows the sales $ and unit by period
+        '''
+
+        with DbConfig.EnginePoolDB() as connection:
+
+            division_period_table = psql.read_sql(f'''
+            
+                with 
+    
+                    grocery_sales as (
+                
+                            select {self.store_type_input}.sales2.*
+                            from {self.store_type_input}.sales2
+                
+                            )
+                            
+                select kroger_period, round(sum(sales)) as sales, sum(qty) as qty_sold from grocery_sales
+                inner join kroger_periods on grocery_sales.store_week = kroger_periods.store_week
+                where store_year={self.store_year}
+                group by kroger_period
+                order by kroger_period
+            
+            ''',connection)
+
+        return  division_period_table
+
+    def kroger_corporate_sales_overview(self):
+
+        with DbConfig.EnginePoolDB() as connection:
+
+            overview = psql.read_sql(f'''
+            
+            with 
+
+                grocery_sales as (
+            
+                        select kroger_atlanta.sales2.*
+                        from kroger_atlanta.sales2
+            
+                        union all
+            
+            
+                        select kroger_central.sales2.*
+                        from kroger_central.sales2
+            
+                        union all
+            
+            
+                        select kroger_cincinatti.sales2.*
+                        from kroger_cincinatti.sales2
+            
+                        union all
+            
+            
+                        select kroger_columbus.sales2.*
+                        from kroger_columbus.sales2
+            
+                        union all
+            
+            
+                        select kroger_dallas.sales2.*
+                        from kroger_dallas.sales2
+            
+                        union all
+            
+            
+                        select kroger_delta.sales2.*
+                        from kroger_delta.sales2
+            
+                        union all
+            
+            
+                        select kroger_dillons.sales2.*
+                        from kroger_dillons.sales2
+            
+                        union all
+            
+            
+                        select kroger_king_soopers.sales2.*
+                        from kroger_king_soopers.sales2
+            
+                        union all
+            
+            
+                        select kroger_louisville.sales2.*
+                        from kroger_louisville.sales2
+            
+                        union all
+            
+            
+                        select kroger_michigan.sales2.*
+                        from kroger_michigan.sales2
+            
+                        union all
+            
+            
+                        select kroger_nashville.sales2.*
+                        from kroger_nashville.sales2),
+                        
+                kroger_division as (select distinct(store_type) from grocery_sales),
+                
+                ytd_sales as (select store_type, round(sum(sales)) as ytd_sales
+                              from grocery_sales
+                              where store_year = {self.store_year}
+                              group by store_type),
+                
+                current_week_sales as (select store_type, round(sum(sales)) as current_wk_sales
+                              from grocery_sales
+                              where store_year = {self.store_year} and store_week = {self.week_num}
+                              group by store_type),
+                              
+                previous_week_sales as (select store_type, round(sum(sales)) as prev_wk_sales
+                          from grocery_sales
+                          where store_year = {self.store_year} and store_week = {self.week_num}-1
+                          group by store_type),
+                
+                /*stores are only considered active whenever a store has a sale on the most present year*/
+                
+                active_programs as (select store_type, sum(count) as active_stores
+                                  from 
+                                          (select count(distinct(store_number)), store_number, store_type
+                                           from grocery_sales
+                                           where store_year = {self.store_year}
+                                           group by store_type, store_number) as active_stores
+                                  
+                                  group by store_type)
+            
+            select kroger_division.store_type, ytd_sales, current_wk_sales,  prev_wk_sales, active_stores
+            
+            from kroger_division
+            
+            inner join ytd_sales on ytd_sales.store_type = kroger_division.store_type
+            
+            inner join current_week_sales on current_week_sales.store_type = kroger_division.store_type
+            
+            inner join previous_week_sales on  previous_week_sales.store_type = kroger_division.store_type
+            
+            inner join active_programs on active_programs.store_type = kroger_division.store_type
+            
+            order by kroger_division.store_type
+
+            ''', connection)
+
+            return overview
+
+
+
+
+# store_type_input = 'kroger_cincinatti'
 #
 # store_setting = pd.read_excel(
 #     rf'C:\Users\User1\OneDrive - winwinproducts.com\Groccery Store Program\{store_type_input}\{store_type_input}_store_setting.xlsm',
@@ -1593,13 +1897,10 @@ class ReportsData:
 # test = ReportsData(store_type_input, store_setting)
 # # a = test.sales_table_qty()
 # # b = test.item_sales_rank_qty()
-# #
-# # # onhand = test.on_hands()
-# #
+#
 # # a.to_excel('sales-qty.xlsx')
 # # b.to_excel('item-qty.xlsx')
 #
-# a = test.ghost_inventory()
-# a.to_excel(f'ghost_{store_type_input}.xlsx', index=False)
+# abc = test.kroger_corporate_report()
 
 

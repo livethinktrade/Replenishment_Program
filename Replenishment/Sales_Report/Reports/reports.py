@@ -1,10 +1,15 @@
 # from datetime import timedelta, date, datetime
 import datetime
+
+import pandas as pd
+
 from Sales_Report.Replenishment.replenishment import *
 from Sales_Report.Replenishment.initial_order import *
-from Sales_Report.Report_Format.weekly_sales_report_format import ReportFormat
+from Sales_Report.Report_Format.ReportsFormat import SalesReportFormat, KrogerCorporateFormat
 from openpyxl import load_workbook
 import numpy as np
+from store_list import kroger_stores
+from IPython import display
 
 
 class Reports:
@@ -139,7 +144,7 @@ class Reports:
 
             writer.save()
 
-        format = ReportFormat(filename, self.replenishment_len, 1, store_sales_rank_len, self.store_setting)
+        format = SalesReportFormat(filename, self.replenishment_len, 1, store_sales_rank_len, self.store_setting)
 
         format.internal_report()
 
@@ -150,7 +155,8 @@ class Reports:
         with pd.ExcelWriter(filename) as writer:
 
             # replenishment tab
-            self.replenishment_report.to_excel(writer, sheet_name="Replenishment",
+            self.replenishment_report.to_excel(writer,
+                                               sheet_name="Replenishment",
                                                index=False,
                                                columns=('store_name', 'item', 'case'))
 
@@ -160,47 +166,54 @@ class Reports:
 
                 sales_table_ytd_mask = self.reports.ytd_table_mask()
 
-                sales_table_ytd_mask.to_excel(writer, sheet_name="Sales Report",
-                                            index=False,
-                                            columns=('ytd_current', 'ytd_previous', 'yoy_change'),
-                                            header=('Division Sales current YTD($) +Mask',
-                                                    'Division Sales previous YTD($) +Mask', '% +/- YOY Change'),
-                                            startrow=10,
-                                            startcol=12)
+                sales_table_ytd_mask.to_excel(writer,
+                                              sheet_name="Sales Report",
+                                              index=False,
+                                              columns=('ytd_current', 'ytd_previous', 'yoy_change'),
+                                              header=('Division Sales current YTD($) +Mask',
+                                                      'Division Sales previous YTD($) +Mask', '% +/- YOY Change'),
+                                              startrow=10,
+                                              startcol=12)
 
             if self.ytd_womask_sales_table == 1:
 
                 sales_table_ytd_wo_mask = self.reports.ytd_table_no_mask()
 
                 sales_table_ytd_wo_mask.to_excel(writer, sheet_name="Sales Report",
-                                              index=False,
-                                              columns=('ytd_current', 'ytd_previous', 'yoy_change'),
-                                              header=('Division Sales current YTD($) -Mask',
-                                                      'Division Sales previous YTD($) -Mask', '% +/- YOY Change'),
-                                              startrow=5,
-                                              startcol=12)
+                                                 index=False,
+                                                 columns=('ytd_current', 'ytd_previous', 'yoy_change'),
+                                                 header=('Division Sales current YTD($) -Mask',
+                                                         'Division Sales previous YTD($) -Mask', '% +/- YOY Change'),
+                                                 startrow=5,
+                                                 startcol=12)
 
             # table that shows stores supported weekly and month sales
             sales_table_ytd_wo_mask.to_excel(writer, sheet_name="Sales Report",
-                                          index=False,
-                                          columns=('store_supported', 'avg_wk_store', 'avg_month_store'),
-                                          header=('(#) Stores Supported', 'Avg Sales Per Wk/Store ($)',
-                                                  'Avg Sales Per Mo/Store ($)'),
-                                          startrow=0,
-                                          startcol=12)
+                                             index=False,
+                                             columns=('store_supported', 'avg_wk_store', 'avg_month_store'),
+                                             header=('(#) Stores Supported', 'Avg Sales Per Wk/Store ($)',
+                                                     'Avg Sales Per Mo/Store ($)'),
+                                             startrow=0,
+                                             startcol=12)
 
             if self.top20 == 1:
-                # stores that have ytd data will usually use top 20 stores that get weekly data will get normal sales table
+                '''
+                
+                stores that have ytd data will usually use top 20 stores that 
+                get weekly data will get normal sales table
+                
+                grabs the sales table that was generated and gets the top 20 stores with the highest ytd
+                
+                '''
 
-                # grabs the sales table that was generated and gets the top 20 stores with the highest ytd
                 sales_report = self.sales_report.drop(columns=['current_week',
-                                                          'previous_week',
-                                                          'wow_sales_percentage',
-                                                          'current_week',
-                                                          'previous_year_week',
-                                                          'yoy_sales_percentage',
-                                                          'ytd_2021',
-                                                          'yoy_sales_percentage'])
+                                                               'previous_week',
+                                                               'wow_sales_percentage',
+                                                               'current_week',
+                                                               'previous_year_week',
+                                                               'yoy_sales_percentage',
+                                                               'ytd_2021',
+                                                               'yoy_sales_percentage'])
 
                 sales_report = sales_report.dropna()
 
@@ -215,13 +228,14 @@ class Reports:
             else:
 
                 self.sales_report.to_excel(writer,
-                                      sheet_name="Sales Report",
-                                      index=False,
-                                      header=(
-                                      'Store (#)', 'Current Week Sales', 'Previous Week Sales', '% +/- Change WOW',
-                                      'Sales ($) 2022 Current Week', 'Sales ($) 2021 Current Week', '% +/- Change YOY',
-                                      'Sales ($) 2022 YTD', 'Sales ($) 2021 YTD', '% +/- Change (YOY)')
-                                      )
+                                           sheet_name="Sales Report",
+                                           index=False,
+                                           header=(
+                                                   'Store (#)', 'Current Week Sales', 'Previous Week Sales',
+                                                   '% +/- Change WOW','Sales ($) 2022 Current Week',
+                                                   'Sales ($) 2021 Current Week', '% +/- Change YOY',
+                                                   'Sales ($) 2022 YTD', 'Sales ($) 2021 YTD', '% +/- Change (YOY)')
+                                           )
 
             if self.item_sales_rank == 1:
 
@@ -229,8 +243,8 @@ class Reports:
 
                 item_sales_rank.to_excel(writer, sheet_name="Sales Report",
                                          index=True,
-                                         columns=('item_group_desc', 'sales','sales per active store', 'active stores','percent_of_total_sales'),
-                                         header=('item', 'sales ($)','Sales Per Active Store','Active Stores', '% of Annual Sales'),
+                                         columns=('item_group_desc', 'sales', 'sales per active store', 'active stores','percent_of_total_sales'),
+                                         header=('item', 'sales ($)', 'Sales Per Active Store', 'Active Stores', '% of Annual Sales'),
                                          startrow=14,
                                          startcol=12)
 
@@ -250,11 +264,84 @@ class Reports:
             # on hands tab
             self.on_hand.to_excel(writer, sheet_name="On Hand", index=False)
 
-
-
-        # weekly_sales_report_format(filename, self.replenishment_len, self.sales_report_len)
-        # ReportsFormat class instantiated for use later
-        format = ReportFormat(filename, self.replenishment_len, self.sales_report_len, 1, self.store_setting)
+        '''
+        
+        weekly_sales_report_format(filename, self.replenishment_len, self.sales_report_len)
+        ReportsFormat class instantiated for use later
+        
+        '''
+        format = SalesReportFormat(filename, self.replenishment_len, self.sales_report_len, 1, self.store_setting)
 
         format.external_report()
+
+    def kroger_corporate_report(self):
+
+        today_date = datetime.date.today()
+        today_date = today_date.strftime("%b-%d-%Y")
+
+        file_name = f'Kroger Corporate {today_date}.xlsx'
+
+        with pd.ExcelWriter(file_name) as writer:
+
+            report_data = ReportsData(self.store_type_input, self.store_setting)
+
+            period_table = report_data.kroger_sales_by_period()
+
+            kroger_sales_overview = report_data.kroger_corporate_sales_overview()
+
+            kroger_sales_overview.to_excel(writer,
+                                           sheet_name=f"Corporate Overview",
+                                           index=False,
+                                           startrow=4,
+                                           startcol=3)
+
+            period_table.to_excel(writer,
+                                  sheet_name=f"Corporate Overview",
+                                  index=False,
+                                  startrow=20,
+                                  startcol=3
+                                  )
+
+            # start row is set to 33 because other data is at this location.
+
+            start_row = 33
+
+            for store_type_input in kroger_stores:
+
+                store_setting = pd.read_excel(
+                    rf'C:\Users\User1\OneDrive - winwinproducts.com\Groccery Store Program\{store_type_input}\{store_type_input}_store_setting.xlsm',
+                    sheet_name='Sheet2',
+                    header=None,
+                    index_col=0,
+                    names=('setting', 'values'))
+
+                report_data = ReportsData(store_type_input, store_setting)
+
+                sales_table = report_data.kroger_division_sales()
+
+                sales_table.to_excel(writer,
+                                     sheet_name=f"{store_type_input}",
+                                     index=False)
+
+                division_period_table = report_data.kroger_division_sales_by_period()
+
+                division_period_table.to_excel(writer,
+                                               sheet_name='Corporate Overview',
+                                               startcol=3,
+                                               startrow=start_row,
+                                               index=False)
+
+                start_row += len(division_period_table) + 4
+
+        kroger_format = KrogerCorporateFormat(file_name)
+
+        kroger_format.kroger_corporate_format()
+
+
+
+
+
+
+
+
 
