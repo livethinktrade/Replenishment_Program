@@ -558,23 +558,6 @@ class TransformData:
                       axis=0,
                       inplace=True)
 
-        # verify all stores are from the same division
-
-        store_type_input_dict = {'intermountain': 'GM/HBC'}
-
-        store_verify = store_type_input_dict[self.store_type_input]
-
-        i = 0
-        while i < len(raw_data):
-
-            division = raw_data.loc[i, 'DEPARTMENT']
-            if division != store_verify:
-                raise Exception(f"""
-                 Store Division Does not Match. Possible mixing of data
-                 Division should be {store_verify} but showing {division}
-                 on line {i + 1}""")
-            i += 1
-
         # verify start date needs to start on January 01 on any given year
 
         if start_date.day == 1 and start_date.month == 1:
@@ -610,10 +593,10 @@ class TransformData:
         # rename columns
 
         raw_data = raw_data.rename(columns={
-                                            'STORE #': 'store',
-                                            'UPC': 'upc',
-                                            'SALES': 'sales',
-                                            'QTY SOLD': 'units'
+                                            'Store ID': 'store',
+                                            'UPC ID': 'upc',
+                                            'Total Sales': 'sales',
+                                            'Total Units': 'units'
                                            })
 
         # reorganize data
@@ -630,7 +613,6 @@ class TransformData:
         group = transformed_data.groupby(by=['store_year', 'date', 'store_week', 'store', 'upc', 'store_type']).sum()
 
         transformed_data = group.reset_index()
-
 
         return transformed_data
 
@@ -885,6 +867,31 @@ class TransformData:
         current_store_year = current_week_sales_data.loc[0, 'store_year']
         previous_store_year = previous_week_sales_data.loc[0, 'store_year']
 
+        '''
+        verify that the previous store week was the last file used to import. necessary so the actor doesn't accidentally
+        choose the wrong file for the previous week.
+        '''
+
+        with engine_pool_connection() as connection:
+
+            last_store_week = psql.read_sql(f'select store_week from {self.store_type_input}.sales2 order by date desc', connection)
+
+            last_store_week = last_store_week.loc[0, 'store_week']
+
+        if previous_week_number == last_store_week:
+            pass
+
+        elif previous_week_number != last_store_week:
+
+            raise Exception(f"""
+                
+                Error: Wrong File Input
+                
+                Did not choose the right file for the previous week sales data. The last sales week was 
+                store_week {last_store_week}""")
+        else:
+            raise Exception('Error')
+
         # verify data to see if the week difference is greater than one
 
         if current_store_year-previous_store_year == 0:
@@ -902,15 +909,17 @@ class TransformData:
             Data from the first file is showing END WK: {current_store_year}
             Data form teh second file is showing END WK: {previous_store_year}""")
 
-        # verifying to check if either of the weeks sales data has already been imported or the weeks in between the
-        # current week or the previous week
+        """
+        verifying to check if either of the weeks sales data has already been imported or the weeks in between the
+        current week or the previous week
 
-        # check to see if the current week store year is in the system  or the weeks in between the previous week sales
-        # data not done with this verification process. need to fix because the data will not check for multiple years
+        check to see if the current week store year is in the system  or the weeks in between the previous week sales
+        data not done with this verification process. need to fix because the data will not check for multiple years
 
-        # create a list of all the numbers in between that 2 sales date
+        create a list of all the numbers in between that 2 sales date
+        """
 
-        week_number_list = list(range(previous_week_number, current_week_number))
+        week_number_list = list(range(previous_week_number+1, current_week_number+1))
 
         year_week_list = []
 
@@ -936,18 +945,20 @@ class TransformData:
 
             if len(year_week_verify) >= 1:
                 raise Exception(f'''
-                Error: Import failed. 
-                                    
-                Tried to import duplication of same weeks. 
+                Error: Import failed.
+
+                Tried to import duplication of same weeks.
                 Store Year:{year_week_list[i][0]}  Week:{year_week_list[i][1]}  sales data already in sales table''')
             else:
                 pass
 
             i += 1
 
-        # creating a primary key in the two tables that way we can do a left join on them. Will left join on the current
-        # weeks data.
-        
+        """
+        creating a primary key in the two tables that way we can do a left join on them. Will left join on the current
+        weeks data.
+        """
+
         current_week_sales_data['unique'] = current_week_sales_data['store'].astype(str) \
                                           + current_week_sales_data['upc'].astype(str)
 
@@ -955,10 +966,12 @@ class TransformData:
                                            + previous_week_sales_data['upc'].astype(str)
 
         left_joined_sales_table = current_week_sales_data.merge(previous_week_sales_data, on='unique', how='left')
-        
-        # fill all data with na with the value of zero for the sales and units columns. necessary because sometimes the 
-        # previous week that was join does not contain the primary key from the current week. possibility that a new 
-        # item has been shipped.
+
+        """
+        fill all data with na with the value of zero for the sales and units columns. necessary because sometimes the 
+        previous week that was join does not contain the primary key from the current week. possibility that a new 
+        item has been shipped.
+        """
 
         left_joined_sales_table = left_joined_sales_table.fillna(0)
 

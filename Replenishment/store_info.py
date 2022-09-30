@@ -634,7 +634,7 @@ class Replenishment():
 
         print("\nSales Report Generated")
 
-    def store_import(self):
+    def store_notes_import(self):
 
         i = 0
         update = 0
@@ -669,7 +669,7 @@ class Replenishment():
         print('Updated:', update, 'Records')
         print('Inserted:', insert, 'Records')
 
-    def store_program_import(self):
+    def store_pog_import(self):
 
         i = 0
         update = 0
