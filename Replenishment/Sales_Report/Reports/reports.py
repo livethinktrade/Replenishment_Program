@@ -96,7 +96,7 @@ class Reports:
 
             if self.initial_orders == 1:
 
-                #will need to replace the code for this
+                # will need to replace the code for this
                 self.on_hands_store.to_excel(writer, sheet_name="Potential Initial Orders",
                                                     index=False,
                                                     startcol=6,

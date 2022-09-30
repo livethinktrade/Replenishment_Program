@@ -3,6 +3,7 @@ from Update.Transform_Sales_Data.transform import *
 from Update.Transform_Sales_Data.history_tracking import *
 from Sales_Report.Reports.reports import *
 from Sales_Report.Replenishment.replenishment import *
+from store_list import *
 import DbConfig
 
 
@@ -85,8 +86,6 @@ class Replenishment():
         """Takes in csv file of delivery data from qb and converts it to proper formating so it can be
         imported into postgres"""
 
-        connection = self.connection_pool.getconn()
-
         df = pd.read_csv(f'{file}')
 
         # drops unnecessary columns
@@ -134,7 +133,7 @@ class Replenishment():
             df[['store_type', 'letter1']] = df.Name.str.split(':', n=1, expand=True)
             df.pop('letter1')
 
-        elif self.store_type_input == 'fresh_encounter':
+        elif self.store_type_input in ['sal', 'midwest']:
             df[['store_type', 'letter1']] = df.Name.str.split(',', n=1, expand=True)
             df.pop('letter1')
 
@@ -177,7 +176,7 @@ class Replenishment():
 
         df['store_type'] = store_list[store_type]
 
-        # renaming collumns and putting them in the right order
+        # renaming columns and putting them in the right order
 
         df = df.rename(columns={
             "Type": "type",
@@ -191,7 +190,37 @@ class Replenishment():
             ['transition_year', 'transition_season', 'type', 'date', 'upc', 'store', 'qty', 'store_type', 'num',
              'code']]
 
+        """
+        Separating the data from fresh encounter. since delivery data for fresh encounter contains both SAL and midwest
+        delivery data. it is important to separate the data and make sure it is being inserted into it assigned 
+        delivery table.
+
+        The two stores are separated because the SAL division is in the SS season all year while the midwest division 
+        switches seasons as the  year progresses. 
+        """
+
+        new_deliv_transform['store'] = new_deliv_transform['store'].astype(int)
+
+        if self.store_type_input == 'sal':
+
+            new_deliv_transform = new_deliv_transform[(new_deliv_transform['store'] >= 400) &
+                                                      (new_deliv_transform['store'] <= 499)]
+
+            new_deliv_transform['store_type'] = self.store_type_input
+
+        elif self.store_type_input == 'midwest':
+
+            new_deliv_transform = new_deliv_transform[(new_deliv_transform['store'] < 400) |
+                                                      (new_deliv_transform['store'] > 499)]
+
+            new_deliv_transform['store_type'] = self.store_type_input
+
+        else:
+            pass
+
         new_deliv_transform = new_deliv_transform.reset_index(drop=True)
+        new_deliv_transform['store'] = new_deliv_transform['store'].astype(str)
+
 
         # Transition Setting Verification
         # This section is here to make sure each item being inserted into the table is
@@ -242,59 +271,59 @@ class Replenishment():
 
         # Loading Data into DB
 
-        new_deliv_transform_length = len(new_deliv_transform)
         i = 0
         update = 0
         insert = 0
 
-        while i < new_deliv_transform_length:
+        with DbConfig.EnginePoolDB() as connection:
 
-            transition_year = new_deliv_transform.loc[i, 'transition_year']
+            while i < len(new_deliv_transform):
 
-            transition_season = new_deliv_transform.loc[i, 'transition_season']
+                transition_year = new_deliv_transform.loc[i, 'transition_year']
 
-            type = new_deliv_transform.loc[i, 'type']
+                transition_season = new_deliv_transform.loc[i, 'transition_season']
 
-            date = new_deliv_transform.loc[i, 'date']
+                type = new_deliv_transform.loc[i, 'type']
 
-            upc = new_deliv_transform.loc[i, 'upc']
+                date = new_deliv_transform.loc[i, 'date']
 
-            store = new_deliv_transform.loc[i, 'store']
+                upc = new_deliv_transform.loc[i, 'upc']
 
-            qty = new_deliv_transform.loc[i, 'qty']
+                store = new_deliv_transform.loc[i, 'store']
 
-            store_type = new_deliv_transform.loc[i, 'store_type']
+                qty = new_deliv_transform.loc[i, 'qty']
 
-            num = new_deliv_transform.loc[i, 'num']
+                store_type = new_deliv_transform.loc[i, 'store_type']
 
-            code = new_deliv_transform.loc[i, 'code']
+                num = new_deliv_transform.loc[i, 'num']
 
-            duplicate_check = psql.read_sql(f"""
-                                                SELECT * FROM {self.store_type_input}.DELIVERY2 
-                                                WHERE type ='{type}' and 
-                                                        date = '{date}' and 
-                                                        store = {store} and 
-                                                        upc = '{upc}' and 
-                                                        store_type = '{store_type}' and
-                                                        code = '{code}' and
-                                                        num = '{num}'
-                                            """, connection)
+                code = new_deliv_transform.loc[i, 'code']
 
-            duplicate_check_len = len(duplicate_check)
+                duplicate_check = psql.read_sql(f"""
+                                                    SELECT * FROM {self.store_type_input}.DELIVERY2 
+                                                    WHERE type ='{type}' and 
+                                                            date = '{date}' and 
+                                                            store = {store} and 
+                                                            upc = '{upc}' and 
+                                                            store_type = '{store_type}' and
+                                                            code = '{code}' and
+                                                            num = '{num}'
+                                                """, connection)
 
-            if duplicate_check_len == 1:
-                delivery_update(transition_year, transition_season, type, date,
-                                upc, store, qty, store_type, num, code, self.connection_pool,self.store_type_input)
-                update += 1
-            else:
-                delivery_insert(transition_year,
-                                transition_season,
-                                type, date, upc, store, qty, store_type,
-                                num, code, self.connection_pool, self.store_type_input)
-                insert += 1
+                duplicate_check_len = len(duplicate_check)
 
-            i += 1
+                if duplicate_check_len == 1:
+                    delivery_update(transition_year, transition_season, type, date,
+                                    upc, store, qty, store_type, num, code, self.connection_pool, self.store_type_input)
+                    update += 1
+                else:
+                    delivery_insert(transition_year,
+                                    transition_season,
+                                    type, date, upc, store, qty, store_type,
+                                    num, code, self.connection_pool, self.store_type_input)
+                    insert += 1
 
+                i += 1
 
         print(f'\n {self.store_type_input} Delivery Data Updated')
         print('Updated:', update, 'Records')
@@ -340,20 +369,20 @@ class Replenishment():
 
     def sales_update(self, current_weeks_sales=None, previous_weeks_sales=None):
 
-        kroger = [
-                  'kroger_atlanta',
-                  'kroger_central',
-                  'kroger_cincinatti',
-                  'kroger_columbus',
-                  'kroger_dallas',
-                  'kroger_delta',
-                  'kroger_dillons',
-                  'kroger_king_soopers',
-                  'kroger_louisville',
-                  'kroger_nashville',
-                  'kroger_michigan']
-        
-        albertson = ['intermountain', 'acme', 'texas_division']
+        '''
+
+        Updates the sales tables for the designated grocery store.
+        2 parameter are needed for stores that are in the YTD formart. ie
+            (alba stores, follett, and the old format of fresh Encounter data)
+
+        current_weeks_sales: name of the csv or excel needed for all Stores
+        previous_weeks_sales: name of the csv or excel file. This parameter is only necessary for stores that are YTD
+
+        return: nothing
+
+        imports the data into the Postgres Database
+
+        '''
 
         with DbConfig.EnginePoolDB() as connection:
 
@@ -361,7 +390,7 @@ class Replenishment():
 
         # series of if statement used to determine which program to use to transform the data to the proper format.
 
-        if self.store_type_input in kroger:
+        if self.store_type_input in kroger_stores:
 
             sales_data = transform.kroger_transform(current_weeks_sales)
 
@@ -377,9 +406,13 @@ class Replenishment():
 
             sales_data = transform.jewel_transform(current_weeks_sales)
         
-        elif self.store_type_input in albertson:
+        elif self.store_type_input in albertson_division:
             
             sales_data = transform.ytd_transform(current_weeks_sales, previous_weeks_sales)
+
+        elif self.store_type_input in fresh_encounter:
+
+            sales_data = transform.fresh_encounter_transform(current_weeks_sales)
 
         else:
             raise Exception('Error: Sales update method is not established for this store')
@@ -461,6 +494,7 @@ class Replenishment():
                                      store_type,
                                      connection_pool,
                                      self.store_type_input)
+                        print(store_number, upc, date, qty, sales)
                         insert += 1
                         inserted_list.append(i)
 
@@ -833,6 +867,12 @@ class Replenishment():
 
         print(f"Updated: {update}\nInserted: {insert}\n Store Table Updated")
 
-#
-# A = Replenishment('jewel')
-# A.sales_report()
+    def kroger_corporate_report(self):
+
+        reports = Reports(self.store_type_input, self.store_setting)
+
+        reports.kroger_corporate_report()
+
+        print('Kroger Corporate Report Generated')
+
+

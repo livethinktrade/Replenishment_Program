@@ -43,7 +43,7 @@ class ReportsData:
                                 'texas_division']:
 
             self.week = 'store_week'
-        elif store_type_input in ['intermountain', 'kvat', 'safeway_denver', 'jewel', 'fresh_encounter','follett']:
+        elif store_type_input in ['intermountain', 'kvat', 'safeway_denver', 'jewel', 'sal','midwest','follett']:
             self.week = 'current_week'
 
         else:
@@ -1895,11 +1895,11 @@ class ReportsData:
 #     names=('setting', 'values'))
 #
 # test = ReportsData(store_type_input, store_setting)
-# # a = test.sales_table_qty()
-# # b = test.item_sales_rank_qty()
-#
-# # a.to_excel('sales-qty.xlsx')
-# # b.to_excel('item-qty.xlsx')
+# a = test.sales_table_qty()
+# b = test.item_sales_rank_qty()
+# #
+# a.to_excel('sales-qty.xlsx')
+# b.to_excel('item-qty.xlsx')
 #
 # abc = test.kroger_corporate_report()
 

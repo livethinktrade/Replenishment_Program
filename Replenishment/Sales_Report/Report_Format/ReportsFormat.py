@@ -1,10 +1,122 @@
 # STEP 8 FORMAT SALES SHEET FOR KROGER
 import openpyxl
-from openpyxl.styles import NamedStyle, Font, Border, Side, colors,Color, Alignment
+from openpyxl.styles import NamedStyle, Font, Border, Side, colors, Color, Alignment
 # from openpyxl.styles import colors
 # from openpyxl.styles import Font, Color
 from openpyxl.styles.fills import PatternFill
 from store_list import kroger_stores
+
+
+class ReportFormat:
+
+    def __init__(self, file_name):
+
+        self.file_name = file_name
+
+        self.wb = openpyxl.load_workbook(self.file_name)
+
+    def white_back_ground(self, sheet_name, min_row=0, max_row=int, min_col=0, max_col=int):
+
+        ws = self.wb[f'{sheet_name}']
+
+        # makes the whole sheet white
+        pattern_fill_white = PatternFill(patternType='solid', fgColor='FFFFFF')
+
+        for row in ws.iter_rows(min_row=min_row, max_row=max_row, min_col=min_col, max_col=max_col):
+            for cell in row:
+                cell.fill = pattern_fill_white
+
+        self.wb.save(self.file_name)
+
+    def thin_outline(self, sheet_name, min_row=0, max_row=int, min_col=0, max_col=int):
+
+        ws = self.wb[f'{sheet_name}']
+
+        bd_thin = Side(style='thin', color="000000")
+
+        border = Border(left=bd_thin, top=bd_thin, right=bd_thin, bottom=bd_thin)
+
+        # outlines main sales table
+        for row in ws.iter_rows(min_row=min_row, max_row=max_row, min_col=min_col, max_col=max_col):
+            for cell in row:
+                cell.border = border
+
+        self.wb.save(self.file_name)
+
+    def bold_font(self, sheet_name, min_row=0, max_row=int, min_col=0, max_col=int):
+
+        ws = self.wb[f'{sheet_name}']
+
+        for row in ws.iter_rows(min_row=min_row, max_row=max_row, min_col=min_col, max_col=max_col):
+            for cell in row:
+                cell.font = Font(bold=True)
+
+        self.wb.save(self.file_name)
+
+    def merge_cells(self, sheet_name, start, end):
+
+        """
+
+         sheet_name: str
+
+         start: str
+                this will take the excel cell location (for example M16, A2)
+         end: str
+                same type of string taken by the start argument.
+
+        """
+
+        ws = self.wb[f'{sheet_name}']
+
+        ws.merge_cells(f'{start}:{end}')
+
+        self.wb.save(self.file_name)
+
+    def set_value(self, sheet_name, location, value):
+
+        ws = self.wb[f'{sheet_name}']
+
+        ws[f'{location}'].value = value
+
+        self.wb.save(self.file_name)
+
+    def left_align(self, sheet_name, min_row=0, max_row=int, min_col=0, max_col=int):
+
+        ws = self.wb[f'{sheet_name}']
+
+        for row in ws.iter_rows(min_row=min_row, max_row=max_row, min_col=min_col, max_col=max_col):
+            for cell in row:
+                cell.alignment = Alignment(wrap_text=True, horizontal='left', vertical='center')
+
+        self.wb.save(self.file_name)
+
+    def change_column_width(self, sheet_name, column_letter, width):
+
+        ws = self.wb[f'{sheet_name}']
+
+        ws.column_dimensions[f'{column_letter}'].width = width
+
+        self.wb.save(self.file_name)
+
+    def change_font(self, sheet_name, location, size):
+
+        ws = self.wb[f'{sheet_name}']
+
+        fontStyle = Font(size=f"{size}")
+
+        ws[f'{location}'].font = fontStyle
+
+        self.wb.save(self.file_name)
+
+    def center_align(self, sheet_name, min_row=0, max_row=int, min_col=0, max_col=int):
+
+        ws = self.wb[f'{sheet_name}']
+
+        for row in ws.iter_rows(min_row=min_row, max_row=max_row, min_col=min_col, max_col=max_col):
+            for cell in row:
+                cell.alignment = Alignment(wrap_text=True, horizontal='center', vertical='center')
+
+        self.wb.save(self.file_name)
 
 
 class SalesReportFormat:
@@ -27,7 +139,7 @@ class SalesReportFormat:
 
         self.store_rank_len = store_rank_len
 
-        #internal report variables
+        # internal report variables
         self.initial_orders = self.store_setting.loc['initial_orders','values']
         self.size_build_up = self.store_setting.loc['size_build_up','values']
         self.high_return = self.store_setting.loc['high_return','values']
@@ -108,7 +220,7 @@ class SalesReportFormat:
         ws['B1'].value = 'ITEM'
         ws['C1'].value = 'CASE'
 
-        #add in filter
+        # add in filter
 
         ws.auto_filter.ref = f"A1:C{replenishment_len+10}"
 
@@ -350,7 +462,6 @@ class SalesReportFormat:
             for cell in row:
                 cell.alignment = Alignment(wrap_text=True, horizontal='center', vertical='center')
 
-
         self.wb.save(self.filename)
 
     def item_sales_ranked(self):
@@ -394,12 +505,9 @@ class SalesReportFormat:
 
         border = Border(left=bd_thin, top=bd_thin, right=bd_thin, bottom=bd_thin)
 
-
         for row in ws.iter_rows(min_row=14, max_row=25, min_col=13, max_col=18):
             for cell in row:
                 cell.border = border
-
-
 
         self.wb.save(self.filename)
 
@@ -436,16 +544,15 @@ class SalesReportFormat:
 
         border = Border(left=bd_thin, top=bd_thin, right=bd_thin, bottom=bd_thin)
 
-        #outlines Store YTD Collumns
+        # outlines Store YTD Collumns
         for row in ws.iter_rows(min_row=10, max_row=12, min_col=13, max_col=15):
             for cell in row:
                 cell.border = border
 
-        #wrap text allign and center
+        # wrap text allign and center
         for row in ws.iter_rows(min_row=10, max_row=10, min_col=13, max_col=15):
             for cell in row:
                 cell.alignment = Alignment(wrap_text=True, horizontal='center', vertical='center')
-
 
         self.wb.save(self.filename)
 
@@ -489,7 +596,6 @@ class SalesReportFormat:
         for row in ws.iter_rows(min_row=5, max_row=5, min_col=13, max_col=15):
             for cell in row:
                 cell.alignment = Alignment(wrap_text=True, horizontal='center', vertical='center')
-
 
         self.wb.save(self.filename)
 
@@ -851,8 +957,4 @@ class KrogerCorporateFormat:
         self.corporate_overview()
 
         self.format_all_sales_table()
-
-
-
-
 

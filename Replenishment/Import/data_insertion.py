@@ -262,7 +262,7 @@ def store_program_insert(store_program_id,store_id, program_id, activity, store_
 
     connection = connection_pool.getconn()
     cursor = connection.cursor()
-    cursor.execute(f""""
+    cursor.execute(f"""
     
     INSERT INTO {store_type_input}.store_program (store_program_id, store_id, program_id, activity,store_type) 
     values (%s,%s,%s,%s,%s)""", (store_program_id, store_id, program_id, activity, store_type))

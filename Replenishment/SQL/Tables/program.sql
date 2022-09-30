@@ -8,7 +8,7 @@ long_hanging_dress numeric NOT NULL
 
 );
 
-create table store (
+create table sal.store (
 	
 store_id integer PRIMARY KEY,
 initial varchar(10) NOT NULL,
@@ -17,7 +17,7 @@ store_type character varying(20) NOT NULL
 
 );
 
-create table store_program (
+create table sal.store_program (
 	
 store_program_id serial PRIMARY KEY,
 store_id integer NOT NULL,
@@ -25,8 +25,8 @@ program_id varchar(15) NOT NULL,
 activity varchar(10),
 store_type character varying(20) NOT NULL,
 
-FOREIGN KEY (program_id) REFERENCES master_planogram (program_id),
-FOREIGN KEY (store_id) REFERENCES store(store_id)
+FOREIGN KEY (program_id) REFERENCES public.master_planogram (program_id),
+FOREIGN KEY (store_id) REFERENCES sal.store(store_id)
 
 );
 
@@ -73,7 +73,7 @@ create table item_support2 (
 	
 );
 
-CREATE TABLE delivery2
+CREATE TABLE sal.delivery2
 (
     id serial NOT NULL PRIMARY KEY,
     transition_year integer,
@@ -87,12 +87,12 @@ CREATE TABLE delivery2
     num numeric,
     code varchar(20) NOT NULL,
 
-    FOREIGN KEY (code) REFERENCES item_support2 (code),
-    FOREIGN KEY (store) REFERENCES store(store_id)
+    FOREIGN KEY (code) REFERENCES public.item_support2 (code),
+    FOREIGN KEY (store) REFERENCES sal.store(store_id)
 
 );
 
-CREATE TABLE sales2
+CREATE TABLE sal.sales2
 (
     id serial NOT NULL PRIMARY KEY,
     transition_year integer,
@@ -111,7 +111,7 @@ CREATE TABLE sales2
 
 );
 
-CREATE TABLE item_approval
+CREATE TABLE sal.item_approval
 (
     code character varying(20) NOT NULL PRIMARY KEY,
     store_price numeric NOT NULL
@@ -145,21 +145,24 @@ values (33, '4W');
 
 insert into store_program (store_id, program_id)
 values (33, '2W'); */
+
+/*sql statement to find mask sales for midwest stores */
 Create view as midwest_mask (
  SELECT sum(sales2.sales) AS sum
    FROM fresh_encounter.sales2
   WHERE (sales2.store_number < 400 OR sales2.store_number > 499) AND sales2.store_year = 2022);
 
-Create Table store_program_history
+Create Table midwest.store_program_history
 (
     store_program_id integer NOT NULL,
     store_id integer NOT NULL,
     program_id varchar(15) NOT NULL,
     activity varchar(10),
     store_type character varying(20) NOT NULL,
+    date_updated date,
     history_id serial primary key,
 
-    FOREIGN KEY (store_id) REFERENCES store(store_id)
+    FOREIGN KEY (store_id) REFERENCES midwest.store(store_id)
 
 )
 
