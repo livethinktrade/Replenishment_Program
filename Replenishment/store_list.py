@@ -23,3 +23,6 @@ kroger_stores = [
 ]
 
 albertson_division = ['texas_division', 'intermountain', 'acme']
+
+
+fresh_encounter = ['sal', 'midwest']

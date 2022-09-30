@@ -356,8 +356,8 @@ class TransformData:
             old['transition_year'] = self.transition_year
             old['transition_season'] = self.transition_season
 
-
-            # Grabs only the necessary columns and reformats them into the necesary df format for the sale insert function
+            # Grabs only the necessary columns and reformats them into the necesary df format for the sale insert
+            # function
             old = old[['transition_year',
                        'transition_season',
                        'Day',
@@ -1132,6 +1132,127 @@ class TransformData:
         else:
 
             raise Exception("This should never happen. will need to investigate")
+
+    def fresh_encounter_transform(self, current_week_sales_data):
+
+        sales_data = pd.read_csv(current_week_sales_data, encoding='utf-16')
+
+        # verify if this is fresh encounter data. As of 09/29/2022, only grocery store that has this sales data format.
+
+        columns = sales_data.columns.to_list()
+
+        # removing first row of dashes
+        sales_data = sales_data[1:]
+        sales_data = sales_data.reset_index(drop=True)
+
+        sales_data['Store'] = sales_data['Store'].astype(np.int64)
+        sales_data['UPC'] = sales_data['UPC'].astype(np.int64)
+        sales_data['QtySold'] = sales_data['QtySold'].astype(np.int64)
+
+        # Correct Store Number to the correct store number:
+        store_ref = {
+                        1: 101,
+                        2: 102,
+                        47: 470,
+                        8: 118,
+                        12: 112,
+                        14: 114,
+                        15: 115
+                    }
+
+        i = 0
+
+        while i < len(sales_data):
+
+            store_number = sales_data.loc[i, 'Store']
+
+            try:
+
+                store_number = store_ref[store_number]
+
+            except KeyError:
+
+                pass
+
+            sales_data.loc[i, 'store_number'] = store_number
+
+            i += 1
+
+        # filtering data so wrong stores do not get inputed into the wrong schema in the database
+        if self.store_type_input == 'sal':
+
+            sales_data = sales_data[(sales_data['store_number'] >= 400) & (sales_data['store_number'] <= 499)]
+
+        elif self.store_type_input == 'midwest':
+
+            sales_data = sales_data[(sales_data['store_number'] < 400) | (sales_data['store_number'] > 499)]
+
+        else:
+            raise Exception('ERROR')
+
+        # transition year, transition season , and store input
+
+        sales_data['transition_year'] = self.transition_year
+
+        sales_data['transition_season'] = self.transition_season
+
+        sales_data['store_type'] = self.store_type_input
+
+        # filtering out all items that have 0 sales and 0 qty
+
+        sales_data = sales_data[(sales_data['AmountSold'] != 0) & (sales_data['QtySold'] != 0)]
+
+        sales_data = sales_data.reset_index(drop=True)
+
+        sales_data['Date'] = pd.to_datetime(sales_data['Date'])
+
+        i = 0
+
+        # find the store week number and store year. Fresh Encounter is on the same fiscal year as winwin
+        while i < len(sales_data):
+
+            date = sales_data.loc[i, 'Date']
+            upc_11_digit = sales_data.loc[i, 'UPC']
+            store = sales_data.loc[i, 'store_number']
+
+            sales_data.loc[i, 'store_week'] = int(self.date_to_week_number_conversion(date))
+
+            sales_data.loc[i, 'store_year'] = self.find_winwin_year(date)
+
+            sales_data.loc[i, 'code'] = self.quickbooks_code_finder(upc_11_digit, store)
+
+            i += 1
+
+        sales_data['store_week'] = sales_data['store_week'].astype('int64')
+
+        # add winwin store year and week
+        sales_data['current_year'] = sales_data['store_year']
+
+        sales_data['current_week'] = sales_data['store_week']
+
+        sales_data = sales_data.rename(columns={'QtySold': 'qty',
+                                                'AmountSold': 'sales',
+                                                'Date': 'date',
+                                                'UPC': 'upc'})
+
+        sales_data = sales_data[['transition_year',
+                                 'transition_season',
+                                 'store_year',
+                                 'date',
+                                 'store_week',
+                                 'store_number',
+                                 'upc',
+                                 'sales',
+                                 'qty',
+                                 'current_year',
+                                 'current_week',
+                                 'code',
+                                 'store_type']]
+
+        return sales_data
+
+
+
 
 
 
