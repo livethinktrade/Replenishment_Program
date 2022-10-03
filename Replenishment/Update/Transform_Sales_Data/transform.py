@@ -260,20 +260,16 @@ class TransformData:
 
         # stripping date from string and converting it to datetime object
 
-        match_str = re.search(r'\d{1}/\d{1}/\d{4}', string)
+        # delimits based off of escape character \n
+        string = string.split('\n')
 
-        if match_str == None:
-            match_str = re.search(r'\d{1}/\d{2}/\d{4}', string)
+        string = string[2].split()
 
-        if match_str == None:
-            match_str = re.search(r'\d{2}/\d{1}/\d{4}', string)
-
-        if match_str == None:
-            match_str = re.search(r'\d{2}/\d{2}/\d{4}', string)
+        date_string = string[4]
 
         # computed date
         # feeding format
-        date = datetime.strptime(match_str.group(), '%m/%d/%Y').date()
+        date = datetime.strptime(date_string, '%m/%d/%Y').date()
 
         # second time reading the raw file is to extract only the sales data
 
