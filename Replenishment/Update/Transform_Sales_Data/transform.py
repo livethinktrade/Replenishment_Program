@@ -1086,6 +1086,8 @@ class TransformData:
 
         """
 
+        verify the starting week and end week for ytd data. Must do this to ensure integrity of the data.
+
         :param current_week_number: integer
         :param previous_week_number: integer
 
@@ -1236,7 +1238,7 @@ class TransformData:
 
             i += 1
 
-        sales_data['store_week'] = sales_data['store_week'].astype('int64')
+        sales_data['store_week'] = sales_data['store_week'].astype(np.int64)
 
         # add winwin store year and week
         sales_data['current_year'] = sales_data['store_year']
@@ -1261,6 +1263,12 @@ class TransformData:
                                  'current_week',
                                  'code',
                                  'store_type']]
+
+        sales_data['store_year'] = sales_data['store_year'].astype(np.int64)
+        sales_data['store_number'] = sales_data['store_number'].astype(np.int64)
+        sales_data['upc'] = sales_data['upc'].astype(np.int64)
+        sales_data['sales'] = sales_data['sales'].astype(np.float64)
+        sales_data['current_year'] = sales_data['current_year'].astype(np.int64)
 
         return sales_data
 

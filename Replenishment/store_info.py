@@ -448,17 +448,38 @@ class Replenishment():
                     else:
                         raise Exception(f'Error: {store_type} is trying to be inserted into the {self.store_type_input} table')
 
-                    duplicate_check = psql.read_sql(f"""
-                                                        SELECT * FROM {self.store_type_input}.SALES2 
-                                                        WHERE store_year ={store_year} and 
-                                                            store_week = '{store_week}' and
-                                                            date = '{date}' and 
-                                                            store_number = {store_number} and 
-                                                            upc = '{upc}' and 
-                                                            store_type = '{store_type}'
-                                                    """, engine)
+                    # Decided to assign query to variable and then plug into the read_sql method for debugging purposes
+                    duplicate_check_query = f"""
+
+                    SELECT * FROM {self.store_type_input}.SALES2 
+                    WHERE store_year ={store_year} and 
+                        store_week = '{store_week}' and
+                        date = '{date}' and 
+                        store_number = {store_number} and 
+                        upc = '{upc}' and 
+                        store_type = '{store_type}'
+                    
+                    """
+
+                    duplicate_check = psql.read_sql(duplicate_check_query, engine)
 
                     duplicate_check_len = len(duplicate_check)
+
+                    # Note to future developer
+                    '''
+                    When searching to see if the data has already been in the dataset or not. 
+                    The length of the output of the query (ie the variable duplicate_check)
+                    Should either be 1 or 0. 
+                    
+                    1 meaning that the data is already in the db and 0 for it is not in the db
+                    
+                    The length of the query should never be > 1. If so then most likely you have
+                    either done one of the following:
+                    
+                        1) Entered the same record into the db more than once.
+                        2) Did not aggregate the data by week or day depending on the sales data.
+                          
+                    '''
 
                     if duplicate_check_len == 1:
 
@@ -478,7 +499,8 @@ class Replenishment():
                                     connection_pool,
                                     self.store_type_input)
                         update += 1
-                    else:
+
+                    elif duplicate_check_len == 0:
                         sales_insert(transition_year,
                                      transition_season,
                                      store_year,
@@ -494,9 +516,26 @@ class Replenishment():
                                      store_type,
                                      connection_pool,
                                      self.store_type_input)
-                        print(store_number, upc, date, qty, sales)
+
                         insert += 1
                         inserted_list.append(i)
+
+                    elif duplicate_check_len > 1:
+
+                        raise Exception(f'''
+                        
+                        Error: Duplicate data error.
+                        
+                        Potential of duplicate data risk. Need to investigate. 
+                        
+                        Use this query to look into the data:
+                        
+                        {duplicate_check_query}
+                        
+                        ''')
+
+                    else:
+                        raise Exception("Error: This is not suppose to happened")
 
                     i += 1
 
