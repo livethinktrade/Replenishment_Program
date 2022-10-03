@@ -1884,7 +1884,7 @@ class ReportsData:
 
 
 
-
+#
 # store_type_input = 'kroger_cincinatti'
 #
 # store_setting = pd.read_excel(
@@ -1900,7 +1900,7 @@ class ReportsData:
 # #
 # a.to_excel('sales-qty.xlsx')
 # b.to_excel('item-qty.xlsx')
-#
+
 # abc = test.kroger_corporate_report()
 
 
