@@ -105,13 +105,13 @@ def salesupdate(transition_year,
                             sales={sales},
                             current_year = {current_year},
                             current_week = {current_week},
-                            code = '{code}',
-                            date = '{date}'
+                            code = '{code}'
                         WHERE store_year ={store_year} and 
                         store_week = '{store_week}' and 
                         store_number = {store_number} and 
                         upc = '{upc}' and 
-                        store_type = '{store_type}'
+                        store_type = '{store_type}' and
+                        date = '{date}'
                     """)
     connection.commit()
     cursor.close()
