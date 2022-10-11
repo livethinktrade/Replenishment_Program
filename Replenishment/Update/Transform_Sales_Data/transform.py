@@ -9,7 +9,7 @@ from psycopg2.extensions import register_adapter, AsIs
 psycopg2.extensions.register_adapter(np.int64, psycopg2._psycopg.AsIs)
 import pandas as pd
 import datetime as dt
-from DbConfig import engine_pool_connection, PsycoPoolDB
+from DbConfig import EnginePoolDB, PsycoPoolDB
 import warnings
 
 
@@ -263,7 +263,7 @@ class TransformData:
         # delimits based off of escape character \n
         string = string.split('\n')
 
-        string = string[2].split()
+        string = string[1].split()
 
         date_string = string[4]
 
@@ -868,7 +868,7 @@ class TransformData:
         choose the wrong file for the previous week.
         '''
 
-        with engine_pool_connection() as connection:
+        with EnginePoolDB() as connection:
 
             last_store_week = psql.read_sql(f'select store_week from {self.store_type_input}.sales2 order by date desc', connection)
 
@@ -1267,16 +1267,5 @@ class TransformData:
         sales_data['current_year'] = sales_data['current_year'].astype(np.int64)
 
         return sales_data
-
-
-
-
-
-
-
-
-
-
-
 
 

@@ -54,11 +54,15 @@ class ReportsData:
             # finds the current year per winwin company year
             year = psql.read_sql(f"select max(current_year) from {store_type_input}.sales2;", connection)
 
-            # finds the current week the store is on
             self.store_year = year.iloc[0, 0]
 
-            num = psql.read_sql(f"select max({self.week}) from {store_type_input}.sales2 where store_year = {self.store_year}", connection)
-            self.week_num = num.iloc[0, 0]
+            # finds the current week the store is on
+
+            max_date = psql.read_sql(f"select max(date) from {store_type_input}.sales2 where store_year = {self.store_year}", connection)
+            max_date = max_date.iloc[0, 0]
+
+            week_num = psql.read_sql(f"select store_week from {store_type_input}.sales2 where date = '{max_date}'", connection)
+            self.week_num = week_num.iloc[0,0]
 
             """ 
             This line is neccesary for jewel because when the sales data comes in on monday it usually
@@ -67,7 +71,7 @@ class ReportsData:
             
             """
 
-            if store_type_input in ['jewel','fresh_encounter']:
+            if store_type_input in ['jewel','sal','midwest']:
                 self.week_num -= 1
 
             """
@@ -111,7 +115,7 @@ class ReportsData:
                     item_support2.case_size,
                     item_support2.item_group_desc
                 FROM {self.store_type_input}.sales2
-                inner JOIN item_support2 ON sales2.upc = item_support2.upc_11_digit),
+                inner JOIN item_support2 ON sales2.code = item_support2.code),
 
             date as (
 
@@ -276,7 +280,7 @@ class ReportsData:
                             item_support2.case_size,
                             item_support2.item_group_desc
                          FROM {self.store_type_input}.sales2
-                         inner JOIN item_support2 ON sales2.upc = item_support2.upc_11_digit),
+                         inner JOIN item_support2 ON sales2.code = item_support2.code),
 
             store_count as (
 
@@ -374,7 +378,7 @@ class ReportsData:
                             item_support2.case_size,
                             item_support2.item_group_desc
                          FROM {self.store_type_input}.sales2
-                         inner JOIN item_support2 ON sales2.upc = item_support2.upc_11_digit),
+                         inner JOIN item_support2 ON sales2.code = item_support2.code),
 
             store_count as (
 
@@ -471,7 +475,7 @@ class ReportsData:
                     item_support2.case_size,
                     item_support2.item_group_desc
                 FROM {self.store_type_input}.sales2
-                inner JOIN item_support2 ON sales2.upc = item_support2.upc_11_digit),
+                inner JOIN item_support2 ON sales2.code = item_support2.code),
 
             year_total as(
                         Select sum(sales) as year_sales, sum(qty) as year_total_unit
@@ -535,7 +539,7 @@ class ReportsData:
                     item_support2.case_size,
                     item_support2.item_group_desc
                 FROM {self.store_type_input}.sales2
-                inner JOIN item_support2 ON sales2.upc = item_support2.upc_11_digit),
+                inner JOIN item_support2 ON sales2.code = item_support2.code),
 
 
                 store_with_item as (
@@ -1230,7 +1234,7 @@ class ReportsData:
                 date = psql.read_sql(f'''
     
                 select store_year, date from {self.store_type_input}.sales2
-                inner join item_support2 on {self.store_type_input}.sales2.upc = item_support2.upc_11_digit
+                inner join item_support2 on {self.store_type_input}.sales2.code = item_support2.code
                 where store_number = {store} and item_group_desc = '{item_group_desc}'
                 order by date desc
     
@@ -1331,7 +1335,7 @@ class ReportsData:
                            item_support2.case_size,
                            item_support2.item_group_desc
                        FROM {self.store_type_input}.sales2
-                       inner JOIN item_support2 ON sales2.upc = item_support2.upc_11_digit),
+                       inner JOIN item_support2 ON sales2.code = item_support2.code),
 
                    date as (
 
@@ -1491,7 +1495,7 @@ class ReportsData:
                     item_support2.case_size,
                     item_support2.item_group_desc
                 FROM {self.store_type_input}.sales2
-                inner JOIN item_support2 ON sales2.upc = item_support2.upc_11_digit),
+                inner JOIN item_support2 ON sales2.code = item_support2.code),
 
             year_total as(
                         Select sum(sales) as year_sales, sum(qty) as year_total_unit
@@ -1555,7 +1559,7 @@ class ReportsData:
                     item_support2.case_size,
                     item_support2.item_group_desc
                 FROM {self.store_type_input}.sales2
-                inner JOIN item_support2 ON sales2.upc = item_support2.upc_11_digit),
+                inner JOIN item_support2 ON sales2.code = item_support2.code),
 
 
                 store_with_item as (
@@ -1885,7 +1889,7 @@ class ReportsData:
 
 
 #
-# store_type_input = 'kroger_cincinatti'
+# store_type_input = 'kroger_dallas'
 #
 # store_setting = pd.read_excel(
 #     rf'C:\Users\User1\OneDrive - winwinproducts.com\Groccery Store Program\{store_type_input}\{store_type_input}_store_setting.xlsm',
@@ -1897,10 +1901,10 @@ class ReportsData:
 # test = ReportsData(store_type_input, store_setting)
 # a = test.sales_table_qty()
 # b = test.item_sales_rank_qty()
-# #
+#
 # a.to_excel('sales-qty.xlsx')
 # b.to_excel('item-qty.xlsx')
-
-# abc = test.kroger_corporate_report()
-
-
+#
+#
+# ghost=test.ghost_inventory()
+# ghost.to_excel('dallas_ghost.xlsx')

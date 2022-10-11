@@ -8,7 +8,7 @@ long_hanging_dress numeric NOT NULL
 
 );
 
-create table sal.store (
+create table store (
 	
 store_id integer PRIMARY KEY,
 initial varchar(10) NOT NULL,
@@ -17,7 +17,7 @@ store_type character varying(20) NOT NULL
 
 );
 
-create table sal.store_program (
+create table store_program (
 	
 store_program_id serial PRIMARY KEY,
 store_id integer NOT NULL,
@@ -26,7 +26,7 @@ activity varchar(10),
 store_type character varying(20) NOT NULL,
 
 FOREIGN KEY (program_id) REFERENCES public.master_planogram (program_id),
-FOREIGN KEY (store_id) REFERENCES sal.store(store_id)
+FOREIGN KEY (store_id) REFERENCES store(store_id)
 
 );
 
@@ -48,32 +48,11 @@ create table item_support2 (
     item_desc varchar(50),
     packing numeric,
     upc_11_digit varchar(11)
-
-
---	/*old stuff below*/
---	upc varchar(12) primary key,
---	upc_11_digit varchar(11) unique not NULL,
---	season char(2) not null,
---	type varchar(30),
---	style varchar(15),
---	gm varchar(5),
---	additional varchar(30),
---	code_qb varchar(20),
---	item_desc varchar(50),
---	unit char(5),
---	salesrank numeric,
---	total_case_size numeric,
---	shipped_per_case numeric,
---	mupc varchar(12) not NULL,
---	item_group_desc varchar(50),
---	display_size varchar(30),
---	size varchar(3),
---	availability integer not NULL
 	
 	
 );
 
-CREATE TABLE sal.delivery2
+CREATE TABLE delivery2
 (
     id serial NOT NULL PRIMARY KEY,
     transition_year integer,
@@ -88,11 +67,11 @@ CREATE TABLE sal.delivery2
     code varchar(20) NOT NULL,
 
     FOREIGN KEY (code) REFERENCES public.item_support2 (code),
-    FOREIGN KEY (store) REFERENCES sal.store(store_id)
+    FOREIGN KEY (store) REFERENCES store(store_id)
 
 );
 
-CREATE TABLE sal.sales2
+CREATE TABLE sales2
 (
     id serial NOT NULL PRIMARY KEY,
     transition_year integer,
@@ -111,7 +90,7 @@ CREATE TABLE sal.sales2
 
 );
 
-CREATE TABLE sal.item_approval
+CREATE TABLE item_approval
 (
     code character varying(20) NOT NULL PRIMARY KEY,
     store_price numeric NOT NULL
@@ -152,7 +131,7 @@ Create view as midwest_mask (
    FROM fresh_encounter.sales2
   WHERE (sales2.store_number < 400 OR sales2.store_number > 499) AND sales2.store_year = 2022);
 
-Create Table midwest.store_program_history
+Create Table store_program_history
 (
     store_program_id integer NOT NULL,
     store_id integer NOT NULL,
@@ -167,10 +146,23 @@ Create Table midwest.store_program_history
 )
 
 
-Create Table fresh_encounter.year_week_verify (
+Create Table year_week_verify (
     store_year integer not null,
     store_week integer not null,
     PRIMARY KEY(store_year, store_week)
 )
 
-commit;
+Create Table bandaids (
+    type character varying(11) NOT NULL,
+    store_id integer not null,
+    item_group_desc varchar(50),
+    qty numeric not null,
+    date_created date NOT NULL,
+    effective_date date NOT NULL,
+    store_type character varying(20) NOT NULL,
+    reason character varying(100) NOT NULL,
+
+    PRIMARY KEY(store_id, item_group_desc, effective_date)
+)
+
+
