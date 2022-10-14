@@ -292,18 +292,19 @@ class Reports:
 
             kroger_sales_overview.to_excel(writer,
                                            sheet_name=f"Corporate Overview",
-                                           index=False,
+                                           index=True,
                                            startrow=4,
                                            startcol=3)
 
             period_table.to_excel(writer,
                                   sheet_name=f"Corporate Overview",
-                                  index=False,
+                                  index=True,
                                   startrow=20,
                                   startcol=3
                                   )
 
-            corporate_period_table_lengths_for_outlining['Overall Period Summary'] = len(period_table)
+            corporate_period_table_lengths_for_outlining['Overall Period Summary'] = {'start_row': 21,
+                                                                                      'table_length': len(period_table)}
 
             # Puts summary data of sales ($ and qty) by division by period into the report
 
@@ -329,7 +330,7 @@ class Reports:
                 name = store_type_input.split('kroger_')[1].capitalize()
 
                 # find length of table for formatting purposes later
-                sales_table_lengths_for_outlining[f'{name}'] = len(sales_table)
+                sales_table_lengths_for_outlining[f'{name}'] = len(sales_table) + 1
 
                 sales_table.to_excel(writer,
                                      sheet_name=f"{name}",
@@ -342,13 +343,15 @@ class Reports:
                                                sheet_name='Corporate Overview',
                                                startcol=3,
                                                startrow=start_row,
-                                               index=False)
+                                               index=True)
 
-                # find length of table for formatting purposes later
-                corporate_period_table_lengths_for_outlining[f'{name}'] = {'start_row': start_row,
-                                                                           'table_length': len(sales_table)}
+                # find length of table for formatting purposes added plus 1 because openpyxl is not 0 indexed based
+                corporate_period_table_lengths_for_outlining[f'{name}'] = {'start_row': start_row+1,
+                                                                           'table_length': len(division_period_table)}
 
                 start_row += len(division_period_table) + 4
+
+            corporate_period_table_lengths_for_outlining['max row'] = start_row
 
         kroger_format = KrogerCorporateFormat(file_name,
                                               corporate_period_table_lengths_for_outlining,

@@ -165,4 +165,3 @@ Create Table bandaids (
     PRIMARY KEY(store_id, item_group_desc, effective_date)
 )
 
-

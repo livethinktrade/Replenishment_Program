@@ -15,7 +15,31 @@ class ReportFormat:
 
         self.wb = openpyxl.load_workbook(self.file_name)
 
-    def white_back_ground(self, sheet_name, min_row=0, max_row=int, min_col=0, max_col=int):
+    def color_fill_background(self, sheet_name, min_row=0, max_row=0, min_col=0, max_col=0, color_fill=None):
+
+        """
+
+        :param sheet_name: str
+        :param min_row: int
+        :param max_row: int
+        :param min_col: int
+        :param max_col: int
+        :param color_fill: str (arg takes in Hex value for the color)
+        :return:
+        """
+
+        ws = self.wb[f'{sheet_name}']
+
+        # makes the whole sheet white
+        pattern_fill_color = PatternFill(patternType='solid', fgColor=f'{color_fill}')
+
+        for row in ws.iter_rows(min_row=min_row, max_row=max_row, min_col=min_col, max_col=max_col):
+            for cell in row:
+                cell.fill = pattern_fill_color
+
+        self.wb.save(self.file_name)
+
+    def white_back_ground(self, sheet_name, min_row=0, max_row=0, min_col=0, max_col=0):
 
         ws = self.wb[f'{sheet_name}']
 
@@ -28,7 +52,7 @@ class ReportFormat:
 
         self.wb.save(self.file_name)
 
-    def thin_outline(self, sheet_name, min_row=0, max_row=int, min_col=0, max_col=int):
+    def thin_outline(self, sheet_name, min_row=0, max_row=0, min_col=0, max_col=0):
 
         ws = self.wb[f'{sheet_name}']
 
@@ -43,7 +67,7 @@ class ReportFormat:
 
         self.wb.save(self.file_name)
 
-    def bold_font(self, sheet_name, min_row=0, max_row=int, min_col=0, max_col=int):
+    def bold_font(self, sheet_name, min_row=0, max_row=0, min_col=0, max_col=0):
 
         ws = self.wb[f'{sheet_name}']
 
@@ -60,7 +84,7 @@ class ReportFormat:
          sheet_name: str
 
          start: str
-                this will take the excel cell location (for example M16, A2)
+                this will take the excel cell location (for example M16, A2, etc..)
          end: str
                 same type of string taken by the start argument.
 
@@ -80,7 +104,7 @@ class ReportFormat:
 
         self.wb.save(self.file_name)
 
-    def left_align(self, sheet_name, min_row=0, max_row=int, min_col=0, max_col=int):
+    def left_align(self, sheet_name, min_row=0, max_row=0, min_col=0, max_col=0):
 
         ws = self.wb[f'{sheet_name}']
 
@@ -92,23 +116,39 @@ class ReportFormat:
 
     def change_column_width(self, sheet_name, column_letter, width):
 
+        """
+
+        :param sheet_name: str
+        :param column_letter: (example would be column 'E')
+        :param width: integer
+        :return:
+
+        """
+
         ws = self.wb[f'{sheet_name}']
 
         ws.column_dimensions[f'{column_letter}'].width = width
 
         self.wb.save(self.file_name)
 
-    def change_font(self, sheet_name, location, size):
+    def change_font(self, sheet_name, cell_location, font_size=12, font_color='00000000'):
+
+        """
+        :param sheet_name:
+        :param cell_location: excel cell location (ie. 'A1', 'C5')
+        :param font_size: int
+        :param font_color: hex code
+        """
 
         ws = self.wb[f'{sheet_name}']
 
-        fontStyle = Font(size=f"{size}")
+        font_style = Font(size=f"{font_size}", color=font_color)
 
-        ws[f'{location}'].font = fontStyle
+        ws[f'{cell_location}'].font = font_style
 
         self.wb.save(self.file_name)
 
-    def center_align(self, sheet_name, min_row=0, max_row=int, min_col=0, max_col=int):
+    def center_align(self, sheet_name, min_row=0, max_row=0, min_col=0, max_col=0):
 
         ws = self.wb[f'{sheet_name}']
 
@@ -145,7 +185,7 @@ class SalesReportFormat:
         self.high_return = self.store_setting.loc['high_return','values']
         self.store_sales_rank = self.store_setting.loc['store_sales_rank','values']
         self.item_approval = self.store_setting.loc['item_approval','values']
-        self.store_program = self.store_setting.loc['store_program','values']
+        self.store_program = self.store_setting.loc['store_program', 'values']
 
         # external report variables
         self.ytd_mask_sales_table = self.store_setting.loc['ytd_mask_sales_table','values']
@@ -645,8 +685,9 @@ class SalesReportFormat:
         ws['F1'].value = 'Delivery'
         ws['G1'].value = 'Credit'
         ws['H1'].value = 'Sales'
-        ws['I1'].value = 'On Hand'
-        ws['J1'].value = 'Case Qty'
+        ws['I1'].value = 'Bandaid'
+        ws['J1'].value = 'On Hand'
+        ws['K1'].value = 'Case Qty'
 
         ws.column_dimensions['A'].width = 15
         ws.column_dimensions['B'].width = 30
@@ -658,13 +699,14 @@ class SalesReportFormat:
         ws.column_dimensions['H'].width = 15
         ws.column_dimensions['I'].width = 15
         ws.column_dimensions['J'].width = 15
+        ws.column_dimensions['K'].width = 15
 
         # outlines main sales table
-        for row in ws.iter_rows(min_row=1, max_row=5000, min_col=1, max_col=10):
+        for row in ws.iter_rows(min_row=1, max_row=5000, min_col=1, max_col=11):
             for cell in row:
                 cell.border = self.border
 
-        ws.auto_filter.ref = f"A1:J500"
+        ws.auto_filter.ref = f"A1:K500"
 
         self.wb.save(self.filename)
 
@@ -838,24 +880,6 @@ class SalesReportFormat:
 
     def replenishment_pivot(self):
 
-        # ws = self.wb['GIRLS']
-        #
-        # ws['A1'].value = 'Store'
-        # ws['C1'].value = 'Long Hanging Top'
-        # ws['D1'].value = 'Long Hanging Dress'
-        #
-        # ws.column_dimensions['C'].width = 16
-        # ws.column_dimensions['D'].width = 18
-        # ws.column_dimensions['E'].width = 30
-        # ws.column_dimensions['F'].width = 20
-        #
-        # ws.auto_filter.ref = f"A1:L500"
-        #
-        # for row in ws.iter_rows(min_row=1, max_row=500, min_col=1, max_col=6):
-        #     for cell in row:
-        #         cell.border = self.border
-        #
-        # self.wb.save(self.filename)
         pass
 
     def external_report(self):
@@ -906,55 +930,201 @@ class SalesReportFormat:
             self.store_programs()
 
 
-class KrogerCorporateFormat:
+class KrogerCorporateFormat(ReportFormat):
 
     """Formats Kroger Corporate Report"""
-    def __init__(self, file_name):
+    def __init__(self, file_name, corporate_period_table_lengths, sales_table_lengths):
+        super().__init__(file_name)
 
-        self.file_name = file_name
-        self.wb = openpyxl.load_workbook(self.file_name)
-        self.pattern_fill_white = PatternFill(patternType='solid', fgColor='FFFFFF')
+        self.corporate_period_table_lengths = corporate_period_table_lengths
+        self.sales_table_lengths = sales_table_lengths
+        self.store_names = self.sales_table_lengths.keys()
 
-    def corporate_overview(self):
+    def corporate_overview_tab(self):
 
-        """Formats the Corporate Overview tab in the excel file"""
+        """
+        Formats the Corporate Overview tab in the excel file
 
-        ws = self.wb['Corporate Overview']
+        There are three sections that is being formatted.
+
+        1) Corporate Summary Overview
+        2) Corporate Period Overview
+        3) Division Period Overview
+
+        """
+
+        ###############################################################################################################
+        # first section of the code is formatting the Corporate Summary Overview table
+
+        sheet_name = 'Corporate Overview'
 
         # makes the whole sheet white
+        self.white_back_ground(sheet_name, max_row=500, max_col=52)
 
-        for row in ws.iter_rows(min_row=0, max_row=500, min_col=0, max_col=52):
-            for cell in row:
-                cell.fill = self.pattern_fill_white
+        # outlining sales summary table
+        self.thin_outline(sheet_name, min_row=5, max_row=17, min_col=4, max_col=9)
 
-        self.wb.save(self.file_name)
+        # outlining kroger period summary
+        self.thin_outline(sheet_name,
+                          min_row=self.corporate_period_table_lengths['Overall Period Summary']['start_row'],
 
-    def sales_table(self, store_type):
+                          max_row=self.corporate_period_table_lengths['Overall Period Summary']['start_row']
+                                 + self.corporate_period_table_lengths['Overall Period Summary']['table_length'],
+                          min_col=4,
+                          max_col=6
+                          )
 
-        """ Formats A sales Table for a particular tab in the excel file """
+        # Change Column Names for summary table
+        self.set_value(sheet_name, 'D5', 'Division')
+        self.set_value(sheet_name, 'E5', 'YTD Sales')
+        self.set_value(sheet_name, 'F5', 'Current Week Sales')
+        self.set_value(sheet_name, 'G5', 'Previous Week Sales')
+        self.set_value(sheet_name, 'H5', '# Stores on Programs')
+        self.set_value(sheet_name, 'I5', '# Stores on MBO Programs')
 
-        ws = self.wb[f'{store_type}']
+        # change width of columns
+        self.change_column_width(sheet_name, 'D', 15)
+        self.change_column_width(sheet_name, 'F', 15)
+        self.change_column_width(sheet_name, 'G', 20)
+        self.change_column_width(sheet_name, 'H', 20)
+        self.change_column_width(sheet_name, 'I', 20)
 
-        # makes the whole sheet white
+        # center store summary tables
+        self.center_align(sheet_name, min_row=5, max_row=18, min_col=4, max_col=9)
 
-        for row in ws.iter_rows(min_row=0, max_row=300, min_col=0, max_col=26):
-            for cell in row:
-                cell.fill = self.pattern_fill_white
+        summary_start_row = 6
 
-        self.wb.save(self.file_name)
+        for store_names in self.store_names:
 
-    def format_all_sales_table(self):
+            # Setting cell values to cleaner store name ie 'kroger_atlanta' ==> 'Atlanta'
+            self.set_value(sheet_name, f'D{summary_start_row}', store_names)
+            summary_start_row += 1
 
-        """Takes the list of all the different kroger division stores and formats it using the sales table method. """
+        self.color_fill_background(sheet_name, min_row=5, max_row=5, min_col=4, max_col=9, color_fill='4f6228')
 
-        for store_type in kroger_stores:
-            self.sales_table(store_type)
+        # change font color of column names
+        for x in ['D', 'E', 'F', 'G', 'H', 'I']:
+
+            self.change_font(sheet_name, f'{x}5', font_color='00FFFFFF')
+
+        ###############################################################################################################
+        # Second section is formatting the corporate period overview
+
+        # find the cell location to set the title
+        title_row_location = self.corporate_period_table_lengths[f'Overall Period Summary']['start_row'] - 1
+
+        # giving each division period table a title
+        self.merge_cells(sheet_name, f'D{title_row_location}', f'F{title_row_location}')
+        self.set_value(sheet_name, f'D{title_row_location}', 'Corporate Period Overview')
+
+        self.change_font(sheet_name, f'D{title_row_location}', font_size=14)
+        self.bold_font(sheet_name, min_row=title_row_location, max_row=title_row_location, min_col=4, max_col=4)
+
+        # Changing column names
+        table_col_names_row_location = self.corporate_period_table_lengths['Overall Period Summary']['start_row']
+
+        self.set_value(sheet_name, f'D{table_col_names_row_location}', 'Kroger Period')
+        self.set_value(sheet_name, f'E{table_col_names_row_location}', 'Sales')
+        self.set_value(sheet_name, f'F{table_col_names_row_location}', 'Total Units Sold')
+
+        # Changing background color of col names
+        self.color_fill_background(sheet_name,
+                                   min_row=table_col_names_row_location,
+                                   max_row=table_col_names_row_location,
+                                   min_col=4,
+                                   max_col=6,
+                                   color_fill='4f6228')
+
+        # Change Font Color the col names
+        for x in ['D', 'E', 'F']:
+            self.change_font(sheet_name, f'{x}{table_col_names_row_location}', font_color='00FFFFFF')
+
+        ###############################################################################################################
+        # third section is formatting the Division period overview for each division
+
+        for store_names in self.store_names:
+
+            # outlining sales by period table for each division
+            self.thin_outline(sheet_name,
+                              min_row=self.corporate_period_table_lengths[f'{store_names}']['start_row'],
+
+                              max_row=self.corporate_period_table_lengths[f'{store_names}']['start_row']
+                                      + self.corporate_period_table_lengths[f'{store_names}']['table_length'],
+                              min_col=4,
+                              max_col=6
+                              )
+
+            # find the cell location to set the title
+            title_row_location = self.corporate_period_table_lengths[f'{store_names}']['start_row']-1
+
+            # giving each division period table a title
+            self.merge_cells(sheet_name, f'D{title_row_location}', f'F{title_row_location}')
+            self.set_value(sheet_name, f'D{title_row_location}', store_names)
+
+            self.change_font(sheet_name, f'D{title_row_location}', font_size=14)
+            self.bold_font(sheet_name, min_row=title_row_location, max_row=title_row_location, min_col=4, max_col=4)
+            
+            # Changing column names
+            table_col_names_row_location = self.corporate_period_table_lengths[f'{store_names}']['start_row']
+
+            self.set_value(sheet_name, f'D{table_col_names_row_location}', 'Kroger Period')
+            self.set_value(sheet_name, f'E{table_col_names_row_location}', 'Sales')
+            self.set_value(sheet_name, f'F{table_col_names_row_location}', 'Total Units Sold')
+
+            # Changing background color of col names
+            self.color_fill_background(sheet_name,
+                                       min_row=table_col_names_row_location,
+                                       max_row=table_col_names_row_location,
+                                       min_col=4,
+                                       max_col=6,
+                                       color_fill='4f6228')
+
+            # Change Font Color the col names
+            for x in ['D', 'E', 'F']:
+                self.change_font(sheet_name, f'{x}{table_col_names_row_location}', font_color='00FFFFFF')
+
+        # center align period tables for all division
+        self.center_align(sheet_name,
+                          min_row=20,
+                          max_row=self.corporate_period_table_lengths['max row'],
+                          min_col=4,
+                          max_col=6)
+
+    def sales_table(self):
+
+        """formats sales table"""
+
+        for store_name in self.store_names:
+
+            self.white_back_ground(store_name, max_row=100, max_col=52)
+
+            self.thin_outline(store_name,
+                              max_row=self.sales_table_lengths[f'{store_name}'],
+                              max_col=5)
+
+            # change column names
+            self.set_value(store_name, 'A1', 'Store')
+            self.set_value(store_name, 'B1', 'YTD Sales')
+            self.set_value(store_name, 'C1', 'YTD Qty Sold')
+            self.set_value(store_name, 'D1', 'Current Week Sales')
+            self.set_value(store_name, 'E1', 'Previous Week Sales')
+
+            self.bold_font(store_name, max_row=1, max_col=5)
+
+            self.center_align(store_name,
+                              max_row=self.sales_table_lengths[f'{store_name}'],
+                              max_col=5)
+
+            # change column width
+            self.change_column_width(store_name, 'A', 15)
+            self.change_column_width(store_name, 'D', 15)
+            self.change_column_width(store_name, 'E', 15)
 
     def kroger_corporate_format(self):
 
         """Formats the Entire Kroger Corporate Excel File"""
 
-        self.corporate_overview()
+        self.corporate_overview_tab()
 
-        self.format_all_sales_table()
+        self.sales_table()
 

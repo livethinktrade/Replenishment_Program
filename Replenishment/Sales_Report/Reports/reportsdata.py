@@ -1802,6 +1802,10 @@ class ReportsData:
                 
                 """, connection)
 
+        period_table = period_table.set_index('kroger_period')
+
+        period_table.loc["Total"] = period_table.sum()
+
         return period_table
 
     def kroger_division_sales_by_period(self):
@@ -1833,6 +1837,10 @@ class ReportsData:
                 order by kroger_period
             
             ''',connection)
+
+        division_period_table = division_period_table.set_index('kroger_period')
+
+        division_period_table.loc["Total"] = division_period_table.sum()
 
         return  division_period_table
 
@@ -1953,7 +1961,13 @@ class ReportsData:
 
             ''', connection)
 
-            return overview
+        overview = overview.set_index('store_type')
+
+        overview.loc["Total"] = overview.sum()
+
+        return overview
+
+
 
 
 
