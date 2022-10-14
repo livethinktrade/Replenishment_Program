@@ -869,7 +869,17 @@ class ReportsData:
                        sales_pivot_previous_season.item_group_desc
 
 
-                order by delivery_pivot.store asc, item_group_desc asc)
+                order by delivery_pivot.store asc, item_group_desc asc),
+
+
+       			bandaids as (
+			
+				select store_id, item_group_desc, sum(qty) as bandaid 
+				from {self.store_type_input}.bandaids
+				group by store_id, item_group_desc
+				
+			)
+				
 
 
         select
@@ -880,15 +890,72 @@ class ReportsData:
                case_size,
                deliveries,
                credit,
-               coalesce(sales_pivot_previous_season.sales,0) + coalesce(sales_pivot_current_season.sales,0) + coalesce(sales_pivot_ay.sales,0) as total_sales,
-               (deliveries + credit - coalesce(sales_pivot_current_season.sales,0) - coalesce(sales_pivot_ay.sales,0)-coalesce(sales_pivot_previous_season.sales,0)) as on_hand,
-               case
-                    when (deliveries + credit - coalesce(sales_pivot_current_season.sales,0) - coalesce(sales_pivot_ay.sales,0)-coalesce(sales_pivot_previous_season.sales,0)) <= 0
-                        then 0
-                    when (deliveries + credit - coalesce(sales_pivot_current_season.sales,0) - coalesce(sales_pivot_ay.sales,0)-coalesce(sales_pivot_previous_season.sales,0)) > 0
-                        then (deliveries + credit - coalesce(sales_pivot_current_season.sales,0) - coalesce(sales_pivot_ay.sales,0)-coalesce(sales_pivot_previous_season.sales,0))/case_size
-                    end as case_qty
+               
+               coalesce(sales_pivot_previous_season.sales,0) 
+                        + coalesce(sales_pivot_current_season.sales,0) 
+                        + coalesce(sales_pivot_ay.sales,0
+                        ) as total_sales,
+                        
+			   coalesce(bandaid,0),
+			   
+			   /*Calculating the on hands: OH = Delivery - Sales + Bandaids*/
+	   			(
+					/* The Delivery Variable in the equation composes of deliveries(aka invoices) and credit (aka credit memos)*/
+					deliveries 
+					+ credit 
+					
+					/* The Sales Variable in the equation is composed of Sales for AY, Sales from the currents season, and Sales from the previous season*/
+					- coalesce(sales_pivot_current_season.sales,0) 
+					- coalesce(sales_pivot_ay.sales,0)
+					- coalesce(sales_pivot_previous_season.sales,0)
+					
+					/*Bandaid section will only concist of AY items*/
 
+					+ coalesce(bandaid,0)
+					
+				) as on_hand,
+			   
+			   
+               case
+                    when (
+						    deliveries 
+						  + credit 
+						  - coalesce(sales_pivot_current_season.sales,0) 
+						  - coalesce(sales_pivot_ay.sales,0)
+						  - coalesce(sales_pivot_previous_season.sales,0)
+						  + coalesce(bandaid,0)
+					
+						  ) <= 0
+						 
+                        then 0
+						 
+                    when (
+						
+						  deliveries 
+						+ credit 
+						- coalesce(sales_pivot_current_season.sales,0) 
+						- coalesce(sales_pivot_ay.sales,0)
+						- coalesce(sales_pivot_previous_season.sales,0)
+						+ coalesce(bandaid,0)
+					
+					    ) > 0
+						
+                        
+						then round(
+                                    (
+                                        (
+                                            deliveries 
+                                            + credit 
+                                            - coalesce(sales_pivot_current_season.sales,0) 
+                                            - coalesce(sales_pivot_ay.sales,0)
+                                            - coalesce(sales_pivot_previous_season.sales,0)
+                                            + coalesce(bandaid,0)
+
+                                        )/case_size
+                                    ),2
+                                   )
+                    end as case_qty
+					
         from combine_sd
         full join sales_pivot_current_season on sales_pivot_current_season.store_number = combine_sd.store and
                    sales_pivot_current_season.item_group_desc = combine_sd.item_group_desc
@@ -896,6 +963,8 @@ class ReportsData:
                    sales_pivot_ay.item_group_desc = combine_sd.item_group_desc
         full join sales_pivot_previous_season on sales_pivot_previous_season.store_number = combine_sd.store and
                    sales_pivot_previous_season.item_group_desc = combine_sd.item_group_desc
+	   	full join bandaids on bandaids.store_id = combine_sd.store and
+                   bandaids.item_group_desc = combine_sd.item_group_desc
 
         order by store asc, item_group_desc asc
 

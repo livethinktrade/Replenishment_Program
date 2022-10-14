@@ -277,11 +277,16 @@ class Reports:
 
         file_name = f'Kroger Corporate {today_date}.xlsx'
 
+        corporate_period_table_lengths_for_outlining = {}
+        sales_table_lengths_for_outlining = {}
+
         with pd.ExcelWriter(file_name) as writer:
 
             report_data = ReportsData(self.store_type_input, self.store_setting)
 
             period_table = report_data.kroger_sales_by_period()
+
+            # puts summary data by period for all divisions in Excel
 
             kroger_sales_overview = report_data.kroger_corporate_sales_overview()
 
@@ -297,6 +302,10 @@ class Reports:
                                   startrow=20,
                                   startcol=3
                                   )
+
+            corporate_period_table_lengths_for_outlining['Overall Period Summary'] = len(period_table)
+
+            # Puts summary data of sales ($ and qty) by division by period into the report
 
             # start row is set to 33 because other data is at this location.
 
@@ -315,10 +324,18 @@ class Reports:
 
                 sales_table = report_data.kroger_division_sales()
 
+                # takes the store_input variable and takes the 'kroger_' out from the str and
+                # then capitalizes the 1 character
+                name = store_type_input.split('kroger_')[1].capitalize()
+
+                # find length of table for formatting purposes later
+                sales_table_lengths_for_outlining[f'{name}'] = len(sales_table)
+
                 sales_table.to_excel(writer,
-                                     sheet_name=f"{store_type_input}",
+                                     sheet_name=f"{name}",
                                      index=False)
 
+                # Gets the summary data for sales $ for each period for a given kroger division
                 division_period_table = report_data.kroger_division_sales_by_period()
 
                 division_period_table.to_excel(writer,
@@ -327,9 +344,15 @@ class Reports:
                                                startrow=start_row,
                                                index=False)
 
+                # find length of table for formatting purposes later
+                corporate_period_table_lengths_for_outlining[f'{name}'] = {'start_row': start_row,
+                                                                           'table_length': len(sales_table)}
+
                 start_row += len(division_period_table) + 4
 
-        kroger_format = KrogerCorporateFormat(file_name)
+        kroger_format = KrogerCorporateFormat(file_name,
+                                              corporate_period_table_lengths_for_outlining,
+                                              sales_table_lengths_for_outlining)
 
         kroger_format.kroger_corporate_format()
 
