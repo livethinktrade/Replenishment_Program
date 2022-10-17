@@ -1,12 +1,9 @@
 # this script is used in the event you need to start changing up the table structures for all of the stores.
 # Built this so you don't have to change each one of them manually
-
+import DbConfig
 
 from store_info import Replenishment
 #
-
-
-
 
 def size_table_insert(store_type_input, connection_pool):
     connection = connection_pool.getconn()
@@ -14,8 +11,18 @@ def size_table_insert(store_type_input, connection_pool):
     cursor.execute(
         f"""
 
-            ALTER TABLE {store_type_input}.store_program_history drop constraint store_program_history_pkey;
-            ALTER TABLE {store_type_input}.store_program_history ADD PRIMARY KEY (history_id)
+           Create Table {store_type_input}.bandaids (
+            type character varying(11) NOT NULL,
+            store_id integer not null,
+            item_group_desc varchar(50),
+            qty numeric not null,
+            date_created date NOT NULL,
+            effective_date date NOT NULL,
+            store_type character varying(20) NOT NULL,
+            reason character varying(100) NOT NULL,
+        
+            PRIMARY KEY(store_id, item_group_desc, effective_date)
+)
             
 """)
 
@@ -25,35 +32,35 @@ def size_table_insert(store_type_input, connection_pool):
 
 store_list = [
 
-    'acme',
-    'follett',
-    'fresh_encounter',
-    'intermountain',
+    # 'acme',
+    # 'follett',
+    # 'fresh_encounter',
+    # 'intermountain',
     'jewel',
     'kroger_atlanta',
     # 'kroger_central',
     'kroger_cincinatti',
     'kroger_columbus',
-    'kroger_dallas',
-    # 'kroger_delta',
+    # 'kroger_dallas',
+    'kroger_delta',
     'kroger_dillons',
     'kroger_king_soopers',
     'kroger_louisville',
     'kroger_michigan',
     'kroger_nashville',
-    # 'kvat',
+    'kvat',
     'safeway_denver',
     'texas_division'
 ]
 
+with DbConfig.PsycoPoolDB() as connection:
+    for x in store_list:
 
-for x in store_list:
+        store = Replenishment(store_type_input=f'{x}')
 
-    store = Replenishment(store_type_input=f'{x}')
+        try:
+            size_table_insert(store.store_type_input, connection)
 
-    try:
-        size_table_insert(store.store_type_input, store.connection_pool)
-
-    except Exception as e:
-        print(e)
-        print(f'for {x}')
+        except Exception as e:
+            print(e)
+            print(f'for {x}')

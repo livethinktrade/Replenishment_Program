@@ -896,7 +896,7 @@ class ReportsData:
                         + coalesce(sales_pivot_ay.sales,0
                         ) as total_sales,
                         
-			   coalesce(bandaid,0),
+			   coalesce(bandaid,0) as bandaid,
 			   
 			   /*Calculating the on hands: OH = Delivery - Sales + Bandaids*/
 	   			(
@@ -1971,8 +1971,8 @@ class ReportsData:
 
 
 
-#
-# store_type_input = 'kroger_dallas'
+
+# store_type_input = 'kroger_cincinatti'
 #
 # store_setting = pd.read_excel(
 #     rf'C:\Users\User1\OneDrive - winwinproducts.com\Groccery Store Program\{store_type_input}\{store_type_input}_store_setting.xlsm',
@@ -1987,7 +1987,7 @@ class ReportsData:
 #
 # a.to_excel('sales-qty.xlsx')
 # b.to_excel('item-qty.xlsx')
-#
-#
+
+
 # ghost=test.ghost_inventory()
 # ghost.to_excel('dallas_ghost.xlsx')

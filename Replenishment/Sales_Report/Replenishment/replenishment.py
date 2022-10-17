@@ -292,6 +292,8 @@ class Restock:
                     (on_hands['display_size'] == f'{display_size}') &
                     (on_hands['season'] == f'{season}')]
 
+                on_hands_filter = on_hands_filter.reset_index(drop=True)
+
                 x = 0
                 times_replenish = 0
 
@@ -391,7 +393,7 @@ class Restock:
                         # percentage selected then all of the other item are >  as well case_qty_replenishment_threshold
                         # is basically how much of the case we have left on hand
 
-                        case_qty = round(on_hands_filter.iloc[x, 9], 2)
+                        case_qty = round(on_hands_filter.loc[x, 'case_qty'], 2)
 
                         # define variables that will be used to check if the item is approved or not
                         item_group_desc = on_hands_filter.iloc[x, 1]
@@ -421,7 +423,6 @@ class Restock:
                             # the item is approved
 
                             if len(approval_df) >= 1:
-
 
                                 # define variable to check inventory using the df generated from above
                                 # will check to see if those codes's have enough inventory
@@ -725,7 +726,7 @@ class Restock:
 
     def season_identifier(self, season):
         """
-        method is neccessary becasue the season value that will be returned will be used as the filter for the on hands
+        method is necessary because the season value that will be returned will be used as the filter for the on hands
         replenishment.
 
         Takes in Season combine variable from potential replenishment table and then check to see if it is filtered
@@ -766,16 +767,4 @@ class Restock:
 
 
 
-# store_type_input = 'kvat'
-#
-# store_setting = pd.read_excel(
-#     rf'C:\Users\User1\OneDrive - winwinproducts.com\Groccery Store Program\{store_type_input}\{store_type_input}_store_setting.xlsm',
-#     sheet_name='Sheet2',
-#     header=None,
-#     index_col=0,
-#     names=('setting', 'values'))
-#
-#
-# a = Restock(store_type_input, store_setting)
-#
-# test = a.replenishment()
+

@@ -959,7 +959,7 @@ class KrogerCorporateFormat(ReportFormat):
         sheet_name = 'Corporate Overview'
 
         # makes the whole sheet white
-        self.white_back_ground(sheet_name, max_row=500, max_col=52)
+        self.white_back_ground(sheet_name, max_row=300, max_col=40)
 
         # outlining sales summary table
         self.thin_outline(sheet_name, min_row=5, max_row=17, min_col=4, max_col=9)
@@ -1096,7 +1096,7 @@ class KrogerCorporateFormat(ReportFormat):
 
         for store_name in self.store_names:
 
-            self.white_back_ground(store_name, max_row=100, max_col=52)
+            self.white_back_ground(store_name, max_row=100, max_col=40)
 
             self.thin_outline(store_name,
                               max_row=self.sales_table_lengths[f'{store_name}'],
