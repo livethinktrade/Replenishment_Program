@@ -37,7 +37,7 @@ class Reports:
         self.sales_report = self.reports.sales_table()
         self.sales_report_len = self.reports.sales_report_len(self.sales_report)
 
-        #internal report variables
+        # internal report variables
         self.initial_orders = self.store_setting.loc['initial_orders', 'values']
         self.size_build_up = self.store_setting.loc['size_build_up', 'values']
         self.high_return = self.store_setting.loc['high_return', 'values']

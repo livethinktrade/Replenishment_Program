@@ -2,7 +2,6 @@ import pandas as pd
 import pandas.io.sql as psql
 from Sales_Report.Reports.reportsdata import ReportsData
 import DbConfig
-from DbConfig import EnginePoolDB
 
 
 class Restock:
@@ -76,9 +75,9 @@ class Restock:
         store_total_capacity = psql.read_sql(f"""
 
             select store_id as store, sum(total_cases) as total_capacity
-            from {self.store_type_input}.store_program
-            inner join master_planogram on {self.store_type_input}.store_program.program_id = master_planogram.program_id
-            where activity = 'ACTIVE'
+            from store_program
+            inner join master_planogram on store_program.program_id = master_planogram.program_id
+            where activity = 'ACTIVE' and store_type = '{self.store_type_input}'
             group by store_id
             order by sum(total_cases)
 
@@ -89,9 +88,9 @@ class Restock:
         store_display_size_capacity = psql.read_sql(f""" 
             
             select store_id, "public".master_planogram.*
-            from {self.store_type_input}.store_program
-            inner join master_planogram on {self.store_type_input}.store_program.program_id = master_planogram.program_id
-            where activity = 'ACTIVE'
+            from store_program
+            inner join master_planogram on store_program.program_id = master_planogram.program_id
+            where activity = 'ACTIVE' and store_type = '{self.store_type_input}'
             order by store_id
             """, self.connection)
 
@@ -101,7 +100,6 @@ class Restock:
         store_display_size_season_capacity = store_display_size_capacity[['store_id', 'cd_ay', 'cd_sn', 'lht_ay',
                                                                           'lht_sn', 'lhd_ay', 'lhd_sn', 'lhp_ay', 'lhp_sn']]
         store_display_size_season_capacity = store_display_size_capacity.groupby(by='store_id').sum()
-
 
         # combining the AY & seasonal display size space to find out how much capacity
         store_display_size_capacity['Carded'] = store_display_size_capacity['cd_ay'] + store_display_size_capacity['cd_sn']
@@ -113,7 +111,7 @@ class Restock:
         store_display_size_capacity = store_display_size_capacity.groupby(['store_id']).sum()
         # store_display_size_capacity = store_display_size_capacity.set_index('store_id')
 
-        store_notes = psql.read_sql(f'select * from {self.store_type_input}.store', self.connection)
+        store_notes = psql.read_sql(f"select * from store_info where store_type = '{self.store_type_input}'", self.connection)
 
         no_program = []
         i = 0
@@ -407,11 +405,13 @@ class Restock:
 
                             approval_df = psql.read_sql(f"""
 
-                                select {self.store_type_input}.item_approval.code, item_group_desc, type, style, store_price
-                                from {self.store_type_input}.item_approval
+                                select item_approval.code, item_group_desc, type, style, store_price
+                                from item_approval
                                 inner join item_support2 on item_approval.code = item_support2.code
 
-                                where store_price < 999 and item_group_desc = '{item_group_desc}'
+                                where store_price < 999 and 
+                                      item_group_desc = '{item_group_desc}' and 
+                                      store_type = '{self.store_type_input}'
 
                                 """, self.connection)
 
@@ -430,11 +430,13 @@ class Restock:
                                 inventory = psql.read_sql(f"""
 
                                     select item_group_desc, sum(on_hand) as on_hand, sum(on_hand)/max(case_size) as cases_on_hand
-                                    from {self.store_type_input}.item_approval
-                                    inner join item_support2 on {self.store_type_input}.item_approval.code = item_support2.code
-                                    inner join inventory on {self.store_type_input}.item_approval.code = inventory.code
+                                    from item_approval
+                                    inner join item_support2 on item_approval.code = item_support2.code
+                                    inner join inventory on item_approval.code = inventory.code
 
-                                    where store_price < 999 and item_group_desc = '{item_group_desc}'
+                                    where store_price < 999 and 
+                                          item_group_desc = '{item_group_desc}' and 
+                                          store_type = '{self.store_type_input}'
                                     group by item_group_desc, display_size, category, season, style
 
                                     """, self.connection)
@@ -670,13 +672,16 @@ class Restock:
 
         new_item = f"""
         
-        select {self.store_type_input}.item_approval.code,item_group_desc, display_size, season, type, 
+        select item_approval.code,item_group_desc, display_size, season, type, 
                 style, on_hand, case_size, round(on_hand/case_size) as cases_on_hand
-        from {self.store_type_input}.item_approval
-        inner join item_support2 on {self.store_type_input}.item_approval.code = public.item_support2.code
-        inner join inventory on {self.store_type_input}.item_approval.code = public.inventory.code
-        where store_price < 999 and round(on_hand/case_size) > {self.cases_on_hand_setting} and 
-              season = '{season}' and display_size = '{display_size}'
+        from item_approval
+        inner join item_support2 on item_approval.code = public.item_support2.code
+        inner join inventory on item_approval.code = public.inventory.code
+        where store_price < 999 and 
+              round(on_hand/case_size) > {self.cases_on_hand_setting} and 
+              season = '{season}' and 
+              display_size = '{display_size}' and 
+              store_type = '{self.store_type_input}'
         order by on_hand desc
         """
 

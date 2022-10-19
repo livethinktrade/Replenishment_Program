@@ -59,8 +59,9 @@ class Replenishment():
             num = new_deliv.iloc[i, 8]
             code = new_deliv.iloc[i, 9]
 
-            if store_type != self.store_type_input:
-                raise Exception(f'Data Validation Failed Inserted {store_type} for {self.store_type_input} database')
+            # irrelevant now that all db are combined
+            # if store_type != self.store_type_input:
+            #     raise Exception(f'Data Validation Failed Inserted {store_type} for {self.store_type_input} database')
 
             # note to self: last line was comment out bc i needed the old version of the deliv insert not the new one.
 
@@ -74,12 +75,11 @@ class Replenishment():
                             store_type,
                             num,
                             code,
-                            self.connection_pool,
-                            self.store_type_input)
+                            self.connection_pool)
 
             i += 1
 
-        print(f'\n {self.store_type_input} Delivery Data Imported')
+        print(f'\n Delivery Data Imported')
 
     def delivery_update(self, file):
 
@@ -149,32 +149,9 @@ class Replenishment():
 
         df.pop('Name')
 
-        store_list = {
-            'ACME MARKETS': 'acme',
-            'JEWEL OSCO': 'jewel',
-            'KROGER CENTRAL': 'kroger_central',
-            'INTERMOUNTAIN DIVISION': 'intermountain',
-            'KROGER COLUMBUS': 'kroger_columbus',
-            'KROGER DALLAS': 'kroger_dallas',
-            'KROGER DELTA': 'kroger_delta',
-            'KROGER MICHIGAN': 'kroger_michigan',
-            'ALBERTSONS DENVER': 'safeway_denver',
-            'TEXAS DIVISION': 'texas_division',
-            'KVAT FOOD STORES': 'kvat',
-            'FRESH ENCOUNTER': 'fresh_encounter',
-            'KROGER KING SOOPERS': 'kroger_king_soopers',
-            'KROGER DILLONS': 'kroger_dillons',
-            'KROGER CINCINNATI': 'kroger_cincinatti',
-            'KROGER ATLANTA': 'kroger_atlanta',
-            'KROGER NASHVILLE': 'kroger_nashville',
-            'KROGER LOUISVILLE': 'kroger_louisville',
-            'FOLLETT': 'follett'
-
-        }
-
         store_type = df.iloc[0, 9]
 
-        df['store_type'] = store_list[store_type]
+        df['store_type'] = quickbooks_store_list[store_type]
 
         # renaming columns and putting them in the right order
 
@@ -221,10 +198,11 @@ class Replenishment():
         new_deliv_transform = new_deliv_transform.reset_index(drop=True)
         new_deliv_transform['store'] = new_deliv_transform['store'].astype(str)
 
-
-        # Transition Setting Verification
-        # This section is here to make sure each item being inserted into the table is
-        # contains the correct transition settings
+        """
+        Transition Setting Verification
+        This section is here to make sure each item being inserted into the table is
+        contains the correct transition settings
+        """
 
         verification = new_deliv_transform.copy()
         verification[['code', 'season']] = verification.code.str.split('-', n=1, expand=True)
@@ -300,7 +278,7 @@ class Replenishment():
                 code = new_deliv_transform.loc[i, 'code']
 
                 duplicate_check = psql.read_sql(f"""
-                                                    SELECT * FROM {self.store_type_input}.DELIVERY2 
+                                                    SELECT * FROM DELIVERY 
                                                     WHERE type ='{type}' and 
                                                             date = '{date}' and 
                                                             store = {store} and 
@@ -314,13 +292,13 @@ class Replenishment():
 
                 if duplicate_check_len == 1:
                     delivery_update(transition_year, transition_season, type, date,
-                                    upc, store, qty, store_type, num, code, self.connection_pool, self.store_type_input)
+                                    upc, store, qty, store_type, num, code, self.connection_pool)
                     update += 1
                 else:
                     delivery_insert(transition_year,
                                     transition_season,
                                     type, date, upc, store, qty, store_type,
-                                    num, code, self.connection_pool, self.store_type_input)
+                                    num, code, self.connection_pool)
                     insert += 1
 
                 i += 1
@@ -356,16 +334,17 @@ class Replenishment():
             code = new_sales.loc[i, 'code']
             store_type = new_sales.loc[i, 'store_type']
 
-            if store_type != self.store_type_input:
-                raise Exception(f'Data Validation Failed Inserted data for {store_type} for {self.store_type_input} database')
+            # code not needed because all dbs are being combined
+            # if store_type != self.store_type_input:
+            # raise Exception(f'Data Validation Failed Inserted data for {store_type} for {self.store_type_input} database')
 
             sales_insert(transition_year, transition_season, store_year, date,
                          store_week, store_number, upc, sales,
                          qty, current_year, current_week, code, store_type,
-                         self.connection_pool, self.store_type_input)
+                         self.connection_pool)
             i += 1
 
-        print(f'\n {self.store_type_input} Sales Data Imported')
+        print(f'\n Sales Data Imported')
 
     def sales_update(self, current_weeks_sales=None, previous_weeks_sales=None):
 
@@ -451,7 +430,7 @@ class Replenishment():
                     # Decided to assign query to variable and then plug into the read_sql method for debugging purposes
                     duplicate_check_query = f"""
 
-                    SELECT * FROM {self.store_type_input}.SALES2 
+                    SELECT * FROM SALES 
                     WHERE store_year ={store_year} and 
                         store_week = '{store_week}' and
                         date = '{date}' and 
@@ -496,8 +475,7 @@ class Replenishment():
                                     current_week,
                                     code,
                                     store_type,
-                                    connection_pool,
-                                    self.store_type_input)
+                                    connection_pool)
                         update += 1
 
                     elif duplicate_check_len == 0:
@@ -514,8 +492,7 @@ class Replenishment():
                                      current_week,
                                      code,
                                      store_type,
-                                     connection_pool,
-                                     self.store_type_input)
+                                     connection_pool)
 
                         insert += 1
                         inserted_list.append(i)

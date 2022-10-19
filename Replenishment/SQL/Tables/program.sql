@@ -2,18 +2,26 @@
 create table master_planogram (
 	
 program_id varchar(15) PRIMARY KEY,
-carded numeric NOT NULL,
-long_hanging_top numeric NOT NULL,
-long_hanging_dress numeric NOT NULL
+cd_ay numeric not null,
+cd_sn numeric not null,
+lht_ay numeric not null,
+lht_sn numeric not null,
+lhd_ay numeric not null,
+lhd_sn numeric not null,
+lhp_ay numeric not null,
+lhp_sn numeric not null,
+total_cases numeric not null
 
 );
 
-create table store (
+create table store_info (
 	
-store_id integer PRIMARY KEY,
+store_id integer,
 initial varchar(10) NOT NULL,
 notes varchar(50) NOT NULL,
-store_type character varying(20) NOT NULL
+store_type character varying(20) NOT NULL,
+
+primary key(store_id, store_type)
 
 );
 
@@ -26,7 +34,7 @@ activity varchar(10),
 store_type character varying(20) NOT NULL,
 
 FOREIGN KEY (program_id) REFERENCES public.master_planogram (program_id),
-FOREIGN KEY (store_id) REFERENCES store(store_id)
+FOREIGN KEY (store_id, store_type) REFERENCES store_info(store_id, store_type)
 
 );
 
@@ -52,7 +60,7 @@ create table item_support2 (
 	
 );
 
-CREATE TABLE delivery2
+CREATE TABLE delivery
 (
     id serial NOT NULL PRIMARY KEY,
     transition_year integer,
@@ -67,11 +75,11 @@ CREATE TABLE delivery2
     code varchar(20) NOT NULL,
 
     FOREIGN KEY (code) REFERENCES public.item_support2 (code),
-    FOREIGN KEY (store) REFERENCES store(store_id)
+    FOREIGN KEY (store, store_type) REFERENCES store_info(store_id, store_type)
 
 );
 
-CREATE TABLE sales2
+CREATE TABLE sales
 (
     id serial NOT NULL PRIMARY KEY,
     transition_year integer,
@@ -92,8 +100,13 @@ CREATE TABLE sales2
 
 CREATE TABLE item_approval
 (
-    code character varying(20) NOT NULL PRIMARY KEY,
-    store_price numeric NOT NULL
+    code character varying(20),
+    store_price numeric NOT NULL,
+    recommend_replen character varying(3) not null,
+    store_type character varying(20),
+
+    primary key (store_type, code)
+
 );
 
 CREATE TABLE inventory
@@ -141,7 +154,7 @@ Create Table store_program_history
     date_updated date,
     history_id serial primary key,
 
-    FOREIGN KEY (store_id) REFERENCES midwest.store(store_id)
+    FOREIGN KEY (store_id,store_type) REFERENCES store(store_id, store_type)
 
 )
 
@@ -149,7 +162,8 @@ Create Table store_program_history
 Create Table year_week_verify (
     store_year integer not null,
     store_week integer not null,
-    PRIMARY KEY(store_year, store_week)
+    store_type character varying(20),
+    PRIMARY KEY(store_year, store_week, store_type)
 )
 
 Create Table bandaids (

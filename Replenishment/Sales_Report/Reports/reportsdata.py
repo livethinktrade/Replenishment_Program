@@ -23,10 +23,7 @@ class ReportsData:
         self.transition_season = self.store_setting.loc['Transition_Season', 'values']
 
 
-        self.connection = psycopg2.connect(database=f"test",
-                                           user="postgres",
-                                           password="winwin",
-                                           host="localhost")
+
 
         if store_type_input in ['kroger_dallas',
                                 'kroger_central',
@@ -52,16 +49,25 @@ class ReportsData:
         with DbConfig.EnginePoolDB() as connection:
 
             # finds the current year per winwin company year
-            year = psql.read_sql(f"select max(current_year) from {store_type_input}.sales2;", connection)
+            year = psql.read_sql(f"select max(current_year) from sales where store_type = '{store_type_input}'", connection)
 
             self.store_year = year.iloc[0, 0]
 
             # finds the current week the store is on
 
-            max_date = psql.read_sql(f"select max(date) from {store_type_input}.sales2 where store_year = {self.store_year}", connection)
+            max_date = psql.read_sql(f"""
+            
+            select max(date) from sales
+            where store_year = {self.store_year} and store_type = '{store_type_input}'
+            """, connection)
+            
             max_date = max_date.iloc[0, 0]
 
-            week_num = psql.read_sql(f"select store_week from {store_type_input}.sales2 where date = '{max_date}'", connection)
+            week_num = psql.read_sql(f"""
+            select store_week from sales 
+            where date = '{max_date}' and store_type = '{store_type_input}'
+            """, connection)
+            
             self.week_num = week_num.iloc[0,0]
 
             """ 
@@ -82,166 +88,173 @@ class ReportsData:
             
             """
 
-            num = psql.read_sql(f"select distinct({self.week}) from {self.store_type_input}.sales2 where store_year = {self.store_year}", connection)
+            num = psql.read_sql(f"""
+            select distinct({self.week}) from sales 
+            where store_year = {self.store_year} and store_type = '{store_type_input}'
+            """, connection)
+            
             self.num = len(num)
 
     def sales_table(self):
 
         """ new sales table incorporating new support sheet"""
 
-        sales_sql = f"""
+        with DbConfig.EnginePoolDB() as connection:
 
-        with
+            sales_sql = f"""
+    
+            with
+    
+                sales_table as (
+    
+    
+                    SELECT distinct sales.id,
+                        sales.transition_year,
+                        sales.transition_season,
+                        sales.store_year,
+                        sales.store_week,
+                        sales.store_number,
+                        sales.upc AS upc_11_digit,
+                        sales.sales,
+                        sales.qty,
+                        sales.current_year,
+                        sales.current_week,
+                        sales.store_type,
+                        item_support2.season,
+                        item_support2.category,
+                        item_support2.upc,
+                        item_support2.display_size,
+                        item_support2.case_size,
+                        item_support2.item_group_desc
+                    FROM sales
+                    inner JOIN item_support2 ON sales.code = item_support2.code
+                    where store_type = '{self.store_type_input}'),
+    
+                date as (
+    
+                    select distinct store_number
+                    from sales_table
+                    order by store_number asc),
+    
+    
+                current_week as (
+    
+                    select store_number, store_year, {self.week}, sum(sales) as sales
+                    from sales_table
+                    where store_year = {self.store_year} and
+                        {self.week} = {self.week_num} and
+                        (season = 'FW' or season = 'AY' or season = 'SS') and
+                        (category != 'GM' and category != 'Accessory' and category != 'Scrub')
+    
+                    group by store_number, store_year, {self.week}
+    
+                    order by store_number asc),
+    
+    
+                previous_week as (
+    
+                    select store_number, store_year, {self.week}, sum(sales) as sales
+                    from sales_table
+    
+                    where store_year = {self.store_year} and
+                        {self.week} = {self.week_num}-1 and
+                        (category != 'GM' or category != 'Accessory' or category != 'Scrub') and
+                        (category != 'GM' and category != 'Accessory' and category != 'Scrub')
+    
+                    group by store_number, store_year, {self.week}
+    
+                    order by store_number asc),
+    
+                previous_year_week as (
+    
+                    select store_number, store_year, {self.week}, sum(sales) as sales
+                    from sales_table
+    
+                    where store_year = {self.store_year}-1 and
+                        {self.week} = {self.week_num} and
+                        (season = 'FW' or season = 'AY' or season = 'SS') and
+                        (category != 'GM' and category != 'Accessory' and category != 'Scrub')
+    
+                    group by store_number, store_year, {self.week}
+    
+                    order by store_number asc),
+    
+                current_ytd_week as (
+    
+                    select store_number, store_year, sum(sales) as sales
+                    from sales_table
+    
+                    where store_year = {self.store_year} and
+                        {self.week} <= {self.week_num} and
+                        (season = 'FW' or season = 'AY' or season = 'SS') and
+                        (category != 'GM' and category != 'Accessory' and category != 'Scrub')
+    
+                    group by store_number, store_year
+    
+                    order by store_number asc),
+    
+    
+                previous_ytd_week as (
+    
+    
+                    select store_number, store_year, sum(sales) as sales
+                    from sales_table
+                    /*looks for previous year so maybe max -1 when finding innitial start for python program*/
+                    where store_year = {self.store_year}-1 and
+                        {self.week} <= {self.week_num} and
+                        (season = 'FW' or season = 'AY' or season = 'SS') and
+                        (category != 'GM' and category != 'Accessory' and category != 'Scrub')
+    
+                    group by store_number, store_year
+    
+                    order by store_number asc)
+    
+            select
+                date.store_number,
+                current_week.sales as current_week,
+                previous_week.sales as previous_week,
+                /*WOW sales % */
+                case
+                    when current_week.sales < 0 or previous_week.sales <= 0
+                        then NULL
+                    when current_week.sales >= 0 or previous_week.sales > 0
+                        then round(((current_week.sales-previous_week.sales)/(previous_week.sales)),2)
+                    end as WOW_sales_percentage,
+    
+    
+    
+                current_week.sales as current_week,
+                previous_year_week.sales as previous_year_week,
+                case
+                    when current_week.sales < 0 or previous_year_week.sales <= 0
+                        then NULL
+                    when current_week.sales >= 0 or previous_year_week.sales > 0
+                        then round(((current_week.sales-previous_year_week.sales)/(previous_year_week.sales)),2)
+                    end as YoY_sales_percentage,
+    
+    
+                current_ytd_week.sales as YTD_2022,
+                previous_ytd_week.sales as YTD_2021,
+                case
+                    when current_ytd_week.sales < 0 or previous_ytd_week.sales <= 0
+                        then NULL
+                    when current_ytd_week.sales >= 0 or previous_ytd_week.sales > 0
+                        then round(((current_ytd_week.sales-previous_ytd_week.sales)/(previous_ytd_week.sales)),2)
+                    end as YoY_sales_percentage
+    
+    
+            from date
+            full join current_week on date.store_number = current_week.store_number
+            full join previous_week on date.store_number = previous_week.store_number
+            full join previous_year_week on date. store_number = previous_year_week.store_number
+            full join current_ytd_week on date.store_number = current_ytd_week.store_number
+            full join previous_ytd_week on date.store_number = previous_ytd_week.store_number
+    
+            order by current_ytd_week.sales desc
+    
+            """
 
-            sales_table as (
-
-
-                SELECT distinct sales2.id,
-                    sales2.transition_year,
-                    sales2.transition_season,
-                    sales2.store_year,
-                    sales2.store_week,
-                    sales2.store_number,
-                    sales2.upc AS upc_11_digit,
-                    sales2.sales,
-                    sales2.qty,
-                    sales2.current_year,
-                    sales2.current_week,
-                    sales2.store_type,
-                    item_support2.season,
-                    item_support2.category,
-                    item_support2.upc,
-                    item_support2.display_size,
-                    item_support2.case_size,
-                    item_support2.item_group_desc
-                FROM {self.store_type_input}.sales2
-                inner JOIN item_support2 ON sales2.code = item_support2.code),
-
-            date as (
-
-                select distinct store_number
-                from sales_table
-                order by store_number asc),
-
-
-            current_week as (
-
-                select store_number, store_year, {self.week}, sum(sales) as sales
-                from sales_table
-                where store_year = {self.store_year} and
-                    {self.week} = {self.week_num} and
-                    (season = 'FW' or season = 'AY' or season = 'SS') and
-                    (category != 'GM' and category != 'Accessory' and category != 'Scrub')
-
-                group by store_number, store_year, {self.week}
-
-                order by store_number asc),
-
-
-            previous_week as (
-
-                select store_number, store_year, {self.week}, sum(sales) as sales
-                from sales_table
-
-                where store_year = {self.store_year} and
-                    {self.week} = {self.week_num}-1 and
-                    (category != 'GM' or category != 'Accessory' or category != 'Scrub') and
-                    (category != 'GM' and category != 'Accessory' and category != 'Scrub')
-
-                group by store_number, store_year, {self.week}
-
-                order by store_number asc),
-
-            previous_year_week as (
-
-                select store_number, store_year, {self.week}, sum(sales) as sales
-                from sales_table
-
-                where store_year = {self.store_year}-1 and
-                    {self.week} = {self.week_num} and
-                    (season = 'FW' or season = 'AY' or season = 'SS') and
-                    (category != 'GM' and category != 'Accessory' and category != 'Scrub')
-
-                group by store_number, store_year, {self.week}
-
-                order by store_number asc),
-
-            current_ytd_week as (
-
-                select store_number, store_year, sum(sales) as sales
-                from sales_table
-
-                where store_year = {self.store_year} and
-                    {self.week} <= {self.week_num} and
-                    (season = 'FW' or season = 'AY' or season = 'SS') and
-                    (category != 'GM' and category != 'Accessory' and category != 'Scrub')
-
-                group by store_number, store_year
-
-                order by store_number asc),
-
-
-            previous_ytd_week as (
-
-
-                select store_number, store_year, sum(sales) as sales
-                from sales_table
-                /*looks for previous year so maybe max -1 when finding innitial start for python program*/
-                where store_year = {self.store_year}-1 and
-                    {self.week} <= {self.week_num} and
-                    (season = 'FW' or season = 'AY' or season = 'SS') and
-                    (category != 'GM' and category != 'Accessory' and category != 'Scrub')
-
-                group by store_number, store_year
-
-                order by store_number asc)
-
-        select
-            date.store_number,
-            current_week.sales as current_week,
-            previous_week.sales as previous_week,
-            /*WOW sales % */
-            case
-                when current_week.sales < 0 or previous_week.sales <= 0
-                    then NULL
-                when current_week.sales >= 0 or previous_week.sales > 0
-                    then round(((current_week.sales-previous_week.sales)/(previous_week.sales)),2)
-                end as WOW_sales_percentage,
-
-
-
-            current_week.sales as current_week,
-            previous_year_week.sales as previous_year_week,
-            case
-                when current_week.sales < 0 or previous_year_week.sales <= 0
-                    then NULL
-                when current_week.sales >= 0 or previous_year_week.sales > 0
-                    then round(((current_week.sales-previous_year_week.sales)/(previous_year_week.sales)),2)
-                end as YoY_sales_percentage,
-
-
-            current_ytd_week.sales as YTD_2022,
-            previous_ytd_week.sales as YTD_2021,
-            case
-                when current_ytd_week.sales < 0 or previous_ytd_week.sales <= 0
-                    then NULL
-                when current_ytd_week.sales >= 0 or previous_ytd_week.sales > 0
-                    then round(((current_ytd_week.sales-previous_ytd_week.sales)/(previous_ytd_week.sales)),2)
-                end as YoY_sales_percentage
-
-
-        from date
-        full join current_week on date.store_number = current_week.store_number
-        full join previous_week on date.store_number = previous_week.store_number
-        full join previous_year_week on date. store_number = previous_year_week.store_number
-        full join current_ytd_week on date.store_number = current_ytd_week.store_number
-        full join previous_ytd_week on date.store_number = previous_ytd_week.store_number
-
-        order by current_ytd_week.sales desc
-
-        """
-
-        sales_report = psql.read_sql(f'{sales_sql}', self.connection)
+            sales_report = psql.read_sql(f'{sales_sql}', connection)
 
         return sales_report
 
@@ -255,97 +268,100 @@ class ReportsData:
 
         """new ytd mask update using the updated item_support sheet"""
 
-        sales_sql_YTD_WoMask = f"""
+        with DbConfig.EnginePoolDB() as connection:
 
-        with
-
-            sales_table as (
-
-                         SELECT distinct sales2.id,
-                            sales2.transition_year,
-                            sales2.transition_season,
-                            sales2.store_year,
-                            sales2.store_week,
-                            sales2.store_number,
-                            sales2.upc AS upc_11_digit,
-                            sales2.sales,
-                            sales2.qty,
-                            sales2.current_year,
-                            sales2.current_week,
-                            sales2.store_type,
-                            item_support2.season,
-                            item_support2.category,
-                            item_support2.upc,
-                            item_support2.display_size,
-                            item_support2.case_size,
-                            item_support2.item_group_desc
-                         FROM {self.store_type_input}.sales2
-                         inner JOIN item_support2 ON sales2.code = item_support2.code),
-
-            store_count as (
-
-                        select distinct store_number
-                        from sales_table
-                        where store_year = {self.store_year}),
-
-            current_ytd_week as (
-
-                        select store_number, store_year, sum(sales) as sales
-                        from sales_table
-                        where store_year = {self.store_year} and
-                            {self.week} <= {self.week_num} and
-                            (season = 'FW' or season = 'AY' or season = 'SS') and
-                            (category != 'GM' and category != 'Accessory' and category != 'Scrub')
-
-                        group by store_number, store_year
-
-                        order by store_number asc),
-
-            previous_ytd_week as (
-
-
-                        select store_number, store_year, sum(sales) as sales
-                        from sales_table
-
-                        /*looks for previous year so maybe max -1 when finding innitial start for python program*/
-                        where store_year = {self.store_year}-1 and
-                            {self.week} <= {self.week_num} and
-                            (season = 'FW' or season = 'AY' or season = 'SS') and
-                            (category != 'GM' and category != 'Accessory' and category != 'Scrub')
-
-                        group by store_number, store_year
-
-                        order by store_number asc),
-
-            yearly_sum as (
-
-                        select round(sum(sales)) as YTD_current,
-                            (select round(sum(sales)) as YTD_previous from previous_ytd_week)
-                        from current_ytd_week),
-
-            yearly_sum_p2 as (
-                        select ytd_current, ytd_previous,
-                                ((ytd_current-ytd_previous)/ytd_previous) as YoY_Change,
-                            (select count(store_number) from store_count) as store_supported
-                        from yearly_sum)
-
-
-        select
-            ytd_current,
-            ytd_previous,
-            yoy_change,
-            store_supported,
-            /*change number to current week of store year to make program dynamic
-            next line calculates Avg Sales Per Wk/Store ($)*/
-            round(ytd_current/store_supported/{self.num}) as avg_wk_store,
-
-            /*next line calculates Avg Sales Per month/Store ($)*/
-            round((ytd_current/store_supported/{self.num})*4) as avg_month_store
-
-        from yearly_sum_p2
-
-        """
-        sales_ytd_no_mask = psql.read_sql(f'{sales_sql_YTD_WoMask}', self.connection)
+            sales_sql_YTD_WoMask = f"""
+    
+            with
+    
+                sales_table as (
+    
+                             SELECT distinct sales.id,
+                                sales.transition_year,
+                                sales.transition_season,
+                                sales.store_year,
+                                sales.store_week,
+                                sales.store_number,
+                                sales.upc AS upc_11_digit,
+                                sales.sales,
+                                sales.qty,
+                                sales.current_year,
+                                sales.current_week,
+                                sales.store_type,
+                                item_support2.season,
+                                item_support2.category,
+                                item_support2.upc,
+                                item_support2.display_size,
+                                item_support2.case_size,
+                                item_support2.item_group_desc
+                             FROM sales
+                             inner JOIN item_support2 ON sales.code = item_support2.code
+                             where store_type = '{self.store_type_input}'),
+    
+                store_count as (
+    
+                            select distinct store_number
+                            from sales_table
+                            where store_year = {self.store_year}),
+    
+                current_ytd_week as (
+    
+                            select store_number, store_year, sum(sales) as sales
+                            from sales_table
+                            where store_year = {self.store_year} and
+                                {self.week} <= {self.week_num} and
+                                (season = 'FW' or season = 'AY' or season = 'SS') and
+                                (category != 'GM' and category != 'Accessory' and category != 'Scrub')
+    
+                            group by store_number, store_year
+    
+                            order by store_number asc),
+    
+                previous_ytd_week as (
+    
+    
+                            select store_number, store_year, sum(sales) as sales
+                            from sales_table
+    
+                            /*looks for previous year so maybe max -1 when finding innitial start for python program*/
+                            where store_year = {self.store_year}-1 and
+                                {self.week} <= {self.week_num} and
+                                (season = 'FW' or season = 'AY' or season = 'SS') and
+                                (category != 'GM' and category != 'Accessory' and category != 'Scrub')
+    
+                            group by store_number, store_year
+    
+                            order by store_number asc),
+    
+                yearly_sum as (
+    
+                            select round(sum(sales)) as YTD_current,
+                                (select round(sum(sales)) as YTD_previous from previous_ytd_week)
+                            from current_ytd_week),
+    
+                yearly_sum_p2 as (
+                            select ytd_current, ytd_previous,
+                                    ((ytd_current-ytd_previous)/ytd_previous) as YoY_Change,
+                                (select count(store_number) from store_count) as store_supported
+                            from yearly_sum)
+    
+    
+            select
+                ytd_current,
+                ytd_previous,
+                yoy_change,
+                store_supported,
+                /*change number to current week of store year to make program dynamic
+                next line calculates Avg Sales Per Wk/Store ($)*/
+                round(ytd_current/store_supported/{self.num}) as avg_wk_store,
+    
+                /*next line calculates Avg Sales Per month/Store ($)*/
+                round((ytd_current/store_supported/{self.num})*4) as avg_month_store
+    
+            from yearly_sum_p2
+    
+            """
+            sales_ytd_no_mask = psql.read_sql(f'{sales_sql_YTD_WoMask}', connection)
 
         return sales_ytd_no_mask
 
@@ -353,95 +369,98 @@ class ReportsData:
 
         """new ytd with mask using the new support sheet"""
 
-        sales_sql_YTD_Mask = f"""
+        with DbConfig.EnginePoolDB() as connection:
 
-        with
+            sales_sql_YTD_Mask = f"""
+    
+            with
+    
+                sales_table as (
+    
+                             SELECT distinct sales.id,
+                                sales.transition_year,
+                                sales.transition_season,
+                                sales.store_year,
+                                sales.store_week,
+                                sales.store_number,
+                                sales.upc AS upc_11_digit,
+                                sales.sales,
+                                sales.qty,
+                                sales.current_year,
+                                sales.current_week,
+                                sales.store_type,
+                                item_support2.season,
+                                item_support2.category,
+                                item_support2.upc,
+                                item_support2.display_size,
+                                item_support2.case_size,
+                                item_support2.item_group_desc
+                             FROM sales
+                             inner JOIN item_support2 ON sales.code = item_support2.code
+                             where store_type = '{self.store_type_input}'),
+    
+                store_count as (
+    
+                            select distinct store_number
+                            from sales_table
+                            where store_year = {self.store_year}),
+    
+                current_ytd_week as (
+    
+                            select store_number, store_year, sum(sales) as sales
+                            from sales_table
+                            where store_year = {self.store_year} and
+                                {self.week} <= {self.week_num}
+    
+                            group by store_number, store_year
+    
+                            order by store_number asc),
+    
+                previous_ytd_week as (
+    
+    
+                            select store_number, store_year, sum(sales) as sales
+                            from sales_table
+    
+                            /*looks for previous year so maybe max -1 when finding innitial start for python program*/
+                            where store_year = {self.store_year}-1 and
+                                {self.week} <= {self.week_num}
+    
+                            group by store_number, store_year
+    
+                            order by store_number asc),
+    
+                yearly_sum as (
+    
+                            select round(sum(sales)) as YTD_current,
+                                (select round(sum(sales)) as YTD_previous from previous_ytd_week)
+                            from current_ytd_week),
+    
+                yearly_sum_p2 as (
+                            select ytd_current, ytd_previous,
+                                    ((ytd_current-ytd_previous)/ytd_previous) as YoY_Change,
+                                (select count(store_number) from store_count) as store_supported
+                            from yearly_sum)
+    
+    
+            select
+                ytd_current,
+                ytd_previous,
+                yoy_change,
+                store_supported,
+                /*change number to current week of store year to make program dynamic
+                next line calculates Avg Sales Per Wk/Store ($)*/
+                round(ytd_current/store_supported/{self.num}) as avg_wk_store,
+    
+                /*next line calculates Avg Sales Per month/Store ($)*/
+                round((ytd_current/store_supported/{self.num})*4) as avg_month_store
+    
+            from yearly_sum_p2
+    
+    
+                """
 
-            sales_table as (
-
-                         SELECT distinct sales2.id,
-                            sales2.transition_year,
-                            sales2.transition_season,
-                            sales2.store_year,
-                            sales2.store_week,
-                            sales2.store_number,
-                            sales2.upc AS upc_11_digit,
-                            sales2.sales,
-                            sales2.qty,
-                            sales2.current_year,
-                            sales2.current_week,
-                            sales2.store_type,
-                            item_support2.season,
-                            item_support2.category,
-                            item_support2.upc,
-                            item_support2.display_size,
-                            item_support2.case_size,
-                            item_support2.item_group_desc
-                         FROM {self.store_type_input}.sales2
-                         inner JOIN item_support2 ON sales2.code = item_support2.code),
-
-            store_count as (
-
-                        select distinct store_number
-                        from sales_table
-                        where store_year = {self.store_year}),
-
-            current_ytd_week as (
-
-                        select store_number, store_year, sum(sales) as sales
-                        from sales_table
-                        where store_year = {self.store_year} and
-                            {self.week} <= {self.week_num}
-
-                        group by store_number, store_year
-
-                        order by store_number asc),
-
-            previous_ytd_week as (
-
-
-                        select store_number, store_year, sum(sales) as sales
-                        from sales_table
-
-                        /*looks for previous year so maybe max -1 when finding innitial start for python program*/
-                        where store_year = {self.store_year}-1 and
-                            {self.week} <= {self.week_num}
-
-                        group by store_number, store_year
-
-                        order by store_number asc),
-
-            yearly_sum as (
-
-                        select round(sum(sales)) as YTD_current,
-                            (select round(sum(sales)) as YTD_previous from previous_ytd_week)
-                        from current_ytd_week),
-
-            yearly_sum_p2 as (
-                        select ytd_current, ytd_previous,
-                                ((ytd_current-ytd_previous)/ytd_previous) as YoY_Change,
-                            (select count(store_number) from store_count) as store_supported
-                        from yearly_sum)
-
-
-        select
-            ytd_current,
-            ytd_previous,
-            yoy_change,
-            store_supported,
-            /*change number to current week of store year to make program dynamic
-            next line calculates Avg Sales Per Wk/Store ($)*/
-            round(ytd_current/store_supported/{self.num}) as avg_wk_store,
-
-            /*next line calculates Avg Sales Per month/Store ($)*/
-            round((ytd_current/store_supported/{self.num})*4) as avg_month_store
-
-        from yearly_sum_p2
-
-
-            """
-
-        sales_sql_YTD_Mask = psql.read_sql(f'{sales_sql_YTD_Mask}', self.connection)
+            sales_sql_YTD_Mask = psql.read_sql(f'{sales_sql_YTD_Mask}', connection)
 
         return sales_sql_YTD_Mask
 
@@ -456,26 +475,27 @@ class ReportsData:
             sales_table as (
 
 
-                SELECT distinct sales2.id,
-                    sales2.transition_year,
-                    sales2.transition_season,
-                    sales2.store_year,
-                    sales2.store_week,
-                    sales2.store_number,
-                    sales2.upc AS upc_11_digit,
-                    sales2.sales,
-                    sales2.qty,
-                    sales2.current_year,
-                    sales2.current_week,
-                    sales2.store_type,
+                SELECT distinct sales.id,
+                    sales.transition_year,
+                    sales.transition_season,
+                    sales.store_year,
+                    sales.store_week,
+                    sales.store_number,
+                    sales.upc AS upc_11_digit,
+                    sales.sales,
+                    sales.qty,
+                    sales.current_year,
+                    sales.current_week,
+                    sales.store_type,
                     item_support2.season,
                     item_support2.category,
                     item_support2.upc,
                     item_support2.display_size,
                     item_support2.case_size,
                     item_support2.item_group_desc
-                FROM {self.store_type_input}.sales2
-                inner JOIN item_support2 ON sales2.code = item_support2.code),
+                FROM sales
+                inner JOIN item_support2 ON sales.code = item_support2.code
+                where store_type = '{self.store_type_input}'),
 
             year_total as(
                         Select sum(sales) as year_sales, sum(qty) as year_total_unit
@@ -502,61 +522,65 @@ class ReportsData:
         # this SQL statement prduces a query that shows all of the items that was sold for a given year.
         # Provides a table with item group desc, season, sum sales, sum qty, % of total sales
 
+        with DbConfig.EnginePoolDB() as connection:
 
-        rank = psql.read_sql(f'{item_sales_rank}', self.connection)
+            rank = psql.read_sql(f'{item_sales_rank}', connection)
 
         i = 0
 
         # using the previous query, python selects the item group desc and finds how many stores carried that particular item during
         # that time. Columns will consist of item_group_desc,sales,units_sold,percent_of_total_sales,season,active,stores,sales per active store
 
-        while i < len(rank):
-            item = rank.loc[i, 'item_group_desc']
+        with DbConfig.EnginePoolDB() as connection:
 
-            store_count = f"""
+            while i < len(rank):
+                item = rank.loc[i, 'item_group_desc']
 
-            with
+                store_count = f"""
+    
+                with
+    
+                sales_table as (
+    
+    
+                    SELECT distinct sales.id,
+                        sales.transition_year,
+                        sales.transition_season,
+                        sales.store_year,
+                        sales.store_week,
+                        sales.store_number,
+                        sales.upc AS upc_11_digit,
+                        sales.sales,
+                        sales.qty,
+                        sales.current_year,
+                        sales.current_week,
+                        sales.store_type,
+                        item_support2.season,
+                        item_support2.category,
+                        item_support2.upc,
+                        item_support2.display_size,
+                        item_support2.case_size,
+                        item_support2.item_group_desc
+                    FROM sales
+                    inner JOIN item_support2 ON sales.code = item_support2.code
+                    where store_type = '{self.store_type_input}'),
+    
+    
+                    store_with_item as (
+    
+                    select * from sales_table where item_group_desc = '{item}' and store_year = {self.store_year})
+    
+                select count(distinct(store_number)) from store_with_item
+    
+                """
 
-            sales_table as (
+                store_count = psql.read_sql(f'{store_count}', connection)
 
+                store_count = store_count.iloc[0, 0]
 
-                SELECT distinct sales2.id,
-                    sales2.transition_year,
-                    sales2.transition_season,
-                    sales2.store_year,
-                    sales2.store_week,
-                    sales2.store_number,
-                    sales2.upc AS upc_11_digit,
-                    sales2.sales,
-                    sales2.qty,
-                    sales2.current_year,
-                    sales2.current_week,
-                    sales2.store_type,
-                    item_support2.season,
-                    item_support2.category,
-                    item_support2.upc,
-                    item_support2.display_size,
-                    item_support2.case_size,
-                    item_support2.item_group_desc
-                FROM {self.store_type_input}.sales2
-                inner JOIN item_support2 ON sales2.code = item_support2.code),
+                rank.loc[i, 'active stores'] = store_count
 
-
-                store_with_item as (
-
-                select * from sales_table where item_group_desc = '{item}' and store_year = {self.store_year})
-
-            select count(distinct(store_number)) from store_with_item
-
-            """
-
-            store_count = psql.read_sql(f'{store_count}', self.connection)
-
-            store_count = store_count.iloc[0, 0]
-
-            rank.loc[i, 'active stores'] = store_count
-
-            i += 1
+                i += 1
 
         rank['sales per active store'] = round(rank['sales'] / rank['active stores'], 2)
 
@@ -577,7 +601,15 @@ class ReportsData:
 
         # finding the max date so I can find the current year.
         # Current year needed to we can see set a point of ref to subtract for ay items
-        max_year = psql.read_sql(f"select max(date) from {self.store_type_input}.delivery2", self.connection)
+
+        with DbConfig.EnginePoolDB() as connection:
+        
+            max_year = psql.read_sql(f"""
+            
+            select max(date) from public.delivery
+            where store_type = '{self.store_type_input}'
+            
+            """, connection)
 
         max_year = max_year.iloc[0, 0]
         max_year = max_year.year
@@ -652,323 +684,336 @@ class ReportsData:
         else:
             raise Exception("No Transition Store Setting has been selected")
 
-        on_hand = psql.read_sql(f"""
+        with DbConfig.EnginePoolDB() as connection:
 
-        with
-
-            delivery_table as (
-
-                /*This table is basically the delivery table with the support sheet lined up */
-                select id, transition_year, transition_season, delivery2.type, date, delivery2.upc, store,
-                qty, season, category, item_group_desc, display_size, case_size
-                from {self.store_type_input}.delivery2
-                inner join item_support2 on {self.store_type_input}.delivery2.code = item_support2.code
-                where date >= '01-01-{min_year}'),
-
-            deliv_pivot_credit as (
-
-                /*this next table will grab all of credits for ay items along with credits for whatever season we are in*/
-
-                SELECT store,
-                    item_group_desc,
-                    sum(qty) AS credit,
-                    display_size,
-                    season,
-                    case_size
-
-
-                FROM delivery_table
-
-                where
-                        /*this next line tracks AY items will need to use python to dynamically track 2 years worth only*/
+            on_hand = psql.read_sql(f"""
+    
+            with
+    
+                delivery_table as (
+    
+                    /*This table is basically the delivery table with the support sheet lined up */
+                    select id, transition_year, transition_season, delivery.type, date, delivery.upc, store,
+                           qty, season, category, item_group_desc, display_size, case_size
+                    from delivery
+                    inner join item_support2 on delivery.code = item_support2.code
+                    where date >= '01-01-{min_year}' and store_type= '{self.store_type_input}'),
+    
+                deliv_pivot_credit as (
+    
+                    /*this next table will grab all of credits for ay items along with credits for whatever season we are in*/
+    
+                    SELECT store,
+                        item_group_desc,
+                        sum(qty) AS credit,
+                        display_size,
+                        season,
+                        case_size
+    
+    
+                    FROM delivery_table
+    
+                    where
+                            /*this next line tracks AY items will need to use python to dynamically track 2 years worth only*/
+                        (
+    
+                            (
+                                season = 'AY'
+                                and type = 'Credit Memo'
+                                and (category != 'Accessory' and category != 'GM' and category != 'Scrub' and category != 'Rack')
+                            )
+    
+                             or
+    
+                            /*filtering out the current seasonal items */
+                            (
+                                season = '{season1}'
+                                and type = 'Credit Memo'
+                                and (category != 'Accessory' and category != 'GM' and category != 'Scrub' and category != 'Rack')
+                                and transition_year = {transition_year1}
+                                and transition_season = '{transition_season1}'
+                            )
+    
+                            or
+                            
+                            /*this next section is only applicable if using rolling transition. will filter all of the prev seasonal items*/
+                            (
+                                season = '{season2}'
+                                and type = 'Credit Memo'
+                                and (category != 'Accessory' and category != 'GM' and category != 'Scrub' and category != 'Rack')
+                                and transition_year = {transition_year2}
+                                and transition_season = '{transition_season2}'
+                            )
+    
+                          )
+    
+                    group by store, item_group_desc,display_size,season, case_size
+                    order by store),
+    
+                deliv_pivot_invoice as (
+    
+    
+                    SELECT store,
+                        item_group_desc,
+                        sum(qty) AS deliveries,
+                        display_size,
+                        season,
+                        case_size
+    
+                    FROM delivery_table
+    
+                    where
+                            /*this next line tracks AY items will need to use python to dynamically track 2 years worth only*/
+                        (
+    
+                            (
+                                season = 'AY'
+                                and (type = 'Invoice' or type = 'BandAid' or type = 'Reset')
+                                and (category != 'Accessory' and category != 'GM' and category != 'Scrub' and category != 'Rack')
+                            )
+    
+                             or
+    
+                            /*this next line should be dynamic using python keep in mind that rolling transition will include SS and FW items */
+                            (
+                                season = '{season1}'
+                                and (type = 'Invoice' or type = 'BandAid' or type = 'Reset')
+                                and (category != 'Accessory' and category != 'GM' and category != 'Scrub' and category != 'Rack')
+                                and transition_year = {transition_year1}
+                                and transition_season = '{transition_season1}'
+                            )
+                            
+                            or
+                            
+                            (
+                                season = '{season2}'
+                                and (type = 'Invoice' or type = 'BandAid' or type = 'Reset')
+                                and (category != 'Accessory' and category != 'GM' and category != 'Scrub' and category != 'Rack')
+                                and transition_year = {transition_year2}
+                                and transition_season = '{transition_season2}'
+                            )
+    
+                          )
+    
+                    group by store, item_group_desc,display_size,season, case_size
+                    order by store),
+    
+                delivery_pivot as (
+    
+                    select deliv_pivot_invoice.store,
+    
+                            deliv_pivot_invoice.item_group_desc,
+                            deliveries,
+                            COALESCE(credit,0) as credit,
+                            deliv_pivot_invoice.display_size,
+                            deliv_pivot_invoice.season,
+                            deliv_pivot_invoice.case_size
+                    from deliv_pivot_invoice
+                    full join deliv_pivot_credit on deliv_pivot_invoice.item_group_desc = deliv_pivot_credit.item_group_desc AND
+                                deliv_pivot_invoice.store = deliv_pivot_credit.store),
+    
+                sales_table as (
+    
+                    SELECT sales.id,
+                        sales.transition_year,
+                        sales.transition_season,
+                        sales.store_year,
+                        sales.store_week,
+                        sales.store_number,
+                        sales.upc AS upc_11_digit,
+                        sales.sales,
+                        sales.qty,
+                        sales.current_year,
+                        sales.store_type,
+                        item_support2.season,
+                        item_support2.category,
+                        item_support2.upc,
+                        item_support2.display_size,
+                        item_support2.case_size,
+                        item_support2.item_group_desc
+                    FROM sales
+                    inner JOIN item_support2 ON sales.code = item_support2.code
+                    where date >= '01-01-{min_year}' and store_type = '{self.store_type_input}'),
+    
+                sales_pivot_AY as (
+    
+                    SELECT store_number,
+                            item_group_desc,
+                            sum(qty) AS sales
+    
+                    from sales_table
+                    where season = 'AY' and (category != 'Accessory' and category != 'GM' and category != 'Rack')
+                    GROUP BY store_number,item_group_desc
+                    ORDER BY store_number, item_group_desc),
+    
+                /*sales for the current season*/
+                sales_pivot_current_season as (
+                    SELECT store_number,
+                            item_group_desc,
+                            sum(qty) AS sales
+                            
+                    FROM sales_table
+                    where season = '{season1}' and 
+                          (category != 'Accessory' and category != 'GM' and category != 'Rack') and 
+                          transition_year = {transition_year1} and 
+                          transition_season = '{transition_season1}'
+                          
+                    GROUP BY store_number, item_group_desc
+                    ORDER BY store_number),
+    
+                /*sales for the previous season*/
+                sales_pivot_previous_season as (
+    
+                    SELECT store_number,
+                            item_group_desc,
+                            sum(qty) AS sales
+                    FROM sales_table
+                    
+                    where season = '{sales_season2}' and 
+                          (category != 'Accessory' and category != 'GM' and category != 'Rack') and 
+                          transition_year = {transition_year2} and 
+                          transition_season = '{transition_season2}'
+                          
+                    GROUP BY store_number, item_group_desc
+                    ORDER BY store_number),
+    
+                combine_sd as (
+    
+                    /*combines all of the sales tables and then joins it to the delivery  table*/
+    
+                    select delivery_pivot.store,
+                           delivery_pivot.item_group_desc,
+                           delivery_pivot.season,
+                           delivery_pivot.display_size,
+                           delivery_pivot.case_size,
+                           deliveries,
+                           credit,
+                           sales_pivot_AY.item_group_desc as AY_Desc,
+                           sales_pivot_current_season.item_group_desc as FW_Desc,
+                           sales_pivot_previous_season.item_group_desc as SS_Desc
+    
+                    from delivery_pivot
+                    full join sales_pivot_current_season on sales_pivot_current_season.store_number = delivery_pivot.store and
+                               sales_pivot_current_season.item_group_desc = delivery_pivot.item_group_desc
+                    full join sales_pivot_ay on sales_pivot_ay.store_number = delivery_pivot.store and
+                               sales_pivot_ay.item_group_desc = delivery_pivot.item_group_desc
+                    full join sales_pivot_previous_season on sales_pivot_previous_season.store_number = delivery_pivot.store and
+                               sales_pivot_previous_season.item_group_desc = delivery_pivot.item_group_desc
+    
+                    group by
+                            delivery_pivot.store,
+                           delivery_pivot.item_group_desc,
+                           delivery_pivot.season,
+                           delivery_pivot.display_size,
+                           delivery_pivot.case_size,
+                           deliveries,
+                           credit,
+                           sales_pivot_AY.item_group_desc,
+                           sales_pivot_current_season.item_group_desc,
+                           sales_pivot_previous_season.item_group_desc
+    
+    
+                    order by delivery_pivot.store asc, item_group_desc asc),
+    
+    
+                    bandaids as (
+                
+                    select store_id, item_group_desc, sum(qty) as bandaid 
+                    from bandaids
+                    where store_type = '{self.store_type_input}'
+                    group by store_id, item_group_desc
+                    
+                )
+                    
+    
+    
+            select
+                   store,
+                   combine_sd.item_group_desc,
+                   display_size,
+                   season,
+                   case_size,
+                   deliveries,
+                   credit,
+                   
+                   coalesce(sales_pivot_previous_season.sales,0) 
+                            + coalesce(sales_pivot_current_season.sales,0) 
+                            + coalesce(sales_pivot_ay.sales,0
+                            ) as total_sales,
+                            
+                   coalesce(bandaid,0) as bandaid,
+                   
+                   /*Calculating the on hands: OH = Delivery - Sales + Bandaids*/
                     (
-
-                        (
-                            season = 'AY'
-                            and type = 'Credit Memo'
-                            and (category != 'Accessory' and category != 'GM' and category != 'Scrub' and category != 'Rack')
-                        )
-
-                         or
-
-                        /*filtering out the current seasonal items */
-                        (
-                            season = '{season1}'
-                            and type = 'Credit Memo'
-                            and (category != 'Accessory' and category != 'GM' and category != 'Scrub' and category != 'Rack')
-                            and transition_year = {transition_year1}
-                            and transition_season = '{transition_season1}'
-                        )
-
-                        or
+                        /* The Delivery Variable in the equation composes of deliveries(aka invoices) and credit (aka credit memos)*/
+                        deliveries 
+                        + credit 
                         
-                        /*this next section is only applicable if using rolling transition. will filter all of the prev seasonal items*/
-                        (
-                            season = '{season2}'
-                            and type = 'Credit Memo'
-                            and (category != 'Accessory' and category != 'GM' and category != 'Scrub' and category != 'Rack')
-                            and transition_year = {transition_year2}
-                            and transition_season = '{transition_season2}'
-                        )
-
-                      )
-
-                group by store, item_group_desc,display_size,season, case_size
-                order by store),
-
-            deliv_pivot_invoice as (
-
-
-                SELECT store,
-                    item_group_desc,
-                    sum(qty) AS deliveries,
-                    display_size,
-                    season,
-                    case_size
-
-                FROM delivery_table
-
-                where
-                        /*this next line tracks AY items will need to use python to dynamically track 2 years worth only*/
-                    (
-
-                        (
-                            season = 'AY'
-                            and (type = 'Invoice' or type = 'BandAid' or type = 'Reset')
-                            and (category != 'Accessory' and category != 'GM' and category != 'Scrub' and category != 'Rack')
-                        )
-
-                         or
-
-                        /*this next line should be dynamic using python keep in mind that rolling transition will include SS and FW items */
-                        (
-                            season = '{season1}'
-                            and (type = 'Invoice' or type = 'BandAid' or type = 'Reset')
-                            and (category != 'Accessory' and category != 'GM' and category != 'Scrub' and category != 'Rack')
-                            and transition_year = {transition_year1}
-                            and transition_season = '{transition_season1}'
-                        )
+                        /* The Sales Variable in the equation is composed of Sales for AY, Sales from the currents season, and Sales from the previous season*/
+                        - coalesce(sales_pivot_current_season.sales,0) 
+                        - coalesce(sales_pivot_ay.sales,0)
+                        - coalesce(sales_pivot_previous_season.sales,0)
                         
-                        or
+                        /*Bandaid section will only concist of AY items*/
+    
+                        + coalesce(bandaid,0)
                         
-                        (
-                            season = '{season2}'
-                            and (type = 'Invoice' or type = 'BandAid' or type = 'Reset')
-                            and (category != 'Accessory' and category != 'GM' and category != 'Scrub' and category != 'Rack')
-                            and transition_year = {transition_year2}
-                            and transition_season = '{transition_season2}'
-                        )
-
-                      )
-
-                group by store, item_group_desc,display_size,season, case_size
-                order by store),
-
-            delivery_pivot as (
-
-                select deliv_pivot_invoice.store,
-
-                        deliv_pivot_invoice.item_group_desc,
-                        deliveries,
-                        COALESCE(credit,0) as credit,
-                        deliv_pivot_invoice.display_size,
-                        deliv_pivot_invoice.season,
-                        deliv_pivot_invoice.case_size
-                from deliv_pivot_invoice
-                full join deliv_pivot_credit on deliv_pivot_invoice.item_group_desc = deliv_pivot_credit.item_group_desc AND
-                            deliv_pivot_invoice.store = deliv_pivot_credit.store),
-
-            sales_table as (
-
-                SELECT sales2.id,
-                    sales2.transition_year,
-                    sales2.transition_season,
-                    sales2.store_year,
-                    sales2.store_week,
-                    sales2.store_number,
-                    sales2.upc AS upc_11_digit,
-                    sales2.sales,
-                    sales2.qty,
-                    sales2.current_year,
-                    sales2.store_type,
-                    item_support2.season,
-                    item_support2.category,
-                    item_support2.upc,
-                    item_support2.display_size,
-                    item_support2.case_size,
-                    item_support2.item_group_desc
-                FROM {self.store_type_input}.sales2
-                inner JOIN item_support2 ON {self.store_type_input}.sales2.code = item_support2.code
-                where date >= '01-01-{min_year}'),
-
-            sales_pivot_AY as (
-
-                SELECT store_number,
-                        item_group_desc,
-                        sum(qty) AS sales
-
-                from sales_table
-                where season = 'AY' and (category != 'Accessory' and category != 'GM' and category != 'Rack')
-                GROUP BY store_number,item_group_desc
-                ORDER BY store_number, item_group_desc),
-
-            /*sales for the current season*/
-            sales_pivot_current_season as (
-                SELECT store_number,
-                        item_group_desc,
-                        sum(qty) AS sales
-                FROM sales_table
-                where season = '{season1}' and (category != 'Accessory' and category != 'GM' and category != 'Rack') and transition_year = {transition_year1} and transition_season = '{transition_season1}'
-                GROUP BY store_number, item_group_desc
-                ORDER BY store_number),
-
-            /*sales for the previous season*/
-            sales_pivot_previous_season as (
-
-                SELECT store_number,
-                        item_group_desc,
-                        sum(qty) AS sales
-                FROM sales_table
-                where season = '{sales_season2}' and (category != 'Accessory' and category != 'GM' and category != 'Rack') and transition_year = {transition_year2} and transition_season = '{transition_season2}'
-                GROUP BY store_number, item_group_desc
-                ORDER BY store_number),
-
-            combine_sd as (
-
-                /*combines all of the sales tables and then joins it to the delivery  table*/
-
-                select delivery_pivot.store,
-                       delivery_pivot.item_group_desc,
-                       delivery_pivot.season,
-                       delivery_pivot.display_size,
-                       delivery_pivot.case_size,
-                       deliveries,
-                       credit,
-                       sales_pivot_AY.item_group_desc as AY_Desc,
-                       sales_pivot_current_season.item_group_desc as FW_Desc,
-                       sales_pivot_previous_season.item_group_desc as SS_Desc
-
-                from delivery_pivot
-                full join sales_pivot_current_season on sales_pivot_current_season.store_number = delivery_pivot.store and
-                           sales_pivot_current_season.item_group_desc = delivery_pivot.item_group_desc
-                full join sales_pivot_ay on sales_pivot_ay.store_number = delivery_pivot.store and
-                           sales_pivot_ay.item_group_desc = delivery_pivot.item_group_desc
-                full join sales_pivot_previous_season on sales_pivot_previous_season.store_number = delivery_pivot.store and
-                           sales_pivot_previous_season.item_group_desc = delivery_pivot.item_group_desc
-
-                group by
-                        delivery_pivot.store,
-                       delivery_pivot.item_group_desc,
-                       delivery_pivot.season,
-                       delivery_pivot.display_size,
-                       delivery_pivot.case_size,
-                       deliveries,
-                       credit,
-                       sales_pivot_AY.item_group_desc,
-                       sales_pivot_current_season.item_group_desc,
-                       sales_pivot_previous_season.item_group_desc
-
-
-                order by delivery_pivot.store asc, item_group_desc asc),
-
-
-       			bandaids as (
-			
-				select store_id, item_group_desc, sum(qty) as bandaid 
-				from {self.store_type_input}.bandaids
-				group by store_id, item_group_desc
-				
-			)
-				
-
-
-        select
-               store,
-               combine_sd.item_group_desc,
-               display_size,
-               season,
-               case_size,
-               deliveries,
-               credit,
-               
-               coalesce(sales_pivot_previous_season.sales,0) 
-                        + coalesce(sales_pivot_current_season.sales,0) 
-                        + coalesce(sales_pivot_ay.sales,0
-                        ) as total_sales,
+                    ) as on_hand,
+                   
+                   
+                   case
+                        when (
+                                deliveries 
+                              + credit 
+                              - coalesce(sales_pivot_current_season.sales,0) 
+                              - coalesce(sales_pivot_ay.sales,0)
+                              - coalesce(sales_pivot_previous_season.sales,0)
+                              + coalesce(bandaid,0)
                         
-			   coalesce(bandaid,0) as bandaid,
-			   
-			   /*Calculating the on hands: OH = Delivery - Sales + Bandaids*/
-	   			(
-					/* The Delivery Variable in the equation composes of deliveries(aka invoices) and credit (aka credit memos)*/
-					deliveries 
-					+ credit 
-					
-					/* The Sales Variable in the equation is composed of Sales for AY, Sales from the currents season, and Sales from the previous season*/
-					- coalesce(sales_pivot_current_season.sales,0) 
-					- coalesce(sales_pivot_ay.sales,0)
-					- coalesce(sales_pivot_previous_season.sales,0)
-					
-					/*Bandaid section will only concist of AY items*/
-
-					+ coalesce(bandaid,0)
-					
-				) as on_hand,
-			   
-			   
-               case
-                    when (
-						    deliveries 
-						  + credit 
-						  - coalesce(sales_pivot_current_season.sales,0) 
-						  - coalesce(sales_pivot_ay.sales,0)
-						  - coalesce(sales_pivot_previous_season.sales,0)
-						  + coalesce(bandaid,0)
-					
-						  ) <= 0
-						 
-                        then 0
-						 
-                    when (
-						
-						  deliveries 
-						+ credit 
-						- coalesce(sales_pivot_current_season.sales,0) 
-						- coalesce(sales_pivot_ay.sales,0)
-						- coalesce(sales_pivot_previous_season.sales,0)
-						+ coalesce(bandaid,0)
-					
-					    ) > 0
-						
+                              ) <= 0
+                             
+                            then 0
+                             
+                        when (
+                            
+                              deliveries 
+                            + credit 
+                            - coalesce(sales_pivot_current_season.sales,0) 
+                            - coalesce(sales_pivot_ay.sales,0)
+                            - coalesce(sales_pivot_previous_season.sales,0)
+                            + coalesce(bandaid,0)
                         
-						then round(
-                                    (
+                            ) > 0
+                            
+                            
+                            then round(
                                         (
-                                            deliveries 
-                                            + credit 
-                                            - coalesce(sales_pivot_current_season.sales,0) 
-                                            - coalesce(sales_pivot_ay.sales,0)
-                                            - coalesce(sales_pivot_previous_season.sales,0)
-                                            + coalesce(bandaid,0)
-
-                                        )/case_size
-                                    ),2
-                                   )
-                    end as case_qty
-					
-        from combine_sd
-        full join sales_pivot_current_season on sales_pivot_current_season.store_number = combine_sd.store and
-                   sales_pivot_current_season.item_group_desc = combine_sd.item_group_desc
-        full join sales_pivot_ay on sales_pivot_ay.store_number = combine_sd.store and
-                   sales_pivot_ay.item_group_desc = combine_sd.item_group_desc
-        full join sales_pivot_previous_season on sales_pivot_previous_season.store_number = combine_sd.store and
-                   sales_pivot_previous_season.item_group_desc = combine_sd.item_group_desc
-	   	full join bandaids on bandaids.store_id = combine_sd.store and
-                   bandaids.item_group_desc = combine_sd.item_group_desc
-
-        order by store asc, item_group_desc asc
-
-        """, self.connection)
+                                            (
+                                                deliveries 
+                                                + credit 
+                                                - coalesce(sales_pivot_current_season.sales,0) 
+                                                - coalesce(sales_pivot_ay.sales,0)
+                                                - coalesce(sales_pivot_previous_season.sales,0)
+                                                + coalesce(bandaid,0)
+    
+                                            )/case_size
+                                        ),2
+                                       )
+                        end as case_qty
+                        
+            from combine_sd
+            full join sales_pivot_current_season on sales_pivot_current_season.store_number = combine_sd.store and
+                       sales_pivot_current_season.item_group_desc = combine_sd.item_group_desc
+            full join sales_pivot_ay on sales_pivot_ay.store_number = combine_sd.store and
+                       sales_pivot_ay.item_group_desc = combine_sd.item_group_desc
+            full join sales_pivot_previous_season on sales_pivot_previous_season.store_number = combine_sd.store and
+                       sales_pivot_previous_season.item_group_desc = combine_sd.item_group_desc
+            full join bandaids on bandaids.store_id = combine_sd.store and
+                       bandaids.item_group_desc = combine_sd.item_group_desc
+    
+            order by store asc, item_group_desc asc
+    
+            """, connection)
 
         on_hand = on_hand.dropna()
         on_hand = on_hand.sort_values(by=['store', 'display_size', 'case_qty'])
@@ -1015,158 +1060,171 @@ class ReportsData:
 
         # no scans for in_season
 
-        if in_season == 1:
+        with DbConfig.EnginePoolDB() as connection:
 
-            # no scans for in_season
+            if in_season == 1:
 
-            max_date = psql.read_sql(f'select max(date) from {self.store_type_input}.delivery2', self.connection)
-            max_date = max_date.iloc[0, 0]
-            min_date = max_date - timedelta(days=21)
+                # no scans for in_season
 
-            recently_shipped = psql.read_sql(f"""
+                max_date = psql.read_sql(f"""
+                
+                select max(date) from delivery
+                where store_type = '{self.store_type_input}'
+                
+                """, connection)
 
-                select distinct(item_group_desc), store
-                from {self.store_type_input}.delivery2
-                inner join item_support2 on {self.store_type_input}.delivery2.code = item_support2.code
-                where date <= '{max_date}' and date >= '{min_date}'
-                order by store
-                """, self.connection)
+                max_date = max_date.iloc[0, 0]
+                min_date = max_date - timedelta(days=21)
 
-            # finds the items that are on the 0 sales df list and the recently shipped list
-            recently_shipped = recently_shipped[['store', 'item_group_desc']]
-            int_df = pd.merge(on_hands, recently_shipped, how='inner', on=['store', 'item_group_desc'])
+                recently_shipped = psql.read_sql(f"""
+    
+                    select distinct(item_group_desc), store
+                    from delivery
+                    inner join item_support2 on delivery.code = item_support2.code
+                    where date <= '{max_date}' and 
+                          date >= '{min_date}' and
+                          store_type = '{self.store_type_input}'
+                    order by store
+                    """, connection)
 
-            on_hands = on_hands.set_index(['store', 'item_group_desc'])
+                # finds the items that are on the 0 sales df list and the recently shipped list
+                recently_shipped = recently_shipped[['store', 'item_group_desc']]
+                int_df = pd.merge(on_hands, recently_shipped, how='inner', on=['store', 'item_group_desc'])
 
-            # deltes recently shipped items off of the 0 sales list
-            i = 0
-            while i < len(int_df):
-                store = int_df.loc[i, 'store']
-                item_group_desc = int_df.loc[i, 'item_group_desc']
-                on_hands = on_hands.drop((store, item_group_desc))
-                i += 1
-            on_hands = on_hands.reset_index()
+                on_hands = on_hands.set_index(['store', 'item_group_desc'])
 
-            on_hands = on_hands[['store', 'item_group_desc']]
+                # deltes recently shipped items off of the 0 sales list
+                i = 0
+                while i < len(int_df):
+                    store = int_df.loc[i, 'store']
+                    item_group_desc = int_df.loc[i, 'item_group_desc']
+                    on_hands = on_hands.drop((store, item_group_desc))
+                    i += 1
+                on_hands = on_hands.reset_index()
 
-            i = 0
-            while i < len(on_hands):
-                store = on_hands.loc[i, 'store']
-                item_group_desc = on_hands.loc[i, 'item_group_desc']
+                on_hands = on_hands[['store', 'item_group_desc']]
 
-                last_date_shipped = psql.read_sql(f"""
+                i = 0
+                while i < len(on_hands):
+                    store = on_hands.loc[i, 'store']
+                    item_group_desc = on_hands.loc[i, 'item_group_desc']
 
-                    select max(date)
-                    from {self.store_type_input}.delivery2
-                    inner join item_support2 on {self.store_type_input}.delivery2.code = item_support2.code
-                    WHERE store = {store} and item_group_desc = '{item_group_desc}'
-                    """, self.connection)
+                    last_date_shipped = psql.read_sql(f"""
+    
+                        select max(date)
+                        from delivery
+                        inner join item_support2 on delivery.code = item_support2.code
+                        
+                        WHERE store = {store} and 
+                              item_group_desc = '{item_group_desc}' and
+                              store_type = '{self.store_type_input}'
+                              
+                        """, connection)
 
-                last_date_shipped = last_date_shipped.iloc[0, 0]
+                    last_date_shipped = last_date_shipped.iloc[0, 0]
 
-                on_hands.loc[i, 'last shipped'] = last_date_shipped
+                    on_hands.loc[i, 'last shipped'] = last_date_shipped
 
-                i += 1
+                    i += 1
 
-            today = date.today()
-            on_hands['weeks age'] = (today - on_hands['last shipped'])
-            on_hands['weeks age'] = (on_hands['weeks age'] / np.timedelta64(1, 'D')).astype(int)
-            on_hands['weeks age'] = (round(on_hands['weeks age'] / 7)).astype(int)
+                today = date.today()
+                on_hands['weeks age'] = (today - on_hands['last shipped'])
+                on_hands['weeks age'] = (on_hands['weeks age'] / np.timedelta64(1, 'D')).astype(int)
+                on_hands['weeks age'] = (round(on_hands['weeks age'] / 7)).astype(int)
 
-        # no scans for initial display
-        elif initial_display == 1:
+            # no scans for initial display
+            elif initial_display == 1:
 
-            # if statement below is determing the different combinations for seasons
+                # if statement below is determing the different combinations for seasons
 
-            if scan_ay == 1:
+                if scan_ay == 1:
 
-                if scan_fw == 1:  # ay = 1, fw=1
+                    if scan_fw == 1:  # ay = 1, fw=1
 
-                    if scan_ss == 1:  # ay1 fw1 ss1
-                        season = (on_hands['season'] == 'AY') | (on_hands['season'] == 'SS') | (
-                                    on_hands['season'] == 'FW')
+                        if scan_ss == 1:  # ay1 fw1 ss1
+                            season = (on_hands['season'] == 'AY') | (on_hands['season'] == 'SS') | (
+                                        on_hands['season'] == 'FW')
 
-                    else:  # ay1 fw1 ss0
-                        season = (on_hands['season'] == 'AY') | (on_hands['season'] == 'FW')
+                        else:  # ay1 fw1 ss0
+                            season = (on_hands['season'] == 'AY') | (on_hands['season'] == 'FW')
 
-                else:  # ay = 1, fw = 0
+                    else:  # ay = 1, fw = 0
 
-                    if scan_ss == 1:  # ay1 fw0 ss1
-                        season = (on_hands['season'] == 'AY') | (on_hands['season'] == 'SS')
+                        if scan_ss == 1:  # ay1 fw0 ss1
+                            season = (on_hands['season'] == 'AY') | (on_hands['season'] == 'SS')
 
-                    else:  # ay1 fw0 ss0
-                        season = (on_hands['season'] == 'AY')
+                        else:  # ay1 fw0 ss0
+                            season = (on_hands['season'] == 'AY')
 
-            else:  # ay= 0
+                else:  # ay= 0
 
-                if scan_fw == 1:  # ay0 fw1
+                    if scan_fw == 1:  # ay0 fw1
 
-                    if scan_ss == 1:  # ay0 fw1 ss1
-                        season = (on_hands['season'] == 'SS') | (on_hands['season'] == 'FW')
+                        if scan_ss == 1:  # ay0 fw1 ss1
+                            season = (on_hands['season'] == 'SS') | (on_hands['season'] == 'FW')
 
-                    else:  # ay0 fw1 ss0
-                        season = (on_hands['season'] == 'FW')
+                        else:  # ay0 fw1 ss0
+                            season = (on_hands['season'] == 'FW')
 
-                else:  # ay = 0, fw = 0
+                    else:  # ay = 0, fw = 0
 
-                    if scan_ss == 1:  # ay0 fw0 ss1
-                        season = (on_hands['season'] == 'SS')
+                        if scan_ss == 1:  # ay0 fw0 ss1
+                            season = (on_hands['season'] == 'SS')
 
-                    else:  # ay0 fw0 ss0
+                        else:  # ay0 fw0 ss0
 
-                        print("\n\n\nALL SEASONS ON NO SCAN SETTINGS ARE SET TO 0\n\n\n")
+                            print("\n\n\nALL SEASONS ON NO SCAN SETTINGS ARE SET TO 0\n\n\n")
 
-            # determining different combinations for display size
+                # determining different combinations for display size
 
-            if scan_tops == 1:
+                if scan_tops == 1:
 
-                if scan_dress == 1:  # top1 dress1
+                    if scan_dress == 1:  # top1 dress1
 
-                    if scan_carded == 1:  # top1 dress1 carded1
+                        if scan_carded == 1:  # top1 dress1 carded1
 
-                        display_size = (on_hands['display_size'] == 'Carded') | (
-                                    on_hands['display_size'] == 'Long Hanging Dress') | (
-                                                   on_hands['display_size'] == 'Long Hanging Top')
+                            display_size = (on_hands['display_size'] == 'Carded') | (
+                                        on_hands['display_size'] == 'Long Hanging Dress') | (
+                                                       on_hands['display_size'] == 'Long Hanging Top')
 
-                    else:  # top1 dress1 carded0
+                        else:  # top1 dress1 carded0
 
-                        display_size = (on_hands['display_size'] == 'Long Hanging Dress') | (
-                                    on_hands['display_size'] == 'Long Hanging Top')
+                            display_size = (on_hands['display_size'] == 'Long Hanging Dress') | (
+                                        on_hands['display_size'] == 'Long Hanging Top')
 
-                else:  # top1 dress0
+                    else:  # top1 dress0
 
-                    if scan_carded == 1:  # top1 dress0  carded 1
+                        if scan_carded == 1:  # top1 dress0  carded 1
 
-                        display_size = (on_hands['display_size'] == 'Carded') | (
-                                    on_hands['display_size'] == 'Long Hanging Top')
+                            display_size = (on_hands['display_size'] == 'Carded') | (
+                                        on_hands['display_size'] == 'Long Hanging Top')
 
-                    else:  # top1 dress0  carded 0
+                        else:  # top1 dress0  carded 0
 
-                        display_size = (on_hands['display_size'] == 'Long Hanging Top')
+                            display_size = (on_hands['display_size'] == 'Long Hanging Top')
 
-            else:
+                else:
 
-                if scan_dress == 1:  # top0 dress1
+                    if scan_dress == 1:  # top0 dress1
 
-                    if scan_carded == 1:  # top0 dress1 carded1
+                        if scan_carded == 1:  # top0 dress1 carded1
 
-                        display_size = (on_hands['display_size'] == 'Carded') | (
-                                    on_hands['display_size'] == 'Long Hanging Dress')
+                            display_size = (on_hands['display_size'] == 'Carded') | (
+                                        on_hands['display_size'] == 'Long Hanging Dress')
 
-                    else:  # top0 dress1 carded0
+                        else:  # top0 dress1 carded0
 
-                        display_size = (on_hands['display_size'] == 'Long Hanging Dress')
+                            display_size = (on_hands['display_size'] == 'Long Hanging Dress')
 
-                else:  # top0 dress0
+                    else:  # top0 dress0
 
-                    if scan_carded == 1:  # top0 dress0  carded 1
+                        if scan_carded == 1:  # top0 dress0  carded 1
 
-                        display_size = (on_hands['display_size'] == 'Carded')
+                            display_size = (on_hands['display_size'] == 'Carded')
 
-                    else:  # top0 dress0  carded 0
+                        else:  # top0 dress0  carded 0
 
-                        print('\n\n\nNO DISPLAY SIZE SELECTED. SET SETTING IN STORE SETTINGS FILE\n\n\n')
-
+                            print('\n\n\nNO DISPLAY SIZE SELECTED. SET SETTING IN STORE SETTINGS FILE\n\n\n')
 
         if initial_display == 1:
 
@@ -1188,42 +1246,45 @@ class ReportsData:
             # this would show that they have not sold at least one of the items from any of the cases taht have been shipped
             on_hands = on_hands[on_hands['total_sales'] == 0]
 
-
         return on_hands
 
     def item_approval(self):
 
-        item_approval = f"""
-        
-        select season, category, style, 
-                display_size, item_group_desc, 
-                on_hand as inventory_on_hand,
-                round((on_hand/item_support2.case_size),0) as num_of_cases,
-                store_price from {self.store_type_input}.item_approval
+        with DbConfig.EnginePoolDB() as connection:
 
-        inner join item_support2 on item_approval.code = item_support2.code
-        inner join inventory on item_approval.code = inventory.code
-        where store_price < 999
-        order by display_size, on_hand desc
-        
-        """
+            item_approval = f"""
+            
+            select season, category, style, 
+                    display_size, item_group_desc, 
+                    on_hand as inventory_on_hand,
+                    round((on_hand/item_support2.case_size),0) as num_of_cases,
+                    store_price from item_approval
+    
+            inner join item_support2 on item_approval.code = item_support2.code
+            inner join inventory on item_approval.code = inventory.code
+            where store_price < 999 and store_type = '{self.store_type_input}'
+            order by display_size, on_hand desc
+            
+            """
 
-        item_approval = psql.read_sql(f'{item_approval}', self.connection)
+            item_approval = psql.read_sql(f'{item_approval}', connection)
 
         return item_approval
 
     def store_sales_rank(self):
 
-        store_sales_rank = f"""
-        
-        select store_number, round(sum(sales),0) as YTD_Sales from {self.store_type_input}.sales2
-        where current_year = {self.store_year}
-        group by store_number
-        order by sum(sales) desc
+        with DbConfig.EnginePoolDB() as connection:
 
-        """
+            store_sales_rank = f"""
+            
+            select store_number, round(sum(sales),0) as YTD_Sales from sales
+            where current_year = {self.store_year} and store_type = '{self.store_type_input}'
+            group by store_number
+            order by sum(sales) desc
+    
+            """
 
-        store_sales_rank = psql.read_sql(f'{store_sales_rank}', self.connection)
+            store_sales_rank = psql.read_sql(f'{store_sales_rank}', connection)
 
         return  store_sales_rank
 
@@ -1235,14 +1296,17 @@ class ReportsData:
                 cd_ay,cd_sn,lht_ay, 
                 lht_sn,lhd_ay, lhd_sn,
                 lhp_ay, lhp_sn, total_cases, notes
-        from {self.store_type_input}.store_program
-        inner join master_planogram on {self.store_type_input}.store_program.program_id = master_planogram.program_id
-        inner join {self.store_type_input}.store on {self.store_type_input}.store_program.store_id = {self.store_type_input}.store.store_id
-        order by {self.store_type_input}.store_program.store_id
+        from store_program
+        inner join master_planogram on .store_program.program_id = master_planogram.program_id
+        inner join store_info on store_program.store_id = store_info.store_id
+        where store_type = '{self.store_type_input}'
+        order by store_program.store_id
         
         """
 
-        store_program = psql.read_sql(f'{store_program}', self.connection)
+        with DbConfig.EnginePoolDB() as connection:
+
+            store_program = psql.read_sql(f'{store_program}', connection)
 
         store_program = store_program.groupby(['store_id','notes']).sum()
 
@@ -1256,27 +1320,33 @@ class ReportsData:
 
         store_program['programs'] = 0
 
-        while i < len(store_program):
+        with DbConfig.EnginePoolDB() as connection:
 
-            store = store_program.loc[i, 'store_id']
+            while i < len(store_program):
 
-            programs = psql.read_sql(f'select * from {self.store_type_input}.store_program where store_id = {store}', self.connection)
+                store = store_program.loc[i, 'store_id']
 
-            programs = programs[['program_id']]
+                programs = psql.read_sql(f"""
+                
+                select * from store_program where store_id = {store} and store_type = '{self.store_type_input}
+                
+                """, connection)
 
-            programs = programs.squeeze()
+                programs = programs[['program_id']]
 
-            try:
+                programs = programs.squeeze()
 
-                programs = programs.str.cat(sep=', ')
+                try:
 
-            except:
+                    programs = programs.str.cat(sep=', ')
 
-                pass
+                except:
 
-            store_program.loc[i, 'programs'] = programs
+                    pass
 
-            i += 1
+                store_program.loc[i, 'programs'] = programs
+
+                i += 1
 
         return store_program
 
@@ -1300,14 +1370,16 @@ class ReportsData:
 
                 # grab the last date the item was sold
 
-                date = psql.read_sql(f'''
+                date = psql.read_sql(f"""
     
-                select store_year, date from {self.store_type_input}.sales2
-                inner join item_support2 on {self.store_type_input}.sales2.code = item_support2.code
-                where store_number = {store} and item_group_desc = '{item_group_desc}'
+                select store_year, date from sales
+                inner join item_support2 on sales.code = item_support2.code
+                where store_number = {store} and 
+                      item_group_desc = '{item_group_desc}' and 
+                      store_type = '{self.store_type_input}'
                 order by date desc
     
-                ''', connection)
+                """, connection)
 
                 try:
 
@@ -1326,9 +1398,11 @@ class ReportsData:
 
                 date = psql.read_sql(f'''
     
-                select store, date, item_group_desc from {self.store_type_input}.delivery2
-                inner join item_support2 on {self.store_type_input}.delivery2.code = item_support2.code
-                where store = {store} and item_group_desc = '{item_group_desc}'
+                select store, date, item_group_desc from delivery
+                inner join item_support2 on delivery.code = item_support2.code
+                where store = {store} and 
+                      item_group_desc = '{item_group_desc}' and
+                      store_type = '{self.store_type_input}'
                 order by date desc
     
     
@@ -1385,26 +1459,27 @@ class ReportsData:
                    sales_table as (
 
 
-                       SELECT distinct sales2.id,
-                           sales2.transition_year,
-                           sales2.transition_season,
-                           sales2.store_year,
-                           sales2.store_week,
-                           sales2.store_number,
-                           sales2.upc AS upc_11_digit,
-                           sales2.sales,
-                           sales2.qty,
-                           sales2.current_year,
-                           sales2.current_week,
-                           sales2.store_type,
+                       SELECT distinct sales.id,
+                           sales.transition_year,
+                           sales.transition_season,
+                           sales.store_year,
+                           sales.store_week,
+                           sales.store_number,
+                           sales.upc AS upc_11_digit,
+                           sales.sales,
+                           sales.qty,
+                           sales.current_year,
+                           sales.current_week,
+                           sales.store_type,
                            item_support2.season,
                            item_support2.category,
                            item_support2.upc,
                            item_support2.display_size,
                            item_support2.case_size,
                            item_support2.item_group_desc
-                       FROM {self.store_type_input}.sales2
-                       inner JOIN item_support2 ON sales2.code = item_support2.code),
+                       FROM sales
+                       inner JOIN item_support2 ON sales.code = item_support2.code
+                       where store_type = '{self.store_type_input}'),
 
                    date as (
 
@@ -1530,7 +1605,9 @@ class ReportsData:
 
                """
 
-        sales_report = psql.read_sql(f'{sales_sql}', self.connection)
+        with DbConfig.EnginePoolDB() as connection:
+
+            sales_report = psql.read_sql(f'{sales_sql}', connection)
 
         return sales_report
 
@@ -1545,26 +1622,27 @@ class ReportsData:
             sales_table as (
 
 
-                SELECT distinct sales2.id,
-                    sales2.transition_year,
-                    sales2.transition_season,
-                    sales2.store_year,
-                    sales2.store_week,
-                    sales2.store_number,
-                    sales2.upc AS upc_11_digit,
-                    sales2.sales,
-                    sales2.qty,
-                    sales2.current_year,
-                    sales2.current_week,
-                    sales2.store_type,
+                SELECT distinct sales.id,
+                    sales.transition_year,
+                    sales.transition_season,
+                    sales.store_year,
+                    sales.store_week,
+                    sales.store_number,
+                    sales.upc AS upc_11_digit,
+                    sales.sales,
+                    sales.qty,
+                    sales.current_year,
+                    sales.current_week,
+                    sales.store_type,
                     item_support2.season,
                     item_support2.category,
                     item_support2.upc,
                     item_support2.display_size,
                     item_support2.case_size,
                     item_support2.item_group_desc
-                FROM {self.store_type_input}.sales2
-                inner JOIN item_support2 ON sales2.code = item_support2.code),
+                FROM sales
+                inner JOIN item_support2 ON sales.code = item_support2.code
+                where store_type = '{self.store_type_input}'),
 
             year_total as(
                         Select sum(sales) as year_sales, sum(qty) as year_total_unit
@@ -1591,61 +1669,65 @@ class ReportsData:
         # this SQL statement prduces a query that shows all of the items that was sold for a given year.
         # Provides a table with item group desc, season, sum sales, sum qty, % of total sales
 
+        with DbConfig.EnginePoolDB() as connection:
 
-        rank = psql.read_sql(f'{item_sales_rank}', self.connection)
+            rank = psql.read_sql(f'{item_sales_rank}', connection)
 
         i = 0
 
         # using the previous query, python selects the item group desc and finds how many stores carried that particular item during
         # that time. Columns will consist of item_group_desc,sales,units_sold,percent_of_total_sales,season,active,stores,sales per active store
 
-        while i < len(rank):
-            item = rank.loc[i, 'item_group_desc']
+        with DbConfig.EnginePoolDB() as connection:
 
-            store_count = f"""
+            while i < len(rank):
+                item = rank.loc[i, 'item_group_desc']
 
-            with
+                store_count = f"""
+    
+                with
+    
+                sales_table as (
+    
+    
+                    SELECT distinct sales.id,
+                        sales.transition_year,
+                        sales.transition_season,
+                        sales.store_year,
+                        sales.store_week,
+                        sales.store_number,
+                        sales.upc AS upc_11_digit,
+                        sales.sales,
+                        sales.qty,
+                        sales.current_year,
+                        sales.current_week,
+                        sales.store_type,
+                        item_support2.season,
+                        item_support2.category,
+                        item_support2.upc,
+                        item_support2.display_size,
+                        item_support2.case_size,
+                        item_support2.item_group_desc
+                    FROM sales
+                    inner JOIN item_support2 ON sales.code = item_support2.code
+                    where store_type = '{self.store_type_input}'),
+    
+    
+                    store_with_item as (
+    
+                    select * from sales_table where item_group_desc = '{item}' and store_year = {self.store_year})
+    
+                select count(distinct(store_number)) from store_with_item
+    
+                """
 
-            sales_table as (
+                store_count = psql.read_sql(f'{store_count}', connection)
 
+                store_count = store_count.iloc[0, 0]
 
-                SELECT distinct sales2.id,
-                    sales2.transition_year,
-                    sales2.transition_season,
-                    sales2.store_year,
-                    sales2.store_week,
-                    sales2.store_number,
-                    sales2.upc AS upc_11_digit,
-                    sales2.sales,
-                    sales2.qty,
-                    sales2.current_year,
-                    sales2.current_week,
-                    sales2.store_type,
-                    item_support2.season,
-                    item_support2.category,
-                    item_support2.upc,
-                    item_support2.display_size,
-                    item_support2.case_size,
-                    item_support2.item_group_desc
-                FROM {self.store_type_input}.sales2
-                inner JOIN item_support2 ON sales2.code = item_support2.code),
+                rank.loc[i, 'active stores'] = store_count
 
-
-                store_with_item as (
-
-                select * from sales_table where item_group_desc = '{item}' and store_year = {self.store_year})
-
-            select count(distinct(store_number)) from store_with_item
-
-            """
-
-            store_count = psql.read_sql(f'{store_count}', self.connection)
-
-            store_count = store_count.iloc[0, 0]
-
-            rank.loc[i, 'active stores'] = store_count
-
-            i += 1
+                i += 1
 
         rank['units sold per active store'] = round(rank['units_sold'] / rank['active stores'], 2)
 
@@ -1680,24 +1762,30 @@ class ReportsData:
                     with
                         ytd_sales as (
                                 select store_number, round(sum(sales)) as ytd_dollar, sum(qty) as ytd_qty
-                                from {self.store_type_input}.sales2
-                                where store_year = {self.store_year}
+                                from sales
+                                where store_year = {self.store_year} and store_type = '{self.store_type_input}'
                                 group by store_number
                                 order by store_number
                                 ),
     
                         current_wk_sales as (
                                 select store_number,  round(sum(sales)) as current_wk_sales
-                                from {self.store_type_input}.sales2
-                                where store_year = {self.store_year} and store_week = {self.week_num}
+                                from sales
+                                where store_year = {self.store_year} and 
+                                      store_week = {self.week_num} and 
+                                      store_type = '{self.store_type_input}'
                                 group by store_number
                                 order by store_number
                                 ),
     
                         prev_wk_sales as (
                                 select store_number, round(sum(sales)) as prev_wk_sales
-                                from {self.store_type_input}.sales2
-                                where store_year = {self.store_year} and store_week = {self.week_num}-1
+                                from sales2
+                                
+                                where store_year = {self.store_year} and 
+                                      store_week = {self.week_num}-1 and
+                                      store_type = '{self.store_type_input}'
+                                      
                                 group by store_number
                                 order by store_number
                         )
@@ -1832,7 +1920,7 @@ class ReportsData:
                             
                 select kroger_period, round(sum(sales)) as sales, sum(qty) as qty_sold from grocery_sales
                 inner join kroger_periods on grocery_sales.store_week = kroger_periods.store_week
-                where store_year={self.store_year}
+                where store_year={self.store_year} and store_type = '{self.store_type_input}'
                 group by kroger_period
                 order by kroger_period
             
@@ -1972,7 +2060,7 @@ class ReportsData:
 
 
 
-# store_type_input = 'kroger_cincinatti'
+# store_type_input = 'texas_division'
 #
 # store_setting = pd.read_excel(
 #     rf'C:\Users\User1\OneDrive - winwinproducts.com\Groccery Store Program\{store_type_input}\{store_type_input}_store_setting.xlsm',
@@ -1988,6 +2076,6 @@ class ReportsData:
 # a.to_excel('sales-qty.xlsx')
 # b.to_excel('item-qty.xlsx')
 
-
+#
 # ghost=test.ghost_inventory()
 # ghost.to_excel('dallas_ghost.xlsx')
