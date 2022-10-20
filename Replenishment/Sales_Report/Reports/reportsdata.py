@@ -213,7 +213,7 @@ class ReportsData:
                 date.store_number,
                 current_week.sales as current_week,
                 previous_week.sales as previous_week,
-                /*WOW sales % */
+                /*WOW sales percent */
                 case
                     when current_week.sales < 0 or previous_week.sales <= 0
                         then NULL
@@ -517,10 +517,6 @@ class ReportsData:
             from item_sales_rank, year_total
 
         """
-
-
-        # this SQL statement prduces a query that shows all of the items that was sold for a given year.
-        # Provides a table with item group desc, season, sum sales, sum qty, % of total sales
 
         with DbConfig.EnginePoolDB() as connection:
 
@@ -1297,9 +1293,9 @@ class ReportsData:
                 lht_sn,lhd_ay, lhd_sn,
                 lhp_ay, lhp_sn, total_cases, notes
         from store_program
-        inner join master_planogram on .store_program.program_id = master_planogram.program_id
+        inner join master_planogram on store_program.program_id = master_planogram.program_id
         inner join store_info on store_program.store_id = store_info.store_id
-        where store_type = '{self.store_type_input}'
+        where store_program.store_type = '{self.store_type_input}'
         order by store_program.store_id
         
         """
@@ -1328,7 +1324,7 @@ class ReportsData:
 
                 programs = psql.read_sql(f"""
                 
-                select * from store_program where store_id = {store} and store_type = '{self.store_type_input}
+                select * from store_program where store_id = {store} and store_type = '{self.store_type_input}'
                 
                 """, connection)
 

@@ -732,9 +732,12 @@ class TransformData:
 
             code = f"""
             
-            select delivery2.code from {self.store_type_input}.delivery2
-            inner join public.item_support2 on {self.store_type_input}.delivery2.code = public.item_support2.code
-            where  store = {store} and upc_11_digit = '{upc_11_digit}' order by date desc
+            select delivery.code from delivery
+            inner join public.item_support2 on delivery.code = public.item_support2.code
+            where  store = {store} and 
+                   upc_11_digit = '{upc_11_digit}' and 
+                   store_type = '{self.store_type_input}'
+            order by date desc
             """
 
             code = psql.read_sql(code, self.connection)
