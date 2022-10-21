@@ -32,9 +32,6 @@ class Replenishment():
         self.store_notes = pd.read_excel(rf'C:\Users\User1\OneDrive - winwinproducts.com\Groccery Store Program\{self.store_type_input}\{self.store_type_input}_store_setting.xlsm',
                                          sheet_name='Store Notes')
 
-        self.master_planogram = pd.read_excel(r'C:\Users\User1\OneDrive\WinWin Staff Folders\Michael\Replenishment program\Replenishment\support document\MASTER PLANOGRAM.xlsx',
-                                              sheet_name='MASTER PLANOGRAM UPDATED', skiprows=1, )
-
     def delivery_import(self, file):
 
         """This takes in an excel file and inserts delivery data into postgres
@@ -663,9 +660,10 @@ class Replenishment():
             notes = self.store_notes.iloc[i, 2]
             store_type = self.store_notes.iloc[i, 3]
 
-            duplicate_check = psql.read_sql(f"""select * from {self.store_type_input}.store
-                                                            where store_id = '{store_id}' 
-                                                         """, self.connection)
+            duplicate_check = psql.read_sql(f"""select * from store_info
+                                                where store_id = '{store_id}' and
+                                                      store_type = '{self.store_type_input}'
+                                            """, self.connection)
 
             if len(duplicate_check) == 1:
 
@@ -675,7 +673,7 @@ class Replenishment():
 
             else:
 
-                store_insert(store_id, initial, notes, store_type, self.connection_pool, self.store_type_input)
+                store_insert(store_id, initial, notes, store_type, self.connection_pool)
 
                 insert += 1
 
@@ -702,14 +700,15 @@ class Replenishment():
             activity = self.store_programs.loc[i, 'ACTIVITY']
             store_type = self.store_programs.iloc[i, 4]
 
-            duplicate_check = psql.read_sql(f"""select * from {self.store_type_input}.store_program
-                                                where store_program_id = '{store_program_id}' 
+            duplicate_check = psql.read_sql(f"""select * from store_program
+                                                where store_program_id = '{store_program_id}' and
+                                                      store_type = '{self.store_type_input}'
                                              """, self.connection)
 
             if len(duplicate_check) == 1:
 
                 add_history = history.existing_program(store_program_id, store_id, program_id, activity, store_type, duplicate_check)
-                store_program_update(store_program_id, store_id, program_id, activity, store_type, self.connection_pool, self.store_type_input)
+                store_program_update(store_program_id, store_id, program_id, activity, store_type, self.connection_pool)
 
                 update += 1
                 history_inserted += add_history
@@ -717,7 +716,7 @@ class Replenishment():
             else:
 
                 add_history = history.new_program(store_program_id,store_id,program_id, activity,store_type)
-                store_program_insert(store_program_id, store_id, program_id, activity, store_type, self.connection_pool, self.store_type_input)
+                store_program_insert(store_program_id, store_id, program_id, activity, store_type, self.connection_pool)
 
                 insert += 1
                 history_inserted += add_history
@@ -728,24 +727,26 @@ class Replenishment():
         print('Inserted:', insert, 'Records')
         print('Program History Insert:', history_inserted, 'Records')
 
-    def master_planogram_import(self):
+    def master_planogram_import(self, file):
+
+        master_planogram = pd.read_excel(f'{file}', sheet_name='MASTER PLANOGRAM UPDATED', skiprows=1)
 
         i = 0
         update = 0
         insert = 0
 
-        while i < len(self.master_planogram):
+        while i < len(master_planogram):
 
-            program_id = self.master_planogram.loc[i, 'Programs']
-            cd_ay = self.master_planogram.loc[i, 'CD-AY']
-            cd_sn = self.master_planogram.loc[i, 'CD-SN']
-            lht_ay = self.master_planogram.loc[i, 'LHT-AY']
-            lht_sn = self.master_planogram.loc[i, 'LHT-SN']
-            lhd_ay = self.master_planogram.loc[i, 'LHD-AY']
-            lhd_sn = self.master_planogram.loc[i, 'LHD-SN']
-            lhp_ay = self.master_planogram.loc[i, 'LHP-AY']
-            lhp_sn = self.master_planogram.loc[i, 'LHP-SN']
-            total_cases = self.master_planogram.loc[i, 'Total Cases']
+            program_id = master_planogram.loc[i, 'Programs']
+            cd_ay = master_planogram.loc[i, 'CD-AY']
+            cd_sn = master_planogram.loc[i, 'CD-SN']
+            lht_ay = master_planogram.loc[i, 'LHT-AY']
+            lht_sn = master_planogram.loc[i, 'LHT-SN']
+            lhd_ay = master_planogram.loc[i, 'LHD-AY']
+            lhd_sn = master_planogram.loc[i, 'LHD-SN']
+            lhp_ay = master_planogram.loc[i, 'LHP-AY']
+            lhp_sn = master_planogram.loc[i, 'LHP-SN']
+            total_cases = master_planogram.loc[i, 'Total Cases']
 
             duplicate_check = psql.read_sql(f"""select * from master_planogram
                                                 where program_id = '{program_id}' 
@@ -790,10 +791,10 @@ class Replenishment():
 
             try:
 
-                duplicate_check = psql.read_sql(f"""select * from {self.store_type_input}.item_approval
-                                                        where code = '{code}' 
-               
-                                                                    """, self.connection)
+                duplicate_check = psql.read_sql(f"""select * from item_approval
+                                                    where code = '{code}' and
+                                                          store_type = '{self.store_type_input}' 
+                                                 """, self.connection)
 
                 if len(duplicate_check) == 1:
 
@@ -809,7 +810,6 @@ class Replenishment():
             except:
 
                 pass
-
 
             i += 1
 
@@ -836,7 +836,7 @@ class Replenishment():
 
             duplicate_check = psql.read_sql(f"""select * from inventory
                                                 where code = '{code}' 
-                                                            """, self.connection)
+                                             """, self.connection)
 
             if len(duplicate_check) == 1:
 

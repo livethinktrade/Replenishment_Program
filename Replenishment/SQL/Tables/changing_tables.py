@@ -11,7 +11,8 @@ def size_table_insert(store_type_input, connection_pool):
     cursor.execute(
         f"""
 
-        update {store_type_input}.item_approval set recommend_replen = 'Yes', store_type='{store_type_input}'
+        update {store_type_input}.year_week_verify
+        set store_type = '{store_type_input}';
             
 """)
 
@@ -21,26 +22,26 @@ def size_table_insert(store_type_input, connection_pool):
 
 store_list = [
 
-    # 'acme',
+    'acme',
     'follett',
     # 'fresh_encounter',
-    'sal',
-    'midwest',
+    # 'sal',
+    # 'midwest',
     'intermountain',
-    'jewel',
-    'kroger_atlanta',
-    'kroger_central',
-    'kroger_cincinatti',
-    'kroger_columbus',
-    'kroger_dallas',
-    'kroger_delta',
-    'kroger_dillons',
-    'kroger_king_soopers',
-    'kroger_louisville',
-    'kroger_michigan',
-    'kroger_nashville',
-    'kvat',
-    'safeway_denver',
+    # 'jewel',
+    # 'kroger_atlanta',
+    # 'kroger_central',
+    # 'kroger_cincinatti',
+    # 'kroger_columbus',
+    # 'kroger_dallas',
+    # 'kroger_delta',
+    # 'kroger_dillons',
+    # 'kroger_king_soopers',
+    # 'kroger_louisville',
+    # 'kroger_michigan',
+    # 'kroger_nashville',
+    # 'kvat',
+    # 'safeway_denver',
     'texas_division'
 ]
 

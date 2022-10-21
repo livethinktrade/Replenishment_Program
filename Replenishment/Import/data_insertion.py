@@ -248,10 +248,14 @@ def store_update(store_id, initial, notes, store_type, connection_pool, store_ty
     connection = connection_pool.getconn()
     cursor = connection.cursor()
     cursor.execute(
-        f"""update store_info set initial = '{initial}',
-                                     notes = '{notes}',
-                                     store_type = '{store_type}'
-             where store_id = '{store_id}'""")
+        f"""update store_info 
+            
+            set initial = '{initial}',
+                notes = '{notes}'
+                
+            where store_id = '{store_id}' and 
+                  store_type = '{store_type}'
+         """)
 
     connection.commit()
     cursor.close()

@@ -378,7 +378,7 @@ class TransformData:
 
             # Find the last date in the db
 
-            date = psql.read_sql(f'select max(date) from {self.store_type_input}.sales2', self.connection)
+            date = psql.read_sql(f"select max(date) from sales where store_type = '{self.store_type_input}'", self.connection)
             date = pd.Timestamp(date.iloc[0, 0])
 
             # sorts dates in order
@@ -873,7 +873,12 @@ class TransformData:
 
         with EnginePoolDB() as connection:
 
-            last_store_week = psql.read_sql(f'select store_week from {self.store_type_input}.sales2 order by date desc', connection)
+            last_store_week = psql.read_sql(f"""
+            
+            select store_week 
+            from sales
+            where store_type = '{self.store_type_input}' 
+            order by date desc""", connection)
 
             last_store_week = last_store_week.loc[0, 'store_week']
 
@@ -935,8 +940,9 @@ class TransformData:
 
         while i < len(year_week_list):
 
-            year_week_verify = psql.read_sql(f"""select * from {self.store_type_input}.year_week_verify
-                                                  where store_year = {year_week_list[i][0]} and
+            year_week_verify = psql.read_sql(f"""select * from year_week_verify
+                                                  where store_type = '{self.store_type_input}' and
+                                                        store_year = {year_week_list[i][0]} and
                                                         store_week = {year_week_list[i][1]} """, self.connection)
 
             # if the store_year and store_week is already in the table, then the data is already in the sales table.

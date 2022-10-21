@@ -153,8 +153,8 @@ Create Table store_program_history
     store_type character varying(20) NOT NULL,
     date_updated date,
     history_id serial primary key,
+	notes character varying(100)
 
-    FOREIGN KEY (store_id,store_type) REFERENCES store(store_id, store_type)
 
 )
 
