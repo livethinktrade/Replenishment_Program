@@ -1,6 +1,13 @@
-/*VERSION 2*/
-create table master_planogram (
-	
+create schema IF NOT EXISTS grocery;
+comment on schema grocery is 'Schema for all grocery clients';
+alter schema grocery owner to michaelwinwin1;
+Grant usage on schema grocery to jackwinwin1;
+Grant usage on schema grocery to kevinwinwin1;
+Grant usage on schema grocery to haoyuewinwin1;
+
+-----------------------------------------------
+create table grocery.master_planogram (
+
 program_id varchar(15) PRIMARY KEY,
 cd_ay numeric not null,
 cd_sn numeric not null,
@@ -14,8 +21,8 @@ total_cases numeric not null
 
 );
 
-create table store_info (
-	
+create table grocery.store_info (
+
 store_id integer,
 initial varchar(10) NOT NULL,
 notes varchar(50) NOT NULL,
@@ -25,20 +32,20 @@ primary key(store_id, store_type)
 
 );
 
-create table store_program (
-	
+create table grocery.store_program (
+
 store_program_id serial PRIMARY KEY,
 store_id integer NOT NULL,
 program_id varchar(15) NOT NULL,
 activity varchar(10),
 store_type character varying(20) NOT NULL,
 
-FOREIGN KEY (program_id) REFERENCES public.master_planogram (program_id),
-FOREIGN KEY (store_id, store_type) REFERENCES store_info(store_id, store_type)
+FOREIGN KEY (program_id) REFERENCES grocery.master_planogram (program_id),
+FOREIGN KEY (store_id, store_type) REFERENCES grocery.store_info(store_id, store_type)
 
 );
 
-create table item_support2 (
+create table grocery.item_support2 (
 
 	season char(2) not null,
 	category varchar(15) not null,
@@ -56,11 +63,11 @@ create table item_support2 (
     item_desc varchar(50),
     packing numeric,
     upc_11_digit varchar(11)
-	
-	
+
+
 );
 
-CREATE TABLE delivery
+CREATE TABLE grocery.delivery
 (
     id serial NOT NULL PRIMARY KEY,
     transition_year integer,
@@ -74,12 +81,12 @@ CREATE TABLE delivery
     num numeric,
     code varchar(20) NOT NULL,
 
-    FOREIGN KEY (code) REFERENCES public.item_support2 (code),
-    FOREIGN KEY (store, store_type) REFERENCES store_info(store_id, store_type)
+    FOREIGN KEY (code) REFERENCES grocery.item_support2 (code),
+    FOREIGN KEY (store, store_type) REFERENCES grocery.store_info(store_id, store_type)
 
 );
 
-CREATE TABLE sales
+CREATE TABLE grocery.sales
 (
     id serial NOT NULL PRIMARY KEY,
     transition_year integer,
@@ -98,7 +105,7 @@ CREATE TABLE sales
 
 );
 
-CREATE TABLE item_approval
+CREATE TABLE grocery.item_approval
 (
     code character varying(20),
     store_price numeric NOT NULL,
@@ -109,26 +116,13 @@ CREATE TABLE item_approval
 
 );
 
-CREATE TABLE inventory
+CREATE TABLE grocery.inventory
 (
     code character varying(20) not null PRIMARY KEY,
     on_hand numeric not null
 );
 
-CREATE TABLE item_size
-(
-    code character varying(20) not null PRIMARY KEY,
-    size varchar(15)
-)
-
-/*sql statement to find mask sales for midwest stores */
-
-Create view as midwest_mask (
- SELECT sum(sales2.sales) AS sum
-   FROM fresh_encounter.sales2
-  WHERE (sales2.store_number < 400 OR sales2.store_number > 499) AND sales2.store_year = 2022);
-
-Create Table store_program_history
+Create Table grocery.store_program_history
 (
     store_program_id integer NOT NULL,
     store_id integer NOT NULL,
@@ -138,19 +132,17 @@ Create Table store_program_history
     date_updated date,
     history_id serial primary key,
 	notes character varying(100)
+);
 
 
-)
-
-
-Create Table year_week_verify (
+Create Table grocery.year_week_verify (
     store_year integer not null,
     store_week integer not null,
     store_type character varying(20),
     PRIMARY KEY(store_year, store_week, store_type)
-)
+);
 
-Create Table bandaids (
+Create Table grocery.bandaids (
     type character varying(11) NOT NULL,
     store_id integer not null,
     item_group_desc varchar(50),
@@ -162,4 +154,7 @@ Create Table bandaids (
 
     PRIMARY KEY(store_id, item_group_desc, effective_date)
 )
-
+-------;----------------------------------------
+GRANT SELECT ON ALL TABLES IN SCHEMA grocery TO jackwinwin1;
+GRANT SELECT ON ALL TABLES IN SCHEMA grocery TO kevinwinwin1;
+GRANT SELECT ON ALL TABLES IN SCHEMA grocery TO haoyuewinwin1;
