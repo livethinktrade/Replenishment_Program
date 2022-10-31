@@ -560,57 +560,36 @@ class Replenishment():
         item_support = len(itemsupport)
         i = 0
 
-        with DbConfig.EnginePoolDB() as connection_pool:
+        with DbConfig.PsycoPoolDB() as connection_pool:
 
-            while i < item_support:
+            with DbConfig.EnginePoolDB() as engine:
 
-                season = itemsupport.loc[i, 'season']
-                category = itemsupport.loc[i, 'category']
-                type = itemsupport.loc[i, 'type']
-                style = itemsupport.loc[i, 'style']
-                additional = itemsupport.loc[i, 'additional']
-                display_size = itemsupport.loc[i, 'display_size']
-                pog_type = itemsupport.loc[i, 'pog_type']
-                upc = itemsupport.loc[i, 'upc']
-                code = itemsupport.loc[i, 'code']
-                code_qb = itemsupport.loc[i, 'code_qb']
-                unique_replen_code = itemsupport.loc[i, 'unique_replen_code']
-                case_size = itemsupport.loc[i, 'case_size']
-                item_group_desc = itemsupport.loc[i, 'item_group_desc']
-                item_desc = itemsupport.loc[i, 'item_desc']
-                packing = itemsupport.loc[i, 'packing']
-                upc_11_digit = str(int(itemsupport.loc[i, 'upc_11_digit']))
+                while i < item_support:
 
-                duplicate_check = psql.read_sql(f"""
-                                                    select * from grocery.item_support2
-                                                    where code = '{code}' 
-                                                    """, connection_pool)
-                if len(duplicate_check) == 1:
+                    season = itemsupport.loc[i, 'season']
+                    category = itemsupport.loc[i, 'category']
+                    type = itemsupport.loc[i, 'type']
+                    style = itemsupport.loc[i, 'style']
+                    additional = itemsupport.loc[i, 'additional']
+                    display_size = itemsupport.loc[i, 'display_size']
+                    pog_type = itemsupport.loc[i, 'pog_type']
+                    upc = itemsupport.loc[i, 'upc']
+                    code = itemsupport.loc[i, 'code']
+                    code_qb = itemsupport.loc[i, 'code_qb']
+                    unique_replen_code = itemsupport.loc[i, 'unique_replen_code']
+                    case_size = itemsupport.loc[i, 'case_size']
+                    item_group_desc = itemsupport.loc[i, 'item_group_desc']
+                    item_desc = itemsupport.loc[i, 'item_desc']
+                    packing = itemsupport.loc[i, 'packing']
+                    upc_11_digit = str(int(itemsupport.loc[i, 'upc_11_digit']))
 
-                    item_support_update(season,
-                                        category,
-                                        type,
-                                        style,
-                                        additional,
-                                        display_size,
-                                        pog_type,
-                                        upc,
-                                        code,
-                                        code_qb,
-                                        unique_replen_code,
-                                        case_size,
-                                        item_group_desc,
-                                        item_desc,
-                                        packing,
-                                        upc_11_digit,
-                                        self.connection_pool)
-                    update += 1
+                    duplicate_check = psql.read_sql(f"""
+                                                        select * from grocery.item_support2
+                                                        where code = '{code}' 
+                                                        """, engine)
+                    if len(duplicate_check) == 1:
 
-                else:
-
-                    try:
-
-                        item_support_insert(season,
+                        item_support_update(season,
                                             category,
                                             type,
                                             style,
@@ -626,14 +605,37 @@ class Replenishment():
                                             item_desc,
                                             packing,
                                             upc_11_digit,
-                                            self.connection_pool)
+                                            connection_pool)
+                        update += 1
 
-                    except Exception as e:
-                        print("\nERROR : " + str(e) + f'Quickbook Item:  {code}')
+                    else:
 
-                    insert += 1
+                        try:
 
-                i += 1
+                            item_support_insert(season,
+                                                category,
+                                                type,
+                                                style,
+                                                additional,
+                                                display_size,
+                                                pog_type,
+                                                upc,
+                                                code,
+                                                code_qb,
+                                                unique_replen_code,
+                                                case_size,
+                                                item_group_desc,
+                                                item_desc,
+                                                packing,
+                                                upc_11_digit,
+                                                connection_pool)
+
+                        except Exception as e:
+                            print("\nERROR : " + str(e) + f'Quickbook Item:  {code}')
+
+                        insert += 1
+
+                    i += 1
 
         print('\nSupport Sheet Imported')
         print(f'Updated: {update}\nInserted: {insert}')
