@@ -228,7 +228,7 @@ class Reports:
                                            index=False,
                                            header=(
                                                    'Store (#)', 'Current Week Sales', 'Previous Week Sales',
-                                                   '% +/- Change WOW','Sales ($) 2022 Current Week',
+                                                   '% +/- Change WOW', 'Sales ($) 2022 Current Week',
                                                    'Sales ($) 2021 Current Week', '% +/- Change YOY',
                                                    'Sales ($) 2022 YTD', 'Sales ($) 2021 YTD', '% +/- Change (YOY)')
                                            )

@@ -163,3 +163,9 @@ Create Table bandaids (
     PRIMARY KEY(store_id, item_group_desc, effective_date)
 )
 
+Create Table kroger_periods (
+
+    kroger_period integer not null,
+    kroger_week integer primary key
+
+)

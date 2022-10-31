@@ -13,9 +13,9 @@ class Replenishment():
         
         self.store_type_input = store_type_input
         
-        self.connection_pool = DbConfig.create_pool_dbconnection()
-
-        self.connection = DbConfig.engine_pool_connection()
+        # self.connection_pool = DbConfig.create_pool_dbconnection()
+        #
+        # self.connection = DbConfig.engine_pool_connection()
 
         self.store_setting = pd.read_excel(rf'C:\Users\User1\OneDrive - winwinproducts.com\Groccery Store Program\{self.store_type_input}\{self.store_type_input}_store_setting.xlsm',
                                            sheet_name='Sheet2',
@@ -44,37 +44,40 @@ class Replenishment():
 
         new_len = len(new_deliv)
         i = 0
-        while i < new_len:
-            transition_year = int(new_deliv.iloc[i, 0])
-            transition_season = new_deliv.iloc[i, 1]
-            ttype = new_deliv.iloc[i, 2]
-            date = new_deliv.iloc[i, 3]
-            upc = new_deliv.iloc[i, 4]
-            store = new_deliv.iloc[i, 5]
-            qty = new_deliv.iloc[i, 6]
-            store_type = new_deliv.iloc[i, 7]
-            num = new_deliv.iloc[i, 8]
-            code = new_deliv.iloc[i, 9]
 
-            # irrelevant now that all db are combined
-            # if store_type != self.store_type_input:
-            #     raise Exception(f'Data Validation Failed Inserted {store_type} for {self.store_type_input} database')
+        with DbConfig.PsycoPoolDB() as connection_pool:
 
-            # note to self: last line was comment out bc i needed the old version of the deliv insert not the new one.
+            while i < new_len:
+                transition_year = int(new_deliv.iloc[i, 0])
+                transition_season = new_deliv.iloc[i, 1]
+                ttype = new_deliv.iloc[i, 2]
+                date = new_deliv.iloc[i, 3]
+                upc = new_deliv.iloc[i, 4]
+                store = new_deliv.iloc[i, 5]
+                qty = new_deliv.iloc[i, 6]
+                store_type = new_deliv.iloc[i, 7]
+                num = new_deliv.iloc[i, 8]
+                code = new_deliv.iloc[i, 9]
 
-            delivery_insert(transition_year,
-                            transition_season,
-                            ttype,
-                            date,
-                            upc,
-                            store,
-                            qty,
-                            store_type,
-                            num,
-                            code,
-                            self.connection_pool)
+                # irrelevant now that all db are combined
+                # if store_type != self.store_type_input:
+                #     raise Exception(f'Data Validation Failed Inserted {store_type} for {self.store_type_input} database')
 
-            i += 1
+                # note to self: last line was comment out bc i needed the old version of the deliv insert not the new one.
+
+                delivery_insert(transition_year,
+                                transition_season,
+                                ttype,
+                                date,
+                                upc,
+                                store,
+                                qty,
+                                store_type,
+                                num,
+                                code,
+                                connection_pool)
+
+                i += 1
 
         print(f'\n Delivery Data Imported')
 
@@ -275,7 +278,7 @@ class Replenishment():
                 code = new_deliv_transform.loc[i, 'code']
 
                 duplicate_check = psql.read_sql(f"""
-                                                    SELECT * FROM DELIVERY 
+                                                    SELECT * FROM grocery.DELIVERY 
                                                     WHERE type ='{type}' and 
                                                             date = '{date}' and 
                                                             store = {store} and 
@@ -316,30 +319,33 @@ class Replenishment():
 
         new_len = len(new_sales)
         i = 0
-        while i < new_len:
-            transition_year = new_sales.loc[i, 'transition_year']
-            transition_season = new_sales.loc[i, 'transition_season']
-            store_year = new_sales.loc[i, 'store_year']
-            date = new_sales.loc[i, 'date']
-            store_week = new_sales.loc[i, 'store_week']
-            store_number = new_sales.loc[i, 'store_number']
-            upc = new_sales.loc[i, 'upc']
-            sales = new_sales.loc[i, 'sales']
-            qty = new_sales.loc[i, 'qty']
-            current_year = new_sales.loc[i, 'current_year']
-            current_week = new_sales.loc[i, 'current_week']
-            code = new_sales.loc[i, 'code']
-            store_type = new_sales.loc[i, 'store_type']
 
-            # code not needed because all dbs are being combined
-            # if store_type != self.store_type_input:
-            # raise Exception(f'Data Validation Failed Inserted data for {store_type} for {self.store_type_input} database')
+        with DbConfig.PsycoPoolDB() as connection_pool:
 
-            sales_insert(transition_year, transition_season, store_year, date,
-                         store_week, store_number, upc, sales,
-                         qty, current_year, current_week, code, store_type,
-                         self.connection_pool)
-            i += 1
+            while i < new_len:
+                transition_year = new_sales.loc[i, 'transition_year']
+                transition_season = new_sales.loc[i, 'transition_season']
+                store_year = new_sales.loc[i, 'store_year']
+                date = new_sales.loc[i, 'date']
+                store_week = new_sales.loc[i, 'store_week']
+                store_number = new_sales.loc[i, 'store_number']
+                upc = new_sales.loc[i, 'upc']
+                sales = new_sales.loc[i, 'sales']
+                qty = new_sales.loc[i, 'qty']
+                current_year = new_sales.loc[i, 'current_year']
+                current_week = new_sales.loc[i, 'current_week']
+                code = new_sales.loc[i, 'code']
+                store_type = new_sales.loc[i, 'store_type']
+
+                # code not needed because all dbs are being combined
+                # if store_type != self.store_type_input:
+                # raise Exception(f'Data Validation Failed Inserted data for {store_type} for {self.store_type_input} database')
+
+                sales_insert(transition_year, transition_season, store_year, date,
+                             store_week, store_number, upc, sales,
+                             qty, current_year, current_week, code, store_type,
+                             connection_pool)
+                i += 1
 
         print(f'\n Sales Data Imported')
 
@@ -427,7 +433,7 @@ class Replenishment():
                     # Decided to assign query to variable and then plug into the read_sql method for debugging purposes
                     duplicate_check_query = f"""
 
-                    SELECT * FROM SALES 
+                    SELECT * FROM grocery.SALES 
                     WHERE store_year ={store_year} and 
                         store_week = '{store_week}' and
                         date = '{date}' and 
@@ -576,7 +582,7 @@ class Replenishment():
                 upc_11_digit = str(int(itemsupport.loc[i, 'upc_11_digit']))
 
                 duplicate_check = psql.read_sql(f"""
-                                                    select * from item_support2
+                                                    select * from grocery.item_support2
                                                     where code = '{code}' 
                                                     """, connection_pool)
                 if len(duplicate_check) == 1:
@@ -660,7 +666,7 @@ class Replenishment():
             notes = self.store_notes.iloc[i, 2]
             store_type = self.store_notes.iloc[i, 3]
 
-            duplicate_check = psql.read_sql(f"""select * from store_info
+            duplicate_check = psql.read_sql(f"""select * from grocery.store_info
                                                 where store_id = '{store_id}' and
                                                       store_type = '{self.store_type_input}'
                                             """, self.connection)
@@ -700,7 +706,7 @@ class Replenishment():
             activity = self.store_programs.loc[i, 'ACTIVITY']
             store_type = self.store_programs.iloc[i, 4]
 
-            duplicate_check = psql.read_sql(f"""select * from store_program
+            duplicate_check = psql.read_sql(f"""select * from grocery.store_program
                                                 where store_program_id = '{store_program_id}' and
                                                       store_type = '{self.store_type_input}'
                                              """, self.connection)
@@ -748,7 +754,7 @@ class Replenishment():
             lhp_sn = master_planogram.loc[i, 'LHP-SN']
             total_cases = master_planogram.loc[i, 'Total Cases']
 
-            duplicate_check = psql.read_sql(f"""select * from master_planogram
+            duplicate_check = psql.read_sql(f"""select * from grocery.master_planogram
                                                 where program_id = '{program_id}' 
                                                             """, self.connection)
 
@@ -791,7 +797,7 @@ class Replenishment():
 
             try:
 
-                duplicate_check = psql.read_sql(f"""select * from item_approval
+                duplicate_check = psql.read_sql(f"""select * from grocery.item_approval
                                                     where code = '{code}' and
                                                           store_type = '{self.store_type_input}' 
                                                  """, self.connection)
@@ -834,7 +840,7 @@ class Replenishment():
             code = inventory_df.iloc[i, 0]
             on_hand = inventory_df.iloc[i, 1]
 
-            duplicate_check = psql.read_sql(f"""select * from inventory
+            duplicate_check = psql.read_sql(f"""select * from grocery.inventory
                                                 where code = '{code}' 
                                              """, self.connection)
 

@@ -49,7 +49,7 @@ class ReportsData:
         with DbConfig.EnginePoolDB() as connection:
 
             # finds the current year per winwin company year
-            year = psql.read_sql(f"select max(current_year) from sales where store_type = '{store_type_input}'", connection)
+            year = psql.read_sql(f"select max(current_year) from grocery.sales where store_type = '{store_type_input}'", connection)
 
             self.store_year = year.iloc[0, 0]
 
@@ -57,14 +57,14 @@ class ReportsData:
 
             max_date = psql.read_sql(f"""
             
-            select max(date) from sales
+            select max(date) from grocery.sales
             where store_year = {self.store_year} and store_type = '{store_type_input}'
             """, connection)
             
             max_date = max_date.iloc[0, 0]
 
             week_num = psql.read_sql(f"""
-            select store_week from sales 
+            select store_week from grocery.sales 
             where date = '{max_date}' and store_type = '{store_type_input}'
             """, connection)
             
@@ -89,7 +89,7 @@ class ReportsData:
             """
 
             num = psql.read_sql(f"""
-            select distinct({self.week}) from sales 
+            select distinct({self.week}) from grocery.sales 
             where store_year = {self.store_year} and store_type = '{store_type_input}'
             """, connection)
             
@@ -126,8 +126,8 @@ class ReportsData:
                         item_support2.display_size,
                         item_support2.case_size,
                         item_support2.item_group_desc
-                    FROM sales
-                    inner JOIN item_support2 ON sales.code = item_support2.code
+                    FROM grocery.sales
+                    inner JOIN grocery.item_support2 ON grocery.sales.code = grocery.item_support2.code
                     where store_type = '{self.store_type_input}'),
     
                 date as (
@@ -294,8 +294,8 @@ class ReportsData:
                                 item_support2.display_size,
                                 item_support2.case_size,
                                 item_support2.item_group_desc
-                             FROM sales
-                             inner JOIN item_support2 ON sales.code = item_support2.code
+                             FROM grocery.sales
+                             inner JOIN grocery.item_support2 ON grocery.sales.code = grocery.item_support2.code
                              where store_type = '{self.store_type_input}'),
     
                 store_count as (
@@ -395,8 +395,8 @@ class ReportsData:
                                 item_support2.display_size,
                                 item_support2.case_size,
                                 item_support2.item_group_desc
-                             FROM sales
-                             inner JOIN item_support2 ON sales.code = item_support2.code
+                             FROM grocery.sales
+                             inner JOIN grocery.item_support2 ON grocery.sales.code = grocery.item_support2.code
                              where store_type = '{self.store_type_input}'),
     
                 store_count as (
@@ -493,8 +493,8 @@ class ReportsData:
                     item_support2.display_size,
                     item_support2.case_size,
                     item_support2.item_group_desc
-                FROM sales
-                inner JOIN item_support2 ON sales.code = item_support2.code
+                FROM grocery.sales
+                inner JOIN grocery.item_support2 ON grocery.sales.code = grocery.item_support2.code
                 where store_type = '{self.store_type_input}'),
 
             year_total as(
@@ -557,8 +557,8 @@ class ReportsData:
                         item_support2.display_size,
                         item_support2.case_size,
                         item_support2.item_group_desc
-                    FROM sales
-                    inner JOIN item_support2 ON sales.code = item_support2.code
+                    FROM grocery.sales
+                    inner JOIN grocery.item_support2 ON grocery.sales.code = grocery.item_support2.code
                     where store_type = '{self.store_type_input}'),
     
     
@@ -602,7 +602,7 @@ class ReportsData:
         
             max_year = psql.read_sql(f"""
             
-            select max(date) from public.delivery
+            select max(date) from grocery.delivery
             where store_type = '{self.store_type_input}'
             
             """, connection)
@@ -691,7 +691,7 @@ class ReportsData:
                     /*This table is basically the delivery table with the support sheet lined up */
                     select id, transition_year, transition_season, delivery.type, date, delivery.upc, store,
                            qty, season, category, item_group_desc, display_size, case_size
-                    from delivery
+                    from grocery.delivery
                     inner join item_support2 on delivery.code = item_support2.code
                     where date >= '01-01-{min_year}' and store_type= '{self.store_type_input}'),
     
@@ -827,8 +827,8 @@ class ReportsData:
                         item_support2.display_size,
                         item_support2.case_size,
                         item_support2.item_group_desc
-                    FROM sales
-                    inner JOIN item_support2 ON sales.code = item_support2.code
+                    FROM grocery.sales
+                    inner JOIN grocery.item_support2 ON grocery.sales.code = grocery.item_support2.code
                     where date >= '01-01-{min_year}' and store_type = '{self.store_type_input}'),
     
                 sales_pivot_AY as (
@@ -1064,7 +1064,7 @@ class ReportsData:
 
                 max_date = psql.read_sql(f"""
                 
-                select max(date) from delivery
+                select max(date) from grocery.delivery
                 where store_type = '{self.store_type_input}'
                 
                 """, connection)
@@ -1075,8 +1075,8 @@ class ReportsData:
                 recently_shipped = psql.read_sql(f"""
     
                     select distinct(item_group_desc), store
-                    from delivery
-                    inner join item_support2 on delivery.code = item_support2.code
+                    from grocery.delivery
+                    inner join grocery.item_support2 on grocery.delivery.code = grocery.item_support2.code
                     where date <= '{max_date}' and 
                           date >= '{min_date}' and
                           store_type = '{self.store_type_input}'
@@ -1108,8 +1108,8 @@ class ReportsData:
                     last_date_shipped = psql.read_sql(f"""
     
                         select max(date)
-                        from delivery
-                        inner join item_support2 on delivery.code = item_support2.code
+                        from grocery.delivery
+                        inner join grocery.item_support2 on grocery.delivery.code = grocery.item_support2.code
                         
                         WHERE store = {store} and 
                               item_group_desc = '{item_group_desc}' and
@@ -1254,10 +1254,10 @@ class ReportsData:
                     display_size, item_group_desc, 
                     on_hand as inventory_on_hand,
                     round((on_hand/item_support2.case_size),0) as num_of_cases,
-                    store_price from item_approval
+                    store_price from grocery.item_approval
     
-            inner join item_support2 on item_approval.code = item_support2.code
-            inner join inventory on item_approval.code = inventory.code
+            inner join grocery.item_support2 on grocery.item_approval.code = grocery.item_support2.code
+            inner join grocery.inventory on grocery.item_approval.code = grocery.inventory.code
             where store_price < 999 and store_type = '{self.store_type_input}'
             order by display_size, on_hand desc
             
@@ -1273,7 +1273,7 @@ class ReportsData:
 
             store_sales_rank = f"""
             
-            select store_number, round(sum(sales),0) as YTD_Sales from sales
+            select store_number, round(sum(sales),0) as YTD_Sales from grocery.sales
             where current_year = {self.store_year} and store_type = '{self.store_type_input}'
             group by store_number
             order by sum(sales) desc
@@ -1292,9 +1292,9 @@ class ReportsData:
                 cd_ay,cd_sn,lht_ay, 
                 lht_sn,lhd_ay, lhd_sn,
                 lhp_ay, lhp_sn, total_cases, notes
-        from store_program
-        inner join master_planogram on store_program.program_id = master_planogram.program_id
-        inner join store_info on store_program.store_id = store_info.store_id
+        from grocery.store_program
+        inner join grocery.master_planogram on grocery.store_program.program_id = grocery.master_planogram.program_id
+        inner join grocery.store_info on grocery.store_program.store_id = grocery.store_info.store_id
         where store_program.store_type = '{self.store_type_input}'
         order by store_program.store_id
         
@@ -1324,7 +1324,7 @@ class ReportsData:
 
                 programs = psql.read_sql(f"""
                 
-                select * from store_program where store_id = {store} and store_type = '{self.store_type_input}'
+                select * from grocery.store_program where store_id = {store} and store_type = '{self.store_type_input}'
                 
                 """, connection)
 
@@ -1368,8 +1368,8 @@ class ReportsData:
 
                 date = psql.read_sql(f"""
     
-                select store_year, date from sales
-                inner join item_support2 on sales.code = item_support2.code
+                select store_year, date from grocery.sales
+                inner join grocery.item_support2 on grocery.sales.code = grocery.item_support2.code
                 where store_number = {store} and 
                       item_group_desc = '{item_group_desc}' and 
                       store_type = '{self.store_type_input}'
@@ -1394,8 +1394,8 @@ class ReportsData:
 
                 date = psql.read_sql(f'''
     
-                select store, date, item_group_desc from delivery
-                inner join item_support2 on delivery.code = item_support2.code
+                select store, date, item_group_desc from grocery.delivery
+                inner join grocery.item_support2 on grocery.delivery.code = grocery.item_support2.code
                 where store = {store} and 
                       item_group_desc = '{item_group_desc}' and
                       store_type = '{self.store_type_input}'
@@ -1473,8 +1473,8 @@ class ReportsData:
                            item_support2.display_size,
                            item_support2.case_size,
                            item_support2.item_group_desc
-                       FROM sales
-                       inner JOIN item_support2 ON sales.code = item_support2.code
+                       FROM grocery.sales
+                       inner JOIN grocery.item_support2 ON grocery.sales.code = grocery.item_support2.code
                        where store_type = '{self.store_type_input}'),
 
                    date as (
@@ -1636,8 +1636,8 @@ class ReportsData:
                     item_support2.display_size,
                     item_support2.case_size,
                     item_support2.item_group_desc
-                FROM sales
-                inner JOIN item_support2 ON sales.code = item_support2.code
+                FROM grocery.sales
+                inner JOIN grocery.item_support2 ON grocery.sales.code = grocery.item_support2.code
                 where store_type = '{self.store_type_input}'),
 
             year_total as(
@@ -1704,8 +1704,8 @@ class ReportsData:
                         item_support2.display_size,
                         item_support2.case_size,
                         item_support2.item_group_desc
-                    FROM sales
-                    inner JOIN item_support2 ON sales.code = item_support2.code
+                    FROM grocery.sales
+                    inner JOIN grocery.item_support2 ON sales.code = grocery.item_support2.code
                     where store_type = '{self.store_type_input}'),
     
     

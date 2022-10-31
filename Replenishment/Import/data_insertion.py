@@ -44,7 +44,7 @@ def delivery_update(transition_year, transition_season,
 
     connection = connection_pool.getconn()
     cursor = connection.cursor()
-    cursor.execute(f"""update delivery set qty = {qty}, transition_year ='{transition_year}', 
+    cursor.execute(f"""update grocery.delivery set qty = {qty}, transition_year ='{transition_year}', 
                         transition_season ='{transition_season}' 
                         WHERE type ='{type}' and 
                         date = '{date}' and 
@@ -69,7 +69,7 @@ def delivery_insert(transition_year,
     connection = connection_pool.getconn()
     cursor = connection.cursor()
     cursor.execute(
-        f"""INSERT INTO delivery (transition_year, transition_season,type, date, upc, store, 
+        f"""INSERT INTO grocery.delivery (transition_year, transition_season,type, date, upc, store, 
                                                       qty, store_type, num, code)
             values (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)""",
         (transition_year, transition_season, type, date, upc, store, qty, store_type, num, code))
@@ -97,7 +97,7 @@ def salesupdate(transition_year,
  
     connection = connection_pool.getconn()
     cursor = connection.cursor()
-    cursor.execute(f"""update sales
+    cursor.execute(f"""update grocery.sales
                         set qty = {qty}, 
                             transition_year ='{transition_year}',
                             transition_season = '{transition_season}',
@@ -136,7 +136,7 @@ def sales_insert(transition_year,
 
     connection = connection_pool.getconn()
     cursor = connection.cursor()
-    cursor.execute(f"""INSERT INTO sales (transition_year, transition_season,store_year, date,
+    cursor.execute(f"""INSERT INTO grocery.sales (transition_year, transition_season,store_year, date,
                                         store_week,store_number,upc,sales,qty,current_year,
                                         current_week,code,store_type)
                         values (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)""",
@@ -171,7 +171,7 @@ def item_support_insert(season,
 
     connection = connection_pool.getconn()
     cursor = connection.cursor()
-    cursor.execute("""INSERT INTO item_support2 (season, category, type, style, additional, display_size, pog_type, 
+    cursor.execute("""INSERT INTO grocery.item_support2 (season, category, type, style, additional, display_size, pog_type, 
                                                  upc, code, code_qb, unique_replen_code, case_size, item_group_desc,
                                                 item_desc, packing, upc_11_digit) 
                     values (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)""", (
@@ -210,7 +210,7 @@ def item_support_update(season,
 
     connection = connection_pool.getconn()
     cursor = connection.cursor()
-    cursor.execute(f"""Update item_support2 set season = '{season}', 
+    cursor.execute(f"""Update grocery.item_support2 set season = '{season}', 
                                                 category = '{category}', 
                                                 type = '{type}', 
                                                 style = '{style}', 
@@ -236,7 +236,7 @@ def store_insert(store_id, initial, notes, store_type, connection_pool):
 
     connection = connection_pool.getconn()
     cursor = connection.cursor()
-    cursor.execute(f"INSERT INTO store_info (store_id, initial, notes, store_type) values (%s,%s,%s,%s)",
+    cursor.execute(f"INSERT INTO grocery.store_info (store_id, initial, notes, store_type) values (%s,%s,%s,%s)",
            (store_id, initial, notes, store_type))
 
     connection.commit()
@@ -248,7 +248,7 @@ def store_update(store_id, initial, notes, store_type, connection_pool, store_ty
     connection = connection_pool.getconn()
     cursor = connection.cursor()
     cursor.execute(
-        f"""update store_info 
+        f"""update grocery.store_info 
             
             set initial = '{initial}',
                 notes = '{notes}'
@@ -268,7 +268,7 @@ def store_program_insert(store_program_id,store_id, program_id, activity, store_
     cursor = connection.cursor()
     cursor.execute(f"""
     
-    INSERT INTO store_program (store_program_id, store_id, program_id, activity,store_type) 
+    INSERT INTO grocery.store_program (store_program_id, store_id, program_id, activity,store_type) 
     values (%s,%s,%s,%s,%s)""", (store_program_id, store_id, program_id, activity, store_type))
 
     connection.commit()
@@ -281,7 +281,7 @@ def store_program_update(store_program_id, store_id, program_id, activity, store
     connection = connection_pool.getconn()
     cursor = connection.cursor()
     cursor.execute(
-        f"""update store_program set store_id = '{store_id}',
+        f"""update grocery.store_program set store_id = '{store_id}',
                                     program_id = '{program_id}',
                                     activity = '{activity}',
                                     store_type = '{store_type}'
@@ -297,7 +297,7 @@ def master_planogram_insert(program_id, cd_ay, cd_sn, lht_ay, lht_sn, lhd_ay, lh
     connection = connection_pool.getconn()
     cursor = connection.cursor()
     cursor.execute("""
-    INSERT INTO master_planogram (program_id, cd_ay, cd_sn, lht_ay, lht_sn, lhd_ay, lhd_sn, lhp_ay, lhp_sn, total_cases) 
+    INSERT INTO grocery.master_planogram (program_id, cd_ay, cd_sn, lht_ay, lht_sn, lhd_ay, lhd_sn, lhp_ay, lhp_sn, total_cases) 
     values (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)""", (program_id, cd_ay, cd_sn, lht_ay, lht_sn,
                                                 lhd_ay, lhd_sn, lhp_ay, lhp_sn, total_cases))
 
@@ -311,7 +311,7 @@ def master_planogram_update(program_id, cd_ay, cd_sn, lht_ay, lht_sn, lhd_ay, lh
     connection = connection_pool.getconn()
     cursor = connection.cursor()
     cursor.execute(
-        f"""update master_planogram set cd_ay = '{cd_ay}',
+        f"""update grocery.master_planogram set cd_ay = '{cd_ay}',
                                     cd_sn= '{cd_sn}',
                                     lht_ay = '{lht_ay}',
                                     lht_sn = '{lht_sn}',
@@ -331,7 +331,7 @@ def item_approval_insert(code, store_price, store_type, connection_pool):
 
     connection = connection_pool.getconn()
     cursor = connection.cursor()
-    cursor.execute(f"INSERT INTO item_approval (code, store_price, store_type) values (%s,%s,%s)",
+    cursor.execute(f"INSERT INTO grocery.item_approval (code, store_price, store_type) values (%s,%s,%s)",
                    (code, store_price, store_type))
 
     connection.commit()
@@ -344,7 +344,7 @@ def item_approval_update(code, store_price, store_type, connection_pool):
     connection = connection_pool.getconn()
     cursor = connection.cursor()
     cursor.execute(
-        f"""update item_approval 
+        f"""update grocery.item_approval 
             set store_price = '{store_price}'
             where code = '{code}' and store_type = '{store_type}'
         """)
@@ -358,7 +358,7 @@ def inventory_insert(code, on_hand, connection_pool):
 
     connection = connection_pool.getconn()
     cursor = connection.cursor()
-    cursor.execute("INSERT INTO inventory (code, on_hand) values (%s,%s)",
+    cursor.execute("INSERT INTO grocery.inventory (code, on_hand) values (%s,%s)",
                    (code, on_hand))
 
     connection.commit()
@@ -370,7 +370,7 @@ def inventory_update(code, on_hand, connection_pool):
     connection = connection_pool.getconn()
     cursor = connection.cursor()
     cursor.execute(
-        f"update inventory set on_hand = '{on_hand}' where code = '{code}'")
+        f"update grocery.inventory set on_hand = '{on_hand}' where code = '{code}'")
 
     connection.commit()
     cursor.close()
@@ -381,7 +381,7 @@ def size_table_insert(code, size, connection_pool):
     connection = connection_pool.getconn()
     cursor = connection.cursor()
     cursor.execute(
-        "INSERT INTO item_size (code, size) values (%s,%s)",
+        "INSERT INTO grocery.item_size (code, size) values (%s,%s)",
         (code,size))
 
     connection.commit()
@@ -393,7 +393,7 @@ def size_table_update(code, size, connection_pool):
     connection = connection_pool.getconn()
     cursor = connection.cursor()
     cursor.execute(
-        f"update item_size set size = '{size}' where code = '{code}'")
+        f"update grocery.item_size set size = '{size}' where code = '{code}'")
 
     connection.commit()
     cursor.close()
@@ -404,7 +404,7 @@ def year_week_verify_insert(store_year, store_week, store_type_input, connection
     connection = connection_pool.getconn()
     cursor = connection.cursor()
     cursor.execute(
-        f"INSERT INTO year_week_verify (store_year, store_week, store_type) values (%s,%s,%s)",
+        f"INSERT INTO grocery.year_week_verify (store_year, store_week, store_type) values (%s,%s,%s)",
         (store_year, store_week, store_type_input))
 
     connection.commit()
