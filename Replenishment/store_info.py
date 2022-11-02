@@ -11,7 +11,7 @@ logging.basicConfig(filename='test.log', format='%(filename)s: %(message)s',
                     level=logging.DEBUG)
 
 
-class Replenishment():
+class Replenishment:
 
     def __init__(self, store_type_input):
         
@@ -51,39 +51,41 @@ class Replenishment():
 
         with DbConfig.PsycoPoolDB() as connection_pool:
 
-            while i < new_len:
-                transition_year = int(new_deliv.iloc[i, 0])
-                transition_season = new_deliv.iloc[i, 1]
-                ttype = new_deliv.iloc[i, 2]
-                date = new_deliv.iloc[i, 3]
-                upc = new_deliv.iloc[i, 4]
-                store = new_deliv.iloc[i, 5]
-                qty = new_deliv.iloc[i, 6]
-                store_type = new_deliv.iloc[i, 7]
-                num = new_deliv.iloc[i, 8]
-                code = new_deliv.iloc[i, 9]
+            insert_execute_batch(connection_pool, new_deliv, 'grocery.delivery')
 
-                # irrelevant now that all db are combined
-                # if store_type != self.store_type_input:
-                #     raise Exception(f'Data Validation Failed Inserted {store_type} for {self.store_type_input} database')
+            # while i < new_len:
+            #     transition_year = int(new_deliv.iloc[i, 0])
+            #     transition_season = new_deliv.iloc[i, 1]
+            #     ttype = new_deliv.iloc[i, 2]
+            #     date = new_deliv.iloc[i, 3]
+            #     upc = new_deliv.iloc[i, 4]
+            #     store = new_deliv.iloc[i, 5]
+            #     qty = new_deliv.iloc[i, 6]
+            #     store_type = new_deliv.iloc[i, 7]
+            #     num = new_deliv.iloc[i, 8]
+            #     code = new_deliv.iloc[i, 9]
+            #
+            #     # irrelevant now that all db are combined
+            #     # if store_type != self.store_type_input:
+            #     #     raise Exception(f'Data Validation Failed Inserted {store_type} for {self.store_type_input} database')
+            #
+            #     # note to self: last line was comment out bc i needed the old version of the deliv insert not the new one.
+            #
+            #     delivery_insert(transition_year,
+            #                     transition_season,
+            #                     ttype,
+            #                     date,
+            #                     upc,
+            #                     store,
+            #                     qty,
+            #                     store_type,
+            #                     num,
+            #                     code,
+            #                     connection_pool)
+            #
+            #     i += 1
 
-                # note to self: last line was comment out bc i needed the old version of the deliv insert not the new one.
-
-                delivery_insert(transition_year,
-                                transition_season,
-                                ttype,
-                                date,
-                                upc,
-                                store,
-                                qty,
-                                store_type,
-                                num,
-                                code,
-                                connection_pool)
-
-                i += 1
-
-        print(f'\n Delivery Data Imported')
+        print(f'\nDelivery Data Imported')
 
     def delivery_update(self, file):
 
@@ -128,10 +130,10 @@ class Replenishment():
         df = df[df.upc_len == 12]
         df.pop('upc_len')
 
-        # store numbers collumn added
+        # store numbers column added
         df['store'] = df.Name.str.extract('(\d+)')
 
-        # getting the data to provide store_types collumn for database
+        # getting the data to provide store_types column for database
 
         if self.store_type_input == 'kvat':
             df[['store_type', 'letter1']] = df.Name.str.split(':', n=1, expand=True)
@@ -257,55 +259,92 @@ class Replenishment():
         update = 0
         insert = 0
 
-        with DbConfig.EnginePoolDB() as connection:
+        # call in data to check
+        with DbConfig.EnginePoolDB() as engine:
 
-            while i < len(new_deliv_transform):
+            store_type = new_deliv_transform.loc[i, 'store_type']
 
-                transition_year = new_deliv_transform.loc[i, 'transition_year']
+            db_delivery_table = psql.read_sql(f"""
+            
+            SELECT * FROM grocery.DELIVERY 
+            WHERE store_type ='{store_type}'""", engine)
 
-                transition_season = new_deliv_transform.loc[i, 'transition_season']
+        col_names = new_deliv_transform.columns.to_list()
 
-                type = new_deliv_transform.loc[i, 'type']
+        # create tables for df
+        df_potential_db_update = pd.DataFrame(columns=col_names)
+        df_potential_db_insert = pd.DataFrame(columns=col_names)
 
-                date = new_deliv_transform.loc[i, 'date']
+        while i < len(new_deliv_transform):
 
-                upc = new_deliv_transform.loc[i, 'upc']
+            type = new_deliv_transform.loc[i, 'type']
 
-                store = new_deliv_transform.loc[i, 'store']
+            date = new_deliv_transform.loc[i, 'date']
 
-                qty = new_deliv_transform.loc[i, 'qty']
+            upc = new_deliv_transform.loc[i, 'upc']
 
-                store_type = new_deliv_transform.loc[i, 'store_type']
+            store = new_deliv_transform.loc[i, 'store']
 
-                num = new_deliv_transform.loc[i, 'num']
+            store_type = new_deliv_transform.loc[i, 'store_type']
 
-                code = new_deliv_transform.loc[i, 'code']
+            num = new_deliv_transform.loc[i, 'num']
 
-                duplicate_check = psql.read_sql(f"""
-                                                    SELECT * FROM grocery.DELIVERY 
-                                                    WHERE type ='{type}' and 
-                                                            date = '{date}' and 
-                                                            store = {store} and 
-                                                            upc = '{upc}' and 
-                                                            store_type = '{store_type}' and
-                                                            code = '{code}' and
-                                                            num = '{num}'
-                                                """, connection)
+            code = new_deliv_transform.loc[i, 'code']
 
-                duplicate_check_len = len(duplicate_check)
+            duplicate_check = db_delivery_table[(db_delivery_table['type'] == type) &
+                                                # (db_delivery_table['date'] == f'{date}')]
+                                                (db_delivery_table['upc'] == upc) &
+                                                (db_delivery_table['store'] == store) &
+                                                (db_delivery_table['store'] == store_type) &
+                                                (db_delivery_table['num'] == num) &
+                                                (db_delivery_table['code'] == code)]
 
-                if duplicate_check_len == 1:
-                    delivery_update(transition_year, transition_season, type, date,
-                                    upc, store, qty, store_type, num, code, self.connection_pool)
-                    update += 1
-                else:
-                    delivery_insert(transition_year,
-                                    transition_season,
-                                    type, date, upc, store, qty, store_type,
-                                    num, code, self.connection_pool)
-                    insert += 1
+            if len(duplicate_check) == 1:
 
-                i += 1
+                df_potential_db_update = pd.concat([df_potential_db_update, new_deliv_transform.loc[i].to_frame().T],
+                                                   ignore_index=True)
+                update += 1
+
+            elif len(duplicate_check) == 0:
+
+                df_potential_db_insert = pd.concat([df_potential_db_insert, new_deliv_transform.loc[i].to_frame().T],
+                                                   ignore_index=True)
+                insert += 1
+
+            else:
+                raise Exception('Error')
+
+            i += 1
+
+        with PsycoPoolDB() as connection_pool:
+
+            # reordering the columns for the update
+
+            cols = df_potential_db_update.columns.to_list()
+            reorder = cols[:8] + cols[9:] + cols[8:9]
+            df_potential_db_update = df_potential_db_update[reorder]
+
+            query = f"""
+            UPDATE grocery.item_support2 
+            set season = %s, 
+                category = %s, 
+                type = %s, 
+                style = %s, 
+                additional = %s, 
+                display_size = %s, 
+                pog_type = %s, 
+                upc = %s, 
+                code_qb = %s, 
+                unique_replen_code = %s, 
+                case_size = %s, 
+                item_group_desc = %s,
+                item_desc = %s, 
+                packing = %s, 
+                upc_11_digit = %s 
+            where code = %s"""
+
+            # update_execute_batch(connection_pool, df_potential_db_update, query)
+            # insert_execute_batch(connection_pool, df_potential_db_insert, 'grocery.delivery')
 
         print(f'\n {self.store_type_input} Delivery Data Updated')
         print('Updated:', update, 'Records')
@@ -320,38 +359,40 @@ class Replenishment():
          upc, sales, qty, current_year, current_week, store_type)"""
 
         new_sales = pd.read_excel(f'{file}')
-
-        new_len = len(new_sales)
-        i = 0
+        #
+        # new_len = len(new_sales)
+        # i = 0
 
         with DbConfig.PsycoPoolDB() as connection_pool:
 
-            while i < new_len:
-                transition_year = new_sales.loc[i, 'transition_year']
-                transition_season = new_sales.loc[i, 'transition_season']
-                store_year = new_sales.loc[i, 'store_year']
-                date = new_sales.loc[i, 'date']
-                store_week = new_sales.loc[i, 'store_week']
-                store_number = new_sales.loc[i, 'store_number']
-                upc = new_sales.loc[i, 'upc']
-                sales = new_sales.loc[i, 'sales']
-                qty = new_sales.loc[i, 'qty']
-                current_year = new_sales.loc[i, 'current_year']
-                current_week = new_sales.loc[i, 'current_week']
-                code = new_sales.loc[i, 'code']
-                store_type = new_sales.loc[i, 'store_type']
+            insert_execute_batch(connection_pool, new_sales, 'grocery.sales')
 
-                # code not needed because all dbs are being combined
-                # if store_type != self.store_type_input:
-                # raise Exception(f'Data Validation Failed Inserted data for {store_type} for {self.store_type_input} database')
+            # while i < new_len:
+            #     transition_year = new_sales.loc[i, 'transition_year']
+            #     transition_season = new_sales.loc[i, 'transition_season']
+            #     store_year = new_sales.loc[i, 'store_year']
+            #     date = new_sales.loc[i, 'date']
+            #     store_week = new_sales.loc[i, 'store_week']
+            #     store_number = new_sales.loc[i, 'store_number']
+            #     upc = new_sales.loc[i, 'upc']
+            #     sales = new_sales.loc[i, 'sales']
+            #     qty = new_sales.loc[i, 'qty']
+            #     current_year = new_sales.loc[i, 'current_year']
+            #     current_week = new_sales.loc[i, 'current_week']
+            #     code = new_sales.loc[i, 'code']
+            #     store_type = new_sales.loc[i, 'store_type']
+            #
+            #     # code not needed because all dbs are being combined
+            #     # if store_type != self.store_type_input:
+            #     # raise Exception(f'Data Validation Failed Inserted data for {store_type} for {self.store_type_input} database')
+            #
+            #     sales_insert(transition_year, transition_season, store_year, date,
+            #                  store_week, store_number, upc, sales,
+            #                  qty, current_year, current_week, code, store_type,
+            #                  connection_pool)
+            #     i += 1
 
-                sales_insert(transition_year, transition_season, store_year, date,
-                             store_week, store_number, upc, sales,
-                             qty, current_year, current_week, code, store_type,
-                             connection_pool)
-                i += 1
-
-        print(f'\n Sales Data Imported')
+        print(f'\nSales Data Imported')
 
     def sales_update(self, current_weeks_sales=None, previous_weeks_sales=None):
 
@@ -560,70 +601,64 @@ class Replenishment():
 
         update = 0
         insert = 0
-
-        item_support = len(itemsupport)
         i = 0
 
-        with DbConfig.PsycoPoolDB() as connection_pool:
+        # pulling support sheet from database
+        with DbConfig.EnginePoolDB() as engine:
 
-            with DbConfig.EnginePoolDB() as engine:
+            print('Connection')
 
-                logging.warning('Connection being made')
-                print('Connection')
+            db_support_sheet = psql.read_sql(f"""select code from grocery.item_support2""", engine)
+            print('support sheet data pulled from db')
 
-                db_support_sheet = psql.read_sql(f"""select code from grocery.item_support2""", engine)
-                print('db pulled')
+        col_names = itemsupport.columns.to_list()
 
-                col_names = itemsupport.columns.to_list()
+        # create tables for df
+        df_potential_db_update = pd.DataFrame(columns=col_names)
+        df_potential_db_insert = pd.DataFrame(columns=col_names)
 
-                # create tables for df
-                df_potential_db_update = pd.DataFrame(columns=col_names)
-                df_potential_db_insert = pd.DataFrame(columns=col_names)
+        while i < len(itemsupport):
 
-                while i < item_support:
+            # season = itemsupport.loc[i, 'season']
+            # category = itemsupport.loc[i, 'category']
+            # type = itemsupport.loc[i, 'type']
+            # style = itemsupport.loc[i, 'style']
+            # additional = itemsupport.loc[i, 'additional']
+            # display_size = itemsupport.loc[i, 'display_size']
+            # pog_type = itemsupport.loc[i, 'pog_type']
+            # upc = itemsupport.loc[i, 'upc']
+            code = itemsupport.loc[i, 'code']
+            # code_qb = itemsupport.loc[i, 'code_qb']
+            # unique_replen_code = itemsupport.loc[i, 'unique_replen_code']
+            # case_size = itemsupport.loc[i, 'case_size']
+            # item_group_desc = itemsupport.loc[i, 'item_group_desc']
+            # item_desc = itemsupport.loc[i, 'item_desc']
+            # packing = itemsupport.loc[i, 'packing']
+            # upc_11_digit = str(int(itemsupport.loc[i, 'upc_11_digit']))
 
-                    logging.warning(f'line {i} support sheet')
+            logging.debug('Duplicate check being made')
 
-                    # season = itemsupport.loc[i, 'season']
-                    # category = itemsupport.loc[i, 'category']
-                    # type = itemsupport.loc[i, 'type']
-                    # style = itemsupport.loc[i, 'style']
-                    # additional = itemsupport.loc[i, 'additional']
-                    # display_size = itemsupport.loc[i, 'display_size']
-                    # pog_type = itemsupport.loc[i, 'pog_type']
-                    # upc = itemsupport.loc[i, 'upc']
-                    code = itemsupport.loc[i, 'code']
-                    # code_qb = itemsupport.loc[i, 'code_qb']
-                    # unique_replen_code = itemsupport.loc[i, 'unique_replen_code']
-                    # case_size = itemsupport.loc[i, 'case_size']
-                    # item_group_desc = itemsupport.loc[i, 'item_group_desc']
-                    # item_desc = itemsupport.loc[i, 'item_desc']
-                    # packing = itemsupport.loc[i, 'packing']
-                    # upc_11_digit = str(int(itemsupport.loc[i, 'upc_11_digit']))
+            duplicate_check = db_support_sheet[db_support_sheet['code'] == code]
 
-                    logging.debug('Duplicate check being made')
+            if len(duplicate_check) == 1:
 
-                    duplicate_check = db_support_sheet[db_support_sheet['code'] == code]
+                logging.warning(f'Updating Data')
 
-                    if len(duplicate_check) == 1:
+                df_potential_db_update = pd.concat([df_potential_db_update, itemsupport.loc[i].to_frame().T],
+                                                   ignore_index=True)
 
-                        logging.warning(f'Updating Data')
+                update += 1
 
-                        df_potential_db_update = pd.concat([df_potential_db_update, itemsupport.loc[i].to_frame().T],
-                                                           ignore_index=True)
+            else:
 
-                        update += 1
+                logging.warning(f'Inserting Data')
 
-                    else:
+                df_potential_db_insert = pd.concat([df_potential_db_insert, itemsupport.loc[i].to_frame().T],
+                                                   ignore_index=True)
 
-                        logging.warning(f'Inserting Data')
+                insert += 1
 
-                        df_potential_db_update = pd.concat([df_potential_db_update, itemsupport.loc[i].to_frame().T],
-                                                           ignore_index=True)
-
-                        insert += 1
-
-                    i += 1
+            i += 1
 
             # df_potential_db_update['upc_11_digit'] = df_potential_db_update['upc_11_digit'].astype(str)
             # df_potential_db_update['style'] = df_potential_db_update['style'].astype(str)
@@ -633,7 +668,33 @@ class Replenishment():
             # df_potential_db_update['case_size'] = df_potential_db_update['case_size'].astype(str)
             # df_potential_db_update['unique_replen_code'] = df_potential_db_update['unique_replen_code'].astype(str)
 
-            support_sheet_update_execute_batch(connection_pool, df_potential_db_update, 'grocery.item_support2')
+        with DbConfig.PsycoPoolDB() as connection_pool:
+            # reordering the columns for the update
+
+            cols = df_potential_db_update.columns.to_list()
+            reorder = cols[:8] + cols[9:] + cols[8:9]
+            df_potential_db_update = df_potential_db_update[reorder]
+
+            query = f"""
+            UPDATE grocery.item_support2 
+            set season = %s, 
+                category = %s, 
+                type = %s, 
+                style = %s, 
+                additional = %s, 
+                display_size = %s, 
+                pog_type = %s, 
+                upc = %s, 
+                code_qb = %s, 
+                unique_replen_code = %s, 
+                case_size = %s, 
+                item_group_desc = %s,
+                item_desc = %s, 
+                packing = %s, 
+                upc_11_digit = %s 
+            where code = %s"""
+
+            update_execute_batch(connection_pool, df_potential_db_update, query)
             insert_execute_batch(connection_pool, df_potential_db_insert, 'grocery.item_support2')
 
         print('\nSupport Sheet Imported')

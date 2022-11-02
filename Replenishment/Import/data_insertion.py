@@ -232,31 +232,16 @@ def item_support_update(season,
     connection_pool.putconn(connection)
 
 
-def support_sheet_update_execute_batch(connection_pool, df, table, page_size=100):
+def update_execute_batch(connection_pool, df, query, page_size=100):
 
     """
     Using psycopg2.extras.execute_batch() to insert the dataframe
     """
 
-    # Comma-separated dataframe columns
-    cols = df.columns.to_list()
-    reorder = cols[:8] + cols[9:] + cols[8:9]
-    df = df[reorder]
-    number_of_columns = len(list(df.columns))
+    # number_of_columns = len(list(df.columns))
 
     # Create a list of tuples from the dataframe values
     tuples_list = [tuple(x) for x in df.to_numpy()]
-
-    values = '%%s'
-
-    for i in range(number_of_columns-1):
-        values = values + ',%%s'
-
-    # SQL query to execute
-    query = f"""
-    UPDATE %s 
-    set season = %%s, 
-    category = %%s, type = %%s, style = %%s, additional = %%s, display_size = %%s, pog_type = %%s, upc = %%s, code_qb = %%s, unique_replen_code = %%s, case_size = %%s, item_group_desc = %%s,item_desc = %%s, packing = %%s, upc_11_digit = %%s where code = %%s""" % table
 
     connection = connection_pool.getconn()
     cursor = connection.cursor()
@@ -264,13 +249,14 @@ def support_sheet_update_execute_batch(connection_pool, df, table, page_size=100
     try:
         extras.execute_batch(cursor, query, tuples_list, page_size)
         connection.commit()
+        print("update execute_batch() done")
 
     except (Exception, psycopg2.DatabaseError) as error:
         print("Error: %s" % error)
         connection.rollback()
         cursor.close()
+        print("update execute_batch() Failed")
 
-    print("update execute_batch() done")
     cursor.close()
 
 
