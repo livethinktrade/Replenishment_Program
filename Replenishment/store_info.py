@@ -5,6 +5,10 @@ from Sales_Report.Reports.reports import *
 from Sales_Report.Replenishment.replenishment import *
 from store_list import *
 import DbConfig
+import logging
+
+logging.basicConfig(filename='test.log', format='%(filename)s: %(message)s',
+                    level=logging.DEBUG)
 
 
 class Replenishment():
@@ -564,78 +568,73 @@ class Replenishment():
 
             with DbConfig.EnginePoolDB() as engine:
 
+                logging.warning('Connection being made')
+                print('Connection')
+
+                db_support_sheet = psql.read_sql(f"""select code from grocery.item_support2""", engine)
+                print('db pulled')
+
+                col_names = itemsupport.columns.to_list()
+
+                # create tables for df
+                df_potential_db_update = pd.DataFrame(columns=col_names)
+                df_potential_db_insert = pd.DataFrame(columns=col_names)
+
                 while i < item_support:
 
-                    season = itemsupport.loc[i, 'season']
-                    category = itemsupport.loc[i, 'category']
-                    type = itemsupport.loc[i, 'type']
-                    style = itemsupport.loc[i, 'style']
-                    additional = itemsupport.loc[i, 'additional']
-                    display_size = itemsupport.loc[i, 'display_size']
-                    pog_type = itemsupport.loc[i, 'pog_type']
-                    upc = itemsupport.loc[i, 'upc']
-                    code = itemsupport.loc[i, 'code']
-                    code_qb = itemsupport.loc[i, 'code_qb']
-                    unique_replen_code = itemsupport.loc[i, 'unique_replen_code']
-                    case_size = itemsupport.loc[i, 'case_size']
-                    item_group_desc = itemsupport.loc[i, 'item_group_desc']
-                    item_desc = itemsupport.loc[i, 'item_desc']
-                    packing = itemsupport.loc[i, 'packing']
-                    upc_11_digit = str(int(itemsupport.loc[i, 'upc_11_digit']))
+                    logging.warning(f'line {i} support sheet')
 
-                    duplicate_check = psql.read_sql(f"""
-                                                        select * from grocery.item_support2
-                                                        where code = '{code}' 
-                                                        """, engine)
+                    # season = itemsupport.loc[i, 'season']
+                    # category = itemsupport.loc[i, 'category']
+                    # type = itemsupport.loc[i, 'type']
+                    # style = itemsupport.loc[i, 'style']
+                    # additional = itemsupport.loc[i, 'additional']
+                    # display_size = itemsupport.loc[i, 'display_size']
+                    # pog_type = itemsupport.loc[i, 'pog_type']
+                    # upc = itemsupport.loc[i, 'upc']
+                    code = itemsupport.loc[i, 'code']
+                    # code_qb = itemsupport.loc[i, 'code_qb']
+                    # unique_replen_code = itemsupport.loc[i, 'unique_replen_code']
+                    # case_size = itemsupport.loc[i, 'case_size']
+                    # item_group_desc = itemsupport.loc[i, 'item_group_desc']
+                    # item_desc = itemsupport.loc[i, 'item_desc']
+                    # packing = itemsupport.loc[i, 'packing']
+                    # upc_11_digit = str(int(itemsupport.loc[i, 'upc_11_digit']))
+
+                    logging.debug('Duplicate check being made')
+
+                    duplicate_check = db_support_sheet[db_support_sheet['code'] == code]
+
                     if len(duplicate_check) == 1:
 
-                        item_support_update(season,
-                                            category,
-                                            type,
-                                            style,
-                                            additional,
-                                            display_size,
-                                            pog_type,
-                                            upc,
-                                            code,
-                                            code_qb,
-                                            unique_replen_code,
-                                            case_size,
-                                            item_group_desc,
-                                            item_desc,
-                                            packing,
-                                            upc_11_digit,
-                                            connection_pool)
+                        logging.warning(f'Updating Data')
+
+                        df_potential_db_update = pd.concat([df_potential_db_update, itemsupport.loc[i].to_frame().T],
+                                                           ignore_index=True)
+
                         update += 1
 
                     else:
 
-                        try:
+                        logging.warning(f'Inserting Data')
 
-                            item_support_insert(season,
-                                                category,
-                                                type,
-                                                style,
-                                                additional,
-                                                display_size,
-                                                pog_type,
-                                                upc,
-                                                code,
-                                                code_qb,
-                                                unique_replen_code,
-                                                case_size,
-                                                item_group_desc,
-                                                item_desc,
-                                                packing,
-                                                upc_11_digit,
-                                                connection_pool)
-
-                        except Exception as e:
-                            print("\nERROR : " + str(e) + f'Quickbook Item:  {code}')
+                        df_potential_db_update = pd.concat([df_potential_db_update, itemsupport.loc[i].to_frame().T],
+                                                           ignore_index=True)
 
                         insert += 1
 
                     i += 1
+
+            # df_potential_db_update['upc_11_digit'] = df_potential_db_update['upc_11_digit'].astype(str)
+            # df_potential_db_update['style'] = df_potential_db_update['style'].astype(str)
+            # df_potential_db_update['additional'] = df_potential_db_update['additional'].astype(str)
+            # df_potential_db_update['upc'] = df_potential_db_update['upc'].astype(str)
+            # df_potential_db_update['packing'] = df_potential_db_update['packing'].astype(str)
+            # df_potential_db_update['case_size'] = df_potential_db_update['case_size'].astype(str)
+            # df_potential_db_update['unique_replen_code'] = df_potential_db_update['unique_replen_code'].astype(str)
+
+            support_sheet_update_execute_batch(connection_pool, df_potential_db_update, 'grocery.item_support2')
+            insert_execute_batch(connection_pool, df_potential_db_insert, 'grocery.item_support2')
 
         print('\nSupport Sheet Imported')
         print(f'Updated: {update}\nInserted: {insert}')
