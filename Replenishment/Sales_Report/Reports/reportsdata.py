@@ -1494,7 +1494,7 @@ class ReportsData:
                        when current_week.sales < 0 or previous_week.sales <= 0
                            then NULL
                        when current_week.sales >= 0 or previous_week.sales > 0
-                           then round(((current_week.sales-previous_week.sales)/(previous_week.sales)),2)
+                           then ((current_week.sales-previous_week.sales)/(previous_week.sales))
                        end as WOW_sales_percentage,
 
 
