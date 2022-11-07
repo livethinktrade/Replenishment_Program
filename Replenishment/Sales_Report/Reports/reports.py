@@ -244,6 +244,31 @@ class Reports:
                                          startrow=14,
                                          startcol=12)
 
+            # Qty Sales Report for cincinatti only
+            if self.store_type_input == 'kroger_cincinatti':
+
+                sales_table_qty_report = self.reports.sales_table_qty()
+                sales_rank_table = self.reports.item_sales_rank_qty()
+
+                sales_table_qty_report.to_excel(writer,
+                                                sheet_name="Qty Report",
+                                                index=False,
+                                                header=(
+                                                    'Store (#)', 'Current Week Qty Sold', 'Previous Week Qty Sold',
+                                                    '% +/- Change WOW', 'Qty Sold 2022 Current Week',
+                                                    'Qty Sold 2021 Current Week', '% +/- Change YOY',
+                                                    'Qty Sold 2022 YTD', 'Qty Sold 2021 YTD', '% +/- Change (YOY)')
+                                                )
+
+                sales_rank_table.to_excel(writer, sheet_name="Qty Report",
+                                          index=True,
+                                          columns=('item_group_desc', 'units_sold', 'units sold per active store', 'active stores',
+                                                   'percent_of_total_sales'),
+                                          header=('item', 'Units Sold', 'Units Sold Per Active Store', 'Active Stores',
+                                                  '% of Annual Sales'),
+                                          startrow=14,
+                                          startcol=12)
+
             # no scans tab
             in_season_setting = self.store_setting.loc['In_Season', 'values']
 
