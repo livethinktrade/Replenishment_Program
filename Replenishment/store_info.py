@@ -7,7 +7,7 @@ from store_list import *
 import DbConfig
 
 
-class Replenishment():
+class Replenishment:
 
     def __init__(self, store_type_input):
         
@@ -915,3 +915,24 @@ class Replenishment():
         print('Kroger Corporate Report Generated')
 
 
+class DataLocker:
+
+    def __init__(self, store_type_input):
+
+        with EnginePoolDB() as engine:
+
+            self.bandaids_table = psql.read_sql(f"select * from {store_type_input}.bandaids", engine)
+
+            self.delivery_table = psql.read_sql(f"select * from {store_type_input}.delivery2", engine)
+
+            self.item_approval_table = psql.read_sql(f"select * from {store_type_input}.item_approval", engine)
+
+            self.sales_table = psql.read_sql(f"select * from {store_type_input}.sales2", engine)
+
+            self.store_info_table = psql.read_sql(f"select * from {store_type_input}.store", engine)
+
+            self.store_planogram_table = psql.read_sql(f"select * from {store_type_input}.store_program", engine)
+
+            self.store_planogram_history_table = psql.read_sql(f"select * from {store_type_input}.store_program_history", engine)
+
+            # self.year_week_verify = psql.read_sql(f"select * from {store_type_input}.year_week_verify", engine)
