@@ -35,6 +35,8 @@ class Replenishment:
         self.master_planogram = pd.read_excel(r'C:\Users\User1\OneDrive\WinWin Staff Folders\Michael\Replenishment program\Replenishment\support document\MASTER PLANOGRAM.xlsx',
                                               sheet_name='MASTER PLANOGRAM UPDATED', skiprows=1, )
 
+        self.data_locker = DataLocker(self.store_type_input)
+
     def delivery_import(self, file):
 
         """This takes in an excel file and inserts delivery data into postgres
@@ -208,9 +210,11 @@ class Replenishment:
         new_deliv_transform = new_deliv_transform.reset_index(drop=True)
         new_deliv_transform['store'] = new_deliv_transform['store'].astype(str)
 
-        # Transition Setting Verification
-        # This section is here to make sure each item being inserted into the table is
-        # contains the correct transition settings
+        """ 
+        Transition Setting Verification
+        This section is here to make sure each item being inserted into the table is
+        contains the correct transition settings
+        """
 
         verification = new_deliv_transform.copy()
         verification[['code', 'season']] = verification.code.str.split('-', n=1, expand=True)
