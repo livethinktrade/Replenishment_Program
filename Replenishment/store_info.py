@@ -4,6 +4,7 @@ from Update.Transform_Sales_Data.history_tracking import *
 from Sales_Report.Reports.reports import *
 from Sales_Report.Replenishment.replenishment import *
 from store_list import *
+from datetime import datetime
 import DbConfig
 
 
@@ -258,6 +259,62 @@ class Replenishment:
 
         else:
             raise Exception(f"Error: transition Season should only be SS or FW. Currently Set to {self.transition_season}")
+
+        # Band-Aid Duplicate Entry Verification Process
+        bandaid_verification = new_deliv_transform[new_deliv_transform['type'] == 'Credit Memo']
+        bandaid_verification = bandaid_verification.reset_index(drop=True)
+
+        # inner join the item_support dataframe to get the item_group_desc column
+        bandaid_verification = bandaid_verification.merge(self.data_locker.support_sheet, on='code', how='left')
+        # bandaid_verification = bandaid_verification[['store', 'item_group_desc', 'qty', 'store_type']]
+
+        bandaid_table_in_db = self.data_locker.bandaids_table
+        bandaid_col_names = bandaid_table_in_db.columns.to_list()
+        df_potential_insert = pd.DataFrame(columns=bandaid_col_names)
+
+        delivery_table_in_db = self.data_locker.delivery_table
+
+        # take the filtered df and then check to see if they are in the db
+
+        i = 0
+
+        while i < len(bandaid_verification):
+
+            type = bandaid_verification.loc[i, 'type_x']
+
+            date_unconverted = bandaid_verification.loc[i, 'date']
+            date = datetime.strptime(date_unconverted, "%m/%d/%Y").date()
+            store = int(bandaid_verification.loc[i, 'store'])
+            upc = bandaid_verification.loc[i, 'upc_x']
+            store_type = bandaid_verification.loc[i, 'store_type']
+            code = bandaid_verification.loc[i, 'code']
+            num = bandaid_verification.loc[i, 'num']
+
+            duplicate_check = delivery_table_in_db[(delivery_table_in_db['date'] == date) &
+                                                   (delivery_table_in_db['type'] == type) &
+                                                   (delivery_table_in_db['store'] == store) &
+                                                   (delivery_table_in_db['upc'] == upc) &
+                                                   (delivery_table_in_db['store_type'] == store_type) &
+                                                   (delivery_table_in_db['code'] == code) &
+                                                   (delivery_table_in_db['num'] == num)
+                                                   ]
+
+            if len(duplicate_check) == 1:
+                pass # if data is already in the delivery table then no need to adjust bandaid table
+
+            elif len(duplicate_check) == 0:
+                pass # proceed to see if adjustment is needed
+
+            else:
+                raise Exception(f"Error: Possible Duplicate Entry. Investigate error invoice num: {num}")
+
+            i += 1
+
+            # if in db go to next cm and verify
+            # if not then check to see if there is band aid that needs to check for adjustments
+
+                # If band aid exist then adjust accordingly
+                # If band aid doesn't exist then insert anyway
 
         # Loading Data into DB
 
@@ -924,5 +981,7 @@ class DataLocker:
             self.store_planogram_table = psql.read_sql(f"select * from {store_type_input}.store_program", engine)
 
             self.store_planogram_history_table = psql.read_sql(f"select * from {store_type_input}.store_program_history", engine)
+
+            self.support_sheet = psql.read_sql(f"select * from public.item_support2", engine)
 
             # self.year_week_verify = psql.read_sql(f"select * from {store_type_input}.year_week_verify", engine)
