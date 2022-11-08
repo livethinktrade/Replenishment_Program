@@ -149,32 +149,19 @@ class Replenishment:
 
         df.pop('Name')
 
-        store_list = {
-            'ACME MARKETS': 'acme',
-            'JEWEL OSCO': 'jewel',
-            'KROGER CENTRAL': 'kroger_central',
-            'INTERMOUNTAIN DIVISION': 'intermountain',
-            'KROGER COLUMBUS': 'kroger_columbus',
-            'KROGER DALLAS': 'kroger_dallas',
-            'KROGER DELTA': 'kroger_delta',
-            'KROGER MICHIGAN': 'kroger_michigan',
-            'ALBERTSONS DENVER': 'safeway_denver',
-            'TEXAS DIVISION': 'texas_division',
-            'KVAT FOOD STORES': 'kvat',
-            'FRESH ENCOUNTER': 'fresh_encounter',
-            'KROGER KING SOOPERS': 'kroger_king_soopers',
-            'KROGER DILLONS': 'kroger_dillons',
-            'KROGER CINCINNATI': 'kroger_cincinatti',
-            'KROGER ATLANTA': 'kroger_atlanta',
-            'KROGER NASHVILLE': 'kroger_nashville',
-            'KROGER LOUISVILLE': 'kroger_louisville',
-            'FOLLETT': 'follett'
+        delivery_name = df.iloc[0, 9]
 
-        }
+        try:
+            store_list_filtered = store_list[(store_list['Delivery Name'] == delivery_name)]
 
-        store_type = df.iloc[0, 9]
+            store_list_filtered = store_list_filtered.reset_index(drop=True)
 
-        df['store_type'] = store_list[store_type]
+            store_type = store_list_filtered.loc[0, 'store_type_input']
+
+        except KeyError:
+            raise Exception("Update Store List File in the Support Documents Folder")
+
+        df['store_type'] = store_type
 
         # renaming columns and putting them in the right order
 
@@ -220,7 +207,6 @@ class Replenishment:
 
         new_deliv_transform = new_deliv_transform.reset_index(drop=True)
         new_deliv_transform['store'] = new_deliv_transform['store'].astype(str)
-
 
         # Transition Setting Verification
         # This section is here to make sure each item being inserted into the table is

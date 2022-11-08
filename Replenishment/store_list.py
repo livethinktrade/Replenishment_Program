@@ -6,6 +6,8 @@ from psycopg2.extensions import register_adapter, AsIs
 
 psycopg2.extensions.register_adapter(np.int64, psycopg2._psycopg.AsIs)
 
+store_list = pd.read_excel(r'C:\Users\User1\OneDrive\WinWin Staff Folders\Michael\Replenishment program\Replenishment\support document\Store List.xlsx')
+
 kroger_stores = [
 
     'kroger_atlanta',
