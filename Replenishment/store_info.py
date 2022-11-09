@@ -1,3 +1,5 @@
+import pandas as pd
+
 from Import.data_insertion import *
 from Update.Transform_Sales_Data.transform import *
 from Update.Transform_Sales_Data.history_tracking import *
@@ -162,7 +164,7 @@ class Replenishment:
             store_type = store_list_filtered.loc[0, 'store_type_input']
 
         except KeyError:
-            raise Exception("Update Store List File in the Support Documents Folder")
+            raise Exception("Update Store List File in the Support Documents Folder. Add new stores if needed")
 
         df['store_type'] = store_type
 
@@ -260,61 +262,11 @@ class Replenishment:
         else:
             raise Exception(f"Error: transition Season should only be SS or FW. Currently Set to {self.transition_season}")
 
-        # Band-Aid Duplicate Entry Verification Process
-        bandaid_verification = new_deliv_transform[new_deliv_transform['type'] == 'Credit Memo']
-        bandaid_verification = bandaid_verification.reset_index(drop=True)
+        # Refresh Program (Band-Aid & Credit Memo duplication prevention program)
 
-        # inner join the item_support dataframe to get the item_group_desc column
-        bandaid_verification = bandaid_verification.merge(self.data_locker.support_sheet, on='code', how='left')
-        # bandaid_verification = bandaid_verification[['store', 'item_group_desc', 'qty', 'store_type']]
-
-        bandaid_table_in_db = self.data_locker.bandaids_table
-        bandaid_col_names = bandaid_table_in_db.columns.to_list()
-        df_potential_insert = pd.DataFrame(columns=bandaid_col_names)
-
-        delivery_table_in_db = self.data_locker.delivery_table
-
-        # take the filtered df and then check to see if they are in the db
-
-        i = 0
-
-        while i < len(bandaid_verification):
-
-            type = bandaid_verification.loc[i, 'type_x']
-
-            date_unconverted = bandaid_verification.loc[i, 'date']
-            date = datetime.strptime(date_unconverted, "%m/%d/%Y").date()
-            store = int(bandaid_verification.loc[i, 'store'])
-            upc = bandaid_verification.loc[i, 'upc_x']
-            store_type = bandaid_verification.loc[i, 'store_type']
-            code = bandaid_verification.loc[i, 'code']
-            num = bandaid_verification.loc[i, 'num']
-
-            duplicate_check = delivery_table_in_db[(delivery_table_in_db['date'] == date) &
-                                                   (delivery_table_in_db['type'] == type) &
-                                                   (delivery_table_in_db['store'] == store) &
-                                                   (delivery_table_in_db['upc'] == upc) &
-                                                   (delivery_table_in_db['store_type'] == store_type) &
-                                                   (delivery_table_in_db['code'] == code) &
-                                                   (delivery_table_in_db['num'] == num)
-                                                   ]
-
-            if len(duplicate_check) == 1:
-                pass # if data is already in the delivery table then no need to adjust bandaid table
-
-            elif len(duplicate_check) == 0:
-                pass # proceed to see if adjustment is needed
-
-            else:
-                raise Exception(f"Error: Possible Duplicate Entry. Investigate error invoice num: {num}")
-
-            i += 1
-
-            # if in db go to next cm and verify
-            # if not then check to see if there is band aid that needs to check for adjustments
-
-                # If band aid exist then adjust accordingly
-                # If band aid doesn't exist then insert anyway
+        bandaid = StoreRefresh(self.data_locker)
+        bandaid.bandaid_adjustments_duplication_prevention(new_deliv_transform)
+        bandaid_adjustments = bandaid.new_bandaid_adjustments
 
         # Loading Data into DB
 
@@ -984,4 +936,162 @@ class DataLocker:
 
             self.support_sheet = psql.read_sql(f"select * from public.item_support2", engine)
 
-            # self.year_week_verify = psql.read_sql(f"select * from {store_type_input}.year_week_verify", engine)
+            self.year_week_verify = psql.read_sql(f"select * from {store_type_input}.year_week_verify", engine)
+
+
+class StoreRefresh:
+
+    """
+    This is the protocol for when any sales member wants to do a Refresh for a given division.
+
+    The purpose of this is when someone want to zero out the inventory for a given store because
+    they sent return labels to them and sent those stores  new cases of items.
+
+    The solution to create space for the new items in the planogram is to manually insert band-aids to zero the
+    inventory out. However, this creates a problem because if we issue them a band aid right now, then the Credit Memo
+    will get registered in the systems 4 months later. Which would in turn create a scenario where there is a
+    double entry. To prevent this the following logic will be followed in the code.
+    """
+    
+    def __init__(self, data_locker):
+        
+        self.data_locker = data_locker
+        self.bandaid_table_in_db = self.data_locker.bandaids_table
+        self.delivery_table_in_db = self.data_locker.delivery_table
+
+        # Create a df for potential adjustments to the band-aids table
+        self.bandaid_col_names = self.bandaid_table_in_db.columns.to_list()
+        self.new_bandaid_adjustments = pd.DataFrame(columns=self.bandaid_col_names)
+
+    def bandaid_adjustments_duplication_prevention(self, new_deliv_transform):
+
+        filtered_credit_memo = self.filtered_credit_memo(new_deliv_transform)
+        self.delivery_table_duplicate_data_check(filtered_credit_memo)
+
+    def filtered_credit_memo(self, new_deliv_transform):
+
+        """
+        Takes the transformed df from the delivery update method in the replenishment class
+        and then filters only the credit memos (CM)
+
+        :return filtered df with only (CM) data
+
+        """
+
+        # Band-Aid Duplicate Entry Verification Process
+        bandaid_verification = new_deliv_transform[new_deliv_transform['type'] == 'Credit Memo']
+        bandaid_verification = bandaid_verification.reset_index(drop=True)
+
+        # inner join the item_support dataframe to get the item_group_desc column
+        filtered_credit_memo = bandaid_verification.merge(self.data_locker.support_sheet, on='code', how='left')
+        # bandaid_verification = bandaid_verification[['store', 'item_group_desc', 'qty', 'store_type']]
+
+        return filtered_credit_memo
+
+    def delivery_table_duplicate_data_check(self, filtered_credit_memo):
+        
+        i = 0
+
+        while i < len(filtered_credit_memo):
+
+            invoice_type = filtered_credit_memo.loc[i, 'type_x']
+
+            date_unconverted = filtered_credit_memo.loc[i, 'date']
+            date = datetime.strptime(date_unconverted, "%m/%d/%Y").date()
+
+            store_id = int(filtered_credit_memo.loc[i, 'store'])
+            upc = filtered_credit_memo.loc[i, 'upc_x']
+            store_type = filtered_credit_memo.loc[i, 'store_type']
+            code = filtered_credit_memo.loc[i, 'code']
+            num = filtered_credit_memo.loc[i, 'num']
+            item_group_desc = filtered_credit_memo.loc[i, 'item_group_desc']
+
+            # check if cm qty is negative
+            credit_memo_qty = filtered_credit_memo.loc[i, 'qty']
+
+            if credit_memo_qty <= 0:
+                pass
+            else:
+                raise Exception(f"Credit Memo Qty is not negative value: {credit_memo_qty}")
+
+
+            duplicate_check = self.delivery_table_in_db[(self.delivery_table_in_db['date'] == date) &
+                                                   (self.delivery_table_in_db['type'] == invoice_type) &
+                                                   (self.delivery_table_in_db['store'] == store_id) &
+                                                   (self.delivery_table_in_db['upc'] == upc) &
+                                                   (self.delivery_table_in_db['store_type'] == store_type) &
+                                                   (self.delivery_table_in_db['code'] == code) &
+                                                   (self.delivery_table_in_db['num'] == num)
+                                                   ]
+
+            if len(duplicate_check) == 1:
+                # if data is already in the delivery table then no need to adjust bandaid table
+                pass
+
+            elif len(duplicate_check) == 0:
+
+                self.bandaid_duplication_check(store_id, item_group_desc, credit_memo_qty, date, store_type)
+
+            else:
+                raise Exception(f"Error: Possible Duplicate Entry. Investigate error invoice num: {num}")
+
+            i += 1
+
+    def bandaid_duplication_check(self, store_id, item_group_desc, credit_memo_qty, date, store_type):
+
+        # sum all bandaids in the db for store-item. If it's >=0 then ignore if < 0 then adjust
+
+        # filter then add everything up
+        bandaid_table_in_db_filtered = self.bandaid_table_in_db[(self.bandaid_table_in_db['store_id'] == store_id) &
+                                                                (self.bandaid_table_in_db[
+                                                                     'item_group_desc'] == item_group_desc)
+                                                                ]
+
+        if len(bandaid_table_in_db_filtered) >= 1:
+
+            sum_db_bandaid_qty = bandaid_table_in_db_filtered['qty'].sum()
+            self.create_bandaid_adjustments(sum_db_bandaid_qty, credit_memo_qty, store_id, item_group_desc, date, store_type)
+
+        elif len(bandaid_table_in_db_filtered) == 0:
+            pass
+        else:
+            raise Exception('Error: Should not happen')
+
+    def create_bandaid_adjustments(self, sum_db_bandaid_qty, credit_memo_qty, store_id, item_group_desc, date, store_type):
+
+        date_created = datetime.now().date()
+
+        # less (cm -13  bandaid -50) or exact (cm -50  bandaid -50)
+        if credit_memo_qty >= sum_db_bandaid_qty:
+
+            bandaid_adjustment_qty = credit_memo_qty * -1
+
+            reason = 'Refresh Program:CM entered in DB. Adjusted bandaid to prevent duplicate entry'
+
+        # more cm -60  bandaid -50
+        elif credit_memo_qty < sum_db_bandaid_qty:
+
+            bandaid_adjustment_qty = sum_db_bandaid_qty * -1
+
+            reason = 'Refresh Program:CM entered in DB. Adjusted bandaid and brought the sum of Bandaid back to zero'
+
+        else:
+            raise Exception("Error: Should not happen")
+
+        dictionary = {'type': 'Bandaid',
+                      'store_id': store_id,
+                      'item_group_desc': item_group_desc,
+                      'qty': bandaid_adjustment_qty,
+                      'date_created': date_created,
+                      'effective_date': date,
+                      'store_type': store_type,
+                      'reason': f'{reason}'
+                      }
+
+        potential_bandaids_adjustments = pd.DataFrame(dictionary, index=[0])
+
+        self.new_bandaid_adjustments = pd.concat([self.new_bandaid_adjustments, potential_bandaids_adjustments],
+                                                 ignore_index=True)
+
+        self.bandaid_table_in_db = pd.concat([self.bandaid_table_in_db, potential_bandaids_adjustments],
+                                             ignore_index=True)
