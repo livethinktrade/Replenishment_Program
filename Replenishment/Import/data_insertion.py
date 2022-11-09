@@ -79,6 +79,25 @@ def delivery_insert(transition_year,
     connection_pool.putconn(connection)
 
 
+def bandaid_insert(type, store_id, item_group_desc, qty,
+                   date_created, effective_date, store_type, reason,
+                   connection_pool, store_type_input):
+
+    """new delivery insert"""
+
+    connection = connection_pool.getconn()
+    cursor = connection.cursor()
+    cursor.execute(
+        f"""INSERT INTO {store_type_input}.bandaids (type, store_id, item_group_desc, qty, 
+                                                     date_created, effective_date, store_type, reason)
+            values (%s,%s,%s,%s,%s,%s,%s,%s)""",
+        (type, store_id, item_group_desc, qty, date_created, effective_date, store_type, reason))
+
+    connection.commit()
+    cursor.close()
+    connection_pool.putconn(connection)
+
+
 # this is for updating prexisting data in the DB
 def salesupdate(transition_year,
                 transition_season,

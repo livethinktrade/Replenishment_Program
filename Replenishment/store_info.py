@@ -324,9 +324,30 @@ class Replenishment:
 
                 i += 1
 
+            bandaid = 0
+            x = 0
+            while x < len(bandaid_adjustments):
+
+                delivery_type = bandaid_adjustments.loc[x, 'type']
+                store_id = bandaid_adjustments.loc[x, 'store_id']
+                item_group_desc = bandaid_adjustments.loc[x, 'item_group_desc']
+                qty = bandaid_adjustments.loc[x, 'qty']
+                date_created = bandaid_adjustments.loc[x, 'date_created']
+                effective_date = bandaid_adjustments.loc[x, 'effective_date']
+                store_type = bandaid_adjustments.loc[x, 'store_type']
+                reason = bandaid_adjustments.loc[x, 'reason']
+
+                bandaid_insert(delivery_type, store_id, item_group_desc, qty,
+                               date_created, effective_date, store_type, reason,
+                               self.connection_pool, self.store_type_input)
+
+                bandaid += 1
+                x += 1
+
         print(f'\n {self.store_type_input} Delivery Data Updated')
         print('Updated:', update, 'Records')
         print('Inserted:', insert, 'Records')
+        print('Bandaids:', bandaid, 'Records')
 
     def sales_import(self, file):
 
@@ -831,7 +852,6 @@ class Replenishment:
             except:
 
                 pass
-
 
             i += 1
 
