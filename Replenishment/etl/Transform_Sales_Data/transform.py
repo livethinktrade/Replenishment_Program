@@ -1,11 +1,11 @@
 # KROGER SALES DATA TRANSFORM transform df for aproprite store
 from datetime import datetime
-from Import.data_insertion import year_week_verify_insert
+from etl.db_updater.data_insertion import year_week_verify_insert
 import psycopg2
-import re
 import pandas.io.sql as psql
 import numpy as np
-from psycopg2.extensions import register_adapter, AsIs
+from psycopg2.extensions import register_adapter
+
 psycopg2.extensions.register_adapter(np.int64, psycopg2._psycopg.AsIs)
 import pandas as pd
 import datetime as dt
@@ -941,7 +941,7 @@ class TransformData:
 
             if len(year_week_verify) >= 1:
                 raise Exception(f'''
-                Error: Import failed.
+                Error: db_updater failed.
 
                 Tried to import duplication of same weeks.
                 Store Year:{year_week_list[i][0]}  Week:{year_week_list[i][1]}  sales data already in sales table''')
@@ -1124,7 +1124,7 @@ class TransformData:
                         i = True
 
                     elif user_input == 'CANCEL':
-                        raise Exception("Import Canceled")
+                        raise Exception("db_updater Canceled")
 
                     else:
                         user_input = str(input('READ STATEMENT ABOVE:\t')).upper()

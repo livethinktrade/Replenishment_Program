@@ -1,8 +1,6 @@
-import pandas as pd
-
-from Import.data_insertion import *
-from Update.Transform_Sales_Data.transform import *
-from Update.Transform_Sales_Data.history_tracking import *
+from etl.Transform_Sales_Data.transform import *
+from etl.Transform_Sales_Data.history_tracking import *
+from etl.db_updater.data_insertion import *
 from Sales_Report.Reports.reports import *
 from Sales_Report.Replenishment.replenishment import *
 from store_list import *
@@ -164,7 +162,7 @@ class Replenishment:
             store_type = store_list_filtered.loc[0, 'store_type_input']
 
         except KeyError:
-            raise Exception("Update Store List File in the Support Documents Folder. Add new stores if needed")
+            raise Exception("etl Store List File in the Support Documents Folder. Add new stores if needed")
 
         df['store_type'] = store_type
 

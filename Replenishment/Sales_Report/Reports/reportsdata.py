@@ -499,7 +499,7 @@ class ReportsData:
         """
 
 
-        # this SQL statement prduces a query that shows all of the items that was sold for a given year.
+        # this db_infrastructure statement prduces a query that shows all of the items that was sold for a given year.
         # Provides a table with item group desc, season, sum sales, sum qty, % of total sales
 
 
@@ -652,8 +652,8 @@ class ReportsData:
         else:
             raise Exception("No Transition Store Setting has been selected")
 
-        on_hand = psql.read_sql(f"""
-
+        sql_query = f"""
+        
         with
 
             delivery_table as (
@@ -967,8 +967,10 @@ class ReportsData:
                    bandaids.item_group_desc = combine_sd.item_group_desc
 
         order by store asc, item_group_desc asc
+        
+        """
 
-        """, self.connection)
+        on_hand = psql.read_sql(sql_query, self.connection)
 
         on_hand = on_hand.dropna()
         on_hand = on_hand.sort_values(by=['store', 'display_size', 'case_qty'])
@@ -1588,7 +1590,7 @@ class ReportsData:
         """
 
 
-        # this SQL statement prduces a query that shows all of the items that was sold for a given year.
+        # this db_infrastructure statement prduces a query that shows all of the items that was sold for a given year.
         # Provides a table with item group desc, season, sum sales, sum qty, % of total sales
 
 
@@ -1980,14 +1982,14 @@ class ReportsData:
 #     header=None,
 #     index_col=0,
 #     names=('setting', 'values'))
-#
+# #
 # test = ReportsData(store_type_input, store_setting)
-# a = test.sales_table_qty()
-# b = test.item_sales_rank_qty()
-#
+# a = test.on_hands()
+# # b = test.item_sales_rank_qty()
+# #
 # a.to_excel('sales-qty.xlsx')
-# b.to_excel('item-qty.xlsx')
-
-
-# ghost=test.ghost_inventory()
-# ghost.to_excel('dallas_ghost.xlsx')
+# # b.to_excel('item-qty.xlsx')
+#
+#
+# # ghost=test.ghost_inventory()
+# # ghost.to_excel('dallas_ghost.xlsx')
