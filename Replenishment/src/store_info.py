@@ -1,7 +1,7 @@
 from store_list import *
 from datetime import datetime
-from etl.Transform_Sales_Data.transform import *
-from etl.Transform_Sales_Data.history_tracking import *
+from etl.transform.transform import *
+from etl.transform.history_tracking import *
 from etl.db_updater.data_insertion import *
 from Sales_Report.Reports.reports import *
 from Sales_Report.Replenishment.replenishment import *
@@ -386,7 +386,7 @@ class Replenishment:
 
         print(f'\n {self.store_type_input} Sales Data Imported')
 
-    def sales_update(self, current_weeks_sales=None, previous_weeks_sales=None):
+    def sales_update(self, current_weeks_sales=None, previous_weeks_sales=None, general_template=None):
 
         '''
 
@@ -403,9 +403,23 @@ class Replenishment:
 
         '''
 
+        # general_template variable check
+
+        try:
+            general_template = general_template.upper()
+
+            if general_template in ['WEEKLY', 'YTD', None]:
+                pass
+            else:
+                raise Exception('Error: general_template arg must be a boolean value')
+
+        except AttributeError:
+            pass
+
         with EnginePoolDB() as connection:
 
-            transform = TransformData(self.store_type_input, self.transition_year, self.transition_season, connection)
+            transform = DataPipeline(self.store_type_input, self.transition_year,
+                                     self.transition_season, connection, self.data_locker)
 
         # series of if statement used to determine which program to use to transform the data to the proper format.
 
@@ -432,6 +446,10 @@ class Replenishment:
         elif self.store_type_input in fresh_encounter:
 
             sales_data = transform.fresh_encounter_transform(current_weeks_sales)
+
+        elif general_template in ['WEEKLY', 'YTD']:
+
+            sales_data = transform.general_pipeline(current_weeks_sales, previous_weeks_sales, general_template)
 
         else:
             raise Exception('Error: Sales update method is not established for this store')
@@ -812,7 +830,7 @@ class Replenishment:
 
     def store_approval_import(self, file):
 
-        transform = TransformData(self.store_type_input, self.transition_year, self.transition_season, self.connection)
+        transform = DataPipeline(self.store_type_input, self.transition_year, self.transition_season, self.connection)
 
         store_approval_df = transform.approval_transform(file)
 
@@ -860,7 +878,7 @@ class Replenishment:
 
     def inventory_import(self, file):
 
-        transform = TransformData(self.store_type_input, self.transition_year, self.transition_season, self.connection)
+        transform = DataPipeline(self.store_type_input, self.transition_year, self.transition_season, self.connection)
 
         inventory_df = transform.inventory_transform(file)
 

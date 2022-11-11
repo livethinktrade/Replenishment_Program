@@ -14,28 +14,9 @@ from config.DbConfig import EnginePoolDB, PsycoPoolDB
 import warnings
 
 
-class TransformData:
+class DataPipeline:
 
-    def __init__(self, store_type_input, transition_year, transition_season, connection):
-
-        self.store_weeks_calender_file = r'C:\Users\User1\OneDrive\WinWin Staff Folders\Michael\Replenishment program\Replenishment\support document\Store Weeks Calender.xlsx'
-
-        self.winwin_calender = pd.read_excel(f'{self.store_weeks_calender_file}',
-                                             sheet_name=f'WinWin Fiscal Year',
-                                             names=('week_number', 'date', 'winwin year'))
-
-        self.cvs_calender = pd.read_excel(f'{self.store_weeks_calender_file}',
-                                          sheet_name=f'CVS Fiscal Year',
-                                          names=('week_number', 'date', 'winwin year'))
-
-        self.kroger_calender = pd.read_excel(f'{self.store_weeks_calender_file}',
-                                             sheet_name=f'Kroger Fiscal Year',
-                                             index_col= 0,
-                                             names=('kroger_week_number', 'date', 'winwin_week_number', 'winwin year'))
-
-        self.albertson_calender = pd.read_excel(f'{self.store_weeks_calender_file}',
-                                                sheet_name=f'2022 Albertson Fiscal Year',
-                                                names=('albertson_week_number', 'date', 'winwin_week_number', 'winwin year'))
+    def __init__(self, store_type_input, transition_year, transition_season, connection, data_locker):
 
         self.connection = connection
 
@@ -44,6 +25,8 @@ class TransformData:
         self.transition_year = transition_year
 
         self.transition_season = transition_season
+        
+        self.data_locker = data_locker
 
     def kroger_transform(self, file):
         # Read in new kroger sales data and then selects certain columns to a new df
@@ -59,8 +42,8 @@ class TransformData:
         i = 0
 
         while i < new_len:
-            MFR_check = new.loc[i, 'MFR_DESC']
-            if MFR_check != 'WINWIN':
+            mfr_check = new.loc[i, 'MFR_DESC']
+            if mfr_check != 'WINWIN':
                 check = "Fail"
 
             i += 1
@@ -86,7 +69,6 @@ class TransformData:
             # ('35 Dallas' => 'Dallas')
             new['RPT_SHORT_DESC'] = new.RPT_SHORT_DESC.str.replace('[^a-zA-Z]', '')
 
-
             # Renames collumn names to approripate name for data insertion and update script
             new = new.rename(columns={
                 'RPT_SHORT_DESC': 'store_type',
@@ -95,7 +77,6 @@ class TransformData:
                 'SCANNED_RETAIL_DOLLARS': 'sales',
                 'SCANNED_MOVEMENT': 'qty'
             })
-
 
             divisions = new.store_type.unique().tolist()
             division_len = len(divisions)
@@ -128,11 +109,10 @@ class TransformData:
             new_filt['store_type'] = store_type
             new = new_filt
 
-
-
             # adding the winwin year and weeknum column. weeknum column is added using the support document
 
-            current_year = self.find_winwin_year('01-01-01')
+            data_conversion = ConvertData(self.store_type_input, self.data_locker)
+            current_year = data_conversion.find_winwin_year('01-01-01')
 
             i = 0
 
@@ -142,15 +122,15 @@ class TransformData:
 
                 store_number = new.loc[i, 'store_number']
 
-                new.loc[i, 'current_week'] = int(self.kroger_calender.loc[store_week, 'winwin_week_number'])
+                new.loc[i, 'current_week'] = int(data_conversion.kroger_calender.loc[store_week, 'winwin_week_number'])
 
-                new.loc[i, 'date'] = self.kroger_calender.loc[store_week, 'date']
+                new.loc[i, 'date'] = data_conversion.kroger_calender.loc[store_week, 'date']
 
                 new.loc[i, 'current_year'] = current_year
 
                 upc_11_digit = str(new.loc[i, 'upc'])
 
-                code = self.quickbooks_code_finder(upc_11_digit, store_number)
+                code = data_conversion.quickbooks_code_finder(upc_11_digit, store_number)
 
                 new.loc[i, 'code'] = code
 
@@ -160,19 +140,7 @@ class TransformData:
             new['transition_season'] = f'{self.transition_season}'
 
             # reorganizes columns to proper format for sales table
-            sales_data = new[['transition_year',
-                              'transition_season',
-                              'store_year',
-                              'date',
-                              'store_week',
-                              'store_number',
-                              'upc',
-                              'sales',
-                              'qty',
-                              'current_year',
-                              'current_week',
-                              'code',
-                              'store_type']]
+            sales_data = data_conversion.sales_table_format(new)
 
         else:
             raise Exception(' Error: MFR_check failed. sales data sheet contains items that is not WinWin Products')
@@ -209,6 +177,7 @@ class TransformData:
         old['UPC'] = old['UPC'].astype(float).astype(np.int64)
         old = old.rename(columns={'UPC': 'upc'})
 
+        data_conversion = ConvertData(self.store_type_input, self.data_locker)
 
         # seting transition date range and store_week values for data and store_type
         old['transition_year'] = self.transition_year
@@ -216,9 +185,9 @@ class TransformData:
         old['date'] = date
         old['store_type'] = 'kvat'
         old['store_year'] = store_year
-        old['current_year'] = self.find_winwin_year(date)
+        old['current_year'] = data_conversion.find_winwin_year(date)
 
-        week_num = self.date_to_week_number_conversion(date)
+        week_num = data_conversion.date_to_week_number_conversion(date)
         old['current_week'] = week_num
         old['store_week'] = week_num
 
@@ -229,27 +198,13 @@ class TransformData:
             upc = old.loc[i, 'upc']
             store_number = old.loc[i, 'store_number']
 
-            old.loc[i, 'code'] = self.quickbooks_code_finder(upc,store_number)
+            old.loc[i, 'code'] = data_conversion.quickbooks_code_finder(upc, store_number)
 
             i += 1
 
-        salesdata = old[['transition_year',
-                         'transition_season',
-                         'store_year',
-                         'date',
-                         'store_week',
-                         'store_number',
-                         'upc',
-                         'sales',
-                         'qty',
-                         'current_year',
-                         'current_week',
-                         'code',
-                         'store_type'
+        sales_data = data_conversion.sales_table_format(old)
 
-                         ]]
-
-        return salesdata
+        return sales_data
 
     def safeway_denver_transform(self, file):
         # the first time reading the raw sales data file is extract the date from the first row
@@ -298,15 +253,15 @@ class TransformData:
 
         # find current store year and assigned to column
         # Important to note that Safeway Denver is on the WinWin Fiscal Year Calender
+        data_conversion = ConvertData(self.store_type_input, self.data_locker)
 
-        current_year = self.find_winwin_year(date)
+        current_year = data_conversion.find_winwin_year(date)
         old['store_year'] = current_year
 
         old['current_year'] = current_year
 
-
-        #finds the current week number per Winwin calender
-        current_week = self.date_to_week_number_conversion(date)
+        # finds the current week number per Winwin calender
+        current_week = data_conversion.date_to_week_number_conversion(date)
 
         old['current_week'] = current_week
         old['store_week'] = current_week
@@ -317,22 +272,10 @@ class TransformData:
 
             store_number = old.loc[i, 'store_number']
             upc_11_digit = old.loc[i, 'upc']
-            old.loc[i, 'code'] = self.quickbooks_code_finder(upc_11_digit, store_number)
+            old.loc[i, 'code'] = data_conversion.quickbooks_code_finder(upc_11_digit, store_number)
             i += 1
 
-        sales_data = old[['transition_year',
-                          'transition_season',
-                          'store_year',
-                          'date',
-                          'store_week',
-                          'store_number',
-                          'upc',
-                          'sales',
-                          'qty',
-                          'current_year',
-                          'current_week',
-                          'code',
-                          'store_type']]
+        sales_data = data_conversion.sales_table_format(old)
 
         return sales_data
 
@@ -397,21 +340,23 @@ class TransformData:
 
             i = 0
 
+            data_conversion = ConvertData(self.store_type_input, self.data_locker)
+
             while i < len(old):
 
                 upc_11_digit = old.loc[i, 'upc']
                 store_number = old.loc[i, 'store_number']
                 date = old.loc[i, 'date']
 
-                week_number = int(self.date_to_week_number_conversion(date))
+                week_number = int(data_conversion.date_to_week_number_conversion(date))
 
-                year = self.find_winwin_year(date)
+                year = data_conversion.find_winwin_year(date)
 
                 old.loc[i, 'current_week'] = week_number
 
                 old.loc[i, 'store_week'] = week_number
 
-                old.loc[i, 'code'] = self.quickbooks_code_finder(upc_11_digit, store_number)
+                old.loc[i, 'code'] = data_conversion.quickbooks_code_finder(upc_11_digit, store_number)
 
                 old.loc[i, 'store_year'] = year
 
@@ -424,19 +369,7 @@ class TransformData:
             old['store_year'] = old['store_year'].astype('int64')
             old['current_year'] = old['current_year'].astype('int64')
 
-            sales_data = old[['transition_year',
-                              'transition_season',
-                              'store_year',
-                              'date',
-                              'store_week',
-                              'store_number',
-                              'upc',
-                              'sales',
-                              'qty',
-                              'current_year',
-                              'current_week',
-                              'code',
-                              'store_type']]
+            sales_data = data_conversion.sales_table_format(old)
 
         else:
 
@@ -507,7 +440,9 @@ class TransformData:
 
         df['store_year'] = store_year
         df['store_week'] = store_week
-        date = self.alba_week_number_to_date(store_year, store_week)
+
+        data_conversion = ConvertData(self.store_type_input, self.data_locker)
+        date = data_conversion.alba_week_number_to_date(store_year, store_week)
         df['date'] = date
 
         cols = ['store_year', 'date', 'store_week', 'STORE', 'UPC', 'SALES TY', 'UNITS TY']
@@ -580,7 +515,8 @@ class TransformData:
 
         # add store week. Intermountain is on the same calendar year as winwin
 
-        store_week = self.date_to_week_number_conversion(end_date)
+        data_conversion = ConvertData(self.store_type_input, self.data_locker)
+        store_week = data_conversion.date_to_week_number_conversion(end_date)
         raw_data['store_week'] = store_week
 
         # add store type
@@ -675,176 +611,6 @@ class TransformData:
                                               'On Hand': 'on_hand'})
 
         return inventory
-
-    def date_to_week_number_conversion(self, date):
-        """
-        Takes in Dataframe
-
-        note may be not relevant anymore. will need to review later.
-
-        This is the reason why we are adding 8 days to the current day to find the weeknumber
-        Pythons isocalender() function is used to calculate the week number and it has an atribute of week
-        It considers Monday as the begining of the week however WinWin week starts on sunday so to address this problem
-        I added one day to each date. The week number is still off by 1 so I then add another 7 days which is another week
-        important to note that isocalendaer uses the gregorian calender which sometimes produces week 53 cvs does this as well
-
-        """
-
-        # assigns dt attributes to variable that way you can convert to np.datetime64
-        # which is what dtype the winwincalender is
-
-        year = date.year
-        month = date.month
-        day = date.day
-
-        # for months and days that are < 10 they need to have a 0 in front of it otherwise they will not work when
-        # forming the datetime64 type
-
-        if month < 10:
-
-            month = '0' + f'{month}'
-
-        if day < 10:
-
-            day = '0' + f'{day}'
-
-        # creating the datetime64 data type
-        search_date = np.datetime64(f'{year}-{month}-{day}')
-
-        # using the search date to filter the winwin calender
-        filter_date = self.winwin_calender[self.winwin_calender['date'] == search_date]
-
-        if len(filter_date) < 1:
-            raise Exception(f"""\nError: Need to update 'Store Weeks Calender' excel file.
-            \t File: '{self.store_weeks_calender_file}'
-            Update the WinWin Fiscal Year tab""")
-        else:
-
-            filter_date = filter_date.reset_index(drop=True)
-            week_num = filter_date.loc[0, 'week_number']
-
-        return week_num
-
-    def quickbooks_code_finder(self, upc_11_digit, store):
-
-        """Takes the 11 digit upc and finds the code by searching for the support sheet """
-
-        try:
-
-            code = f"""
-            
-            select delivery2.code from {self.store_type_input}.delivery2
-            inner join public.item_support2 on {self.store_type_input}.delivery2.code = public.item_support2.code
-            where  store = {store} and upc_11_digit = '{upc_11_digit}' order by date desc
-            """
-
-            code = psql.read_sql(code, self.connection)
-
-            if len(code) > 0:
-
-                code = code.iloc[0, 0]
-
-            else:
-
-                code = f"""
-
-                select code
-                from item_support2
-                where upc_11_digit = '{upc_11_digit}'
-                
-                """
-
-                code = psql.read_sql(code, self.connection)
-
-                print(f'Found code for Sales table in support sheet instead of delivery table store {store} upc: {upc_11_digit}')
-
-                code = code.iloc[0, 0]
-
-        except Exception as e:
-
-            raise Exception("ERROR : " + str(e))
-
-        return code
-
-    def find_winwin_year(self, date):
-
-        kroger = [
-                  'kroger_atlanta',
-                  'kroger_central',
-                  'kroger_cincinatti',
-                  'kroger_columbus',
-                  'kroger_dallas',
-                  'kroger_delta',
-                  'kroger_dillons',
-                  'kroger_king_soopers',
-                  'kroger_louisville',
-                  'kroger_nashville',
-                  'kroger_michigan']
-
-        if self.store_type_input in kroger:
-            date = dt.datetime.now()
-
-        else:
-            pass
-
-        # assigns dt attributes to variable that way you can convert to np.datetime64
-        # which is what dtype the winwincalender is
-
-        year = date.year
-        month = date.month
-        day = date.day
-
-        # for months and days that are < 10 they need to have a 0 in front of it otherwise they will not work when
-        # forming the datetime64 type
-
-        if month < 10:
-
-            month = '0' + f'{month}'
-
-        if day < 10:
-
-            day = '0' + f'{day}'
-
-        # creating the datetime64 data type
-        search_date = np.datetime64(f'{year}-{month}-{day}')
-
-        # using the search date to filter the winwin calender
-        filter_date = self.winwin_calender[self.winwin_calender['date'] == search_date]
-
-        if len(filter_date) < 1:
-            raise Exception(f"""\nError: Need to update 'Store Weeks Calender' excel file.
-            \t File: '{self.store_weeks_calender_file}'
-            Update the WinWin Fiscal Year tab""")
-        else:
-
-            filter_date = filter_date.reset_index(drop=True)
-            year = filter_date.loc[0, 'winwin year']
-
-        return year
-
-    def alba_week_number_to_date(self, store_year, store_week):
-
-        calender_2021 = pd.read_excel((r'C:\Users\User1\OneDrive\WinWin Staff Folders\Michael\Replenishment program\Replenishment\support document\Store Weeks Calender.xlsx'),
-                                      sheet_name='2021 Albertson Fiscal Year')
-
-        calender_2022 = pd.read_excel((r'C:\Users\User1\OneDrive\WinWin Staff Folders\Michael\Replenishment program\Replenishment\support document\Store Weeks Calender.xlsx'),
-                                      sheet_name='2022 Albertson Fiscal Year')
-
-        date = None
-
-        if store_year == 2021 and (store_week < 45):
-
-            filtered_calender = calender_2021[calender_2021['Week Number'] == store_week]
-            date = filtered_calender.iloc[0, 1]
-            return date
-
-        elif store_year == 2022 or (store_year == 2021 and (store_week <=52 and store_week >= 45)):
-
-            filtered_calender = calender_2022[calender_2022['Week Number'] == store_week]
-            date = filtered_calender.iloc[0, 1]
-            return date
-        else:
-            return date
 
     def find_difference_between_tables(self, current_week_sales_data, previous_week_sales_data):
         
@@ -1000,9 +766,10 @@ class TransformData:
         left_joined_sales_table['transition_year'] = self.transition_year
         left_joined_sales_table['transition_season'] = f'{self.transition_season}'
 
+        data_conversion = ConvertData(self.store_type_input, self.data_locker)
         date = left_joined_sales_table.loc[0, 'date']
-        left_joined_sales_table['current_year'] = self.find_winwin_year(date)
-        left_joined_sales_table['current_week'] = self.date_to_week_number_conversion(date)
+        left_joined_sales_table['current_year'] = data_conversion.find_winwin_year(date)
+        left_joined_sales_table['current_week'] = data_conversion.date_to_week_number_conversion(date)
 
         left_joined_sales_table['store_type'] = self.store_type_input
 
@@ -1013,7 +780,7 @@ class TransformData:
 
             upc_11_digit = left_joined_sales_table.loc[i, 'upc']
 
-            left_joined_sales_table.loc[i, 'code'] = self.quickbooks_code_finder(upc_11_digit, store)
+            left_joined_sales_table.loc[i, 'code'] = data_conversion.quickbooks_code_finder(upc_11_digit, store)
 
             i += 1
 
@@ -1221,17 +988,19 @@ class TransformData:
         i = 0
 
         # find the store week number and store year. Fresh Encounter is on the same fiscal year as winwin
+        data_conversion = ConvertData(self.store_type_input, self.data_locker)
+
         while i < len(sales_data):
 
             date = sales_data.loc[i, 'Date']
             upc_11_digit = sales_data.loc[i, 'UPC']
             store = sales_data.loc[i, 'store_number']
 
-            sales_data.loc[i, 'store_week'] = int(self.date_to_week_number_conversion(date))
+            sales_data.loc[i, 'store_week'] = int(data_conversion.date_to_week_number_conversion(date))
 
-            sales_data.loc[i, 'store_year'] = self.find_winwin_year(date)
+            sales_data.loc[i, 'store_year'] = data_conversion.find_winwin_year(date)
 
-            sales_data.loc[i, 'code'] = self.quickbooks_code_finder(upc_11_digit, store)
+            sales_data.loc[i, 'code'] = data_conversion.quickbooks_code_finder(upc_11_digit, store)
 
             i += 1
 
@@ -1269,4 +1038,263 @@ class TransformData:
 
         return sales_data
 
+    def general_pipeline(self, current_weeks_sales, previous_weeks_sales, general_template):
+        pass
 
+
+class DataVerification:
+
+    def upc_length(self):
+        """method used for sales data. Check to see if upc is 11 digit instead of 12"""
+
+
+class ConvertData:
+
+    def __init__(self, store_type_input, data_locker):
+
+        self.store_weeks_calender_file = r'C:\Users\User1\OneDrive\WinWin Staff Folders\Michael\Replenishment program\Replenishment\support document\Store Weeks Calender.xlsx'
+
+        self.winwin_calender = pd.read_excel(f'{self.store_weeks_calender_file}',
+                                             sheet_name=f'WinWin Fiscal Year',
+                                             names=('week_number', 'date', 'winwin year'))
+
+        self.cvs_calender = pd.read_excel(f'{self.store_weeks_calender_file}',
+                                          sheet_name=f'CVS Fiscal Year',
+                                          names=('week_number', 'date', 'winwin year'))
+
+        self.kroger_calender = pd.read_excel(f'{self.store_weeks_calender_file}',
+                                             sheet_name=f'Kroger Fiscal Year',
+                                             index_col= 0,
+                                             names=('kroger_week_number', 'date', 'winwin_week_number', 'winwin year'))
+
+        self.albertson_calender = pd.read_excel(f'{self.store_weeks_calender_file}',
+                                                sheet_name=f'2022 Albertson Fiscal Year',
+                                                names=('albertson_week_number', 'date', 'winwin_week_number', 'winwin year'))
+        
+        self.store_type_input = store_type_input
+
+        # tables for the database
+
+        self.delivery_table = data_locker.delivery_table.merge(data_locker.support_sheet, on='code', how='left')
+
+        self.support_sheet = data_locker.support_sheet
+
+    def date_to_week_number_conversion(self, date):
+        """
+        Takes in Dataframe
+
+        note may be not relevant anymore. will need to review later.
+
+        This is the reason why we are adding 8 days to the current day to find the weeknumber
+        Pythons isocalender() function is used to calculate the week number and it has an atribute of week
+        It considers Monday as the begining of the week however WinWin week starts on sunday so to address this problem
+        I added one day to each date. The week number is still off by 1 so I then add another 7 days which is another week
+        important to note that isocalendaer uses the gregorian calender which sometimes produces week 53 cvs does this as well
+
+        """
+
+        # assigns dt attributes to variable that way you can convert to np.datetime64
+        # which is what dtype the winwincalender is
+
+        year = date.year
+        month = date.month
+        day = date.day
+
+        # for months and days that are < 10 they need to have a 0 in front of it otherwise they will not work when
+        # forming the datetime64 type
+
+        if month < 10:
+            month = '0' + f'{month}'
+
+        if day < 10:
+            day = '0' + f'{day}'
+
+        # creating the datetime64 data type
+        search_date = np.datetime64(f'{year}-{month}-{day}')
+
+        # using the search date to filter the winwin calender
+        filter_date = self.winwin_calender[self.winwin_calender['date'] == search_date]
+
+        if len(filter_date) < 1:
+            raise Exception(f"""\nError: Need to update 'Store Weeks Calender' excel file.
+            \t File: '{self.store_weeks_calender_file}'
+            Update the WinWin Fiscal Year tab""")
+        else:
+
+            filter_date = filter_date.reset_index(drop=True)
+            week_num = filter_date.loc[0, 'week_number']
+
+        return week_num
+
+    def quickbooks_code_finder(self, upc_11_digit, store_id):
+
+        """Takes the 11 digit upc and finds the code by searching for the support sheet """
+
+        upc_11_digit = str(upc_11_digit)
+
+        try:
+
+            delivery_db_search = self.delivery_table[(self.delivery_table['store'] == store_id) &
+                                                     (self.delivery_table['upc_11_digit'] == upc_11_digit) &
+                                                     (self.delivery_table['store_type'] == f'{self.store_type_input}')
+                                                     ]
+
+            delivery_db_search = delivery_db_search.sort_values(by='date', ascending=False)
+            delivery_db_search = delivery_db_search.reset_index(drop=True)
+
+            # code = f"""
+            #
+            # select delivery2.code from {self.store_type_input}.delivery2
+            # inner join public.item_support2 on {self.store_type_input}.delivery2.code = public.item_support2.code
+            # where  store = {store} and upc_11_digit = '{upc_11_digit}' order by date desc
+            # """
+            #
+            # code = psql.read_sql(code, self.connection)
+
+            if len(delivery_db_search) > 0:
+
+                code = delivery_db_search.loc[0, 'code']
+
+            else:
+
+                support_sheet_db_search = self.support_sheet[(self.support_sheet['upc_11_digit'] == upc_11_digit)]
+                support_sheet_db_search = support_sheet_db_search.reset_index(drop=True)
+                code = support_sheet_db_search.loc[0, 'code']
+
+                # code = f"""
+                #
+                # select code
+                # from item_support2
+                # where upc_11_digit = '{upc_11_digit}'
+                #
+                # """
+                #
+                # code = psql.read_sql(code, self.connection)
+                #
+                # print(
+                #     f'Found code for Sales table in support sheet instead of delivery table store {store} upc: {upc_11_digit}')
+                #
+                # code = code.iloc[0, 0
+
+        except Exception as e:
+
+            raise Exception("ERROR : " + str(e))
+
+        return code
+
+    def find_winwin_year(self, date):
+
+        kroger = [
+            'kroger_atlanta',
+            'kroger_central',
+            'kroger_cincinatti',
+            'kroger_columbus',
+            'kroger_dallas',
+            'kroger_delta',
+            'kroger_dillons',
+            'kroger_king_soopers',
+            'kroger_louisville',
+            'kroger_nashville',
+            'kroger_michigan']
+
+        if self.store_type_input in kroger:
+            date = dt.datetime.now()
+
+        else:
+            pass
+
+        # assigns dt attributes to variable that way you can convert to np.datetime64
+        # which is what dtype the winwincalender is
+
+        year = date.year
+        month = date.month
+        day = date.day
+
+        # for months and days that are < 10 they need to have a 0 in front of it otherwise they will not work when
+        # forming the datetime64 type
+
+        if month < 10:
+            month = '0' + f'{month}'
+
+        if day < 10:
+            day = '0' + f'{day}'
+
+        # creating the datetime64 data type
+        search_date = np.datetime64(f'{year}-{month}-{day}')
+
+        # using the search date to filter the winwin calender
+        filter_date = self.winwin_calender[self.winwin_calender['date'] == search_date]
+
+        if len(filter_date) < 1:
+            raise Exception(f"""\nError: Need to update 'Store Weeks Calender' excel file.
+            \t File: '{self.store_weeks_calender_file}'
+            Update the WinWin Fiscal Year tab""")
+        else:
+
+            filter_date = filter_date.reset_index(drop=True)
+            year = filter_date.loc[0, 'winwin year']
+
+        return year
+
+    def alba_week_number_to_date(self, store_year, store_week):
+
+        calender_2021 = pd.read_excel((
+                                          r'C:\Users\User1\OneDrive\WinWin Staff Folders\Michael\Replenishment program\Replenishment\support document\Store Weeks Calender.xlsx'),
+                                      sheet_name='2021 Albertson Fiscal Year')
+
+        calender_2022 = pd.read_excel((
+                                          r'C:\Users\User1\OneDrive\WinWin Staff Folders\Michael\Replenishment program\Replenishment\support document\Store Weeks Calender.xlsx'),
+                                      sheet_name='2022 Albertson Fiscal Year')
+
+        date = None
+
+        if store_year == 2021 and (store_week < 45):
+
+            filtered_calender = calender_2021[calender_2021['Week Number'] == store_week]
+            date = filtered_calender.iloc[0, 1]
+
+        elif store_year == 2022 or (store_year == 2021 and (store_week <= 52 and store_week >= 45)):
+
+            filtered_calender = calender_2022[calender_2022['Week Number'] == store_week]
+            date = filtered_calender.iloc[0, 1]
+        else:
+            pass
+
+        return date
+
+    def sales_table_format(self, df):
+        """
+        format the sales table to the same format in the db:
+
+            -reorders the column in a df to the same column order
+            -format column datatype to the appropriate data type
+
+        :argument df
+        :return df
+
+        """
+
+        sales_data = df[['transition_year',
+                         'transition_season',
+                         'store_year',
+                         'date',
+                         'store_week',
+                         'store_number',
+                         'upc',
+                         'sales',
+                         'qty',
+                         'current_year',
+                         'current_week',
+                         'code',
+                         'store_type']]
+
+        sales_data['current_week'] = sales_data['current_week'].astype('int64')
+        sales_data['store_week'] = sales_data['store_week'].astype('int64')
+        sales_data['store_year'] = sales_data['store_year'].astype('int64')
+        sales_data['current_year'] = sales_data['current_year'].astype('int64')
+
+        return sales_data
+
+
+class YTD:
+    pass
