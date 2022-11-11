@@ -418,8 +418,8 @@ class Replenishment:
 
         with EnginePoolDB() as connection:
 
-            transform = DataPipeline(self.store_type_input, self.transition_year,
-                                     self.transition_season, connection, self.data_locker)
+            transform = SalesDataPipeline(self.store_type_input, self.transition_year,
+                                          self.transition_season, connection, self.data_locker)
 
         # series of if statement used to determine which program to use to transform the data to the proper format.
 
@@ -449,7 +449,11 @@ class Replenishment:
 
         elif general_template in ['WEEKLY', 'YTD']:
 
-            sales_data = transform.general_pipeline(current_weeks_sales, previous_weeks_sales, general_template)
+            if general_template == 'WEEKLY':
+                sales_data = transform.general_weekly_pipeline(current_weeks_sales)
+
+            else:
+                sales_data = transform.general_ytd_pipeline(current_weeks_sales, previous_weeks_sales)
 
         else:
             raise Exception('Error: Sales update method is not established for this store')
@@ -830,7 +834,7 @@ class Replenishment:
 
     def store_approval_import(self, file):
 
-        transform = DataPipeline(self.store_type_input, self.transition_year, self.transition_season, self.connection)
+        transform = SupportDataPipeline(self.store_type_input)
 
         store_approval_df = transform.approval_transform(file)
 
@@ -878,7 +882,7 @@ class Replenishment:
 
     def inventory_import(self, file):
 
-        transform = DataPipeline(self.store_type_input, self.transition_year, self.transition_season, self.connection)
+        transform = SupportDataPipeline(self.store_type_input)
 
         inventory_df = transform.inventory_transform(file)
 

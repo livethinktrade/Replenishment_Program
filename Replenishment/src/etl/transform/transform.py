@@ -14,7 +14,7 @@ from config.DbConfig import EnginePoolDB, PsycoPoolDB
 import warnings
 
 
-class DataPipeline:
+class SalesDataPipeline:
 
     def __init__(self, store_type_input, transition_year, transition_season, connection, data_locker):
 
@@ -549,69 +549,6 @@ class DataPipeline:
 
         return transformed_data
 
-    def approval_transform(self, file):
-
-        approval = pd.read_csv(f'{file}')
-
-        store_price_column_name = {
-
-            'kvat': 'KVAT Food Stores Price',
-            'acme': 'Albertsons Acme Price',
-            'brookshire': 'Brookshire Brothers Price',
-            'kroger_nashville': 'Kroger - Nashville Price',
-            'kroger_michigan': 'Kroger - Michigan Price',
-            'kroger_louisville': 'Kroger South - Louisville Price',
-            'kroger_king_soopers': 'Kroger - King Soopers Price',
-            'kroger_delta': 'Kroger South - Delta Price',
-            'kroger_dillons': 'Kroger - Dillons Price',
-            'kroger_columbus': 'Kroger - Columbus Price',
-            'kroger_cincinatti': 'Kroger - Cincinnati Price',
-            'kroger_central': 'Kroger - Central Price',
-            'kroger_dallas' : 'Kroger Texas - Dallas Price',
-            'kroger_atlanta': 'Kroger South - Atlanta Price',
-            'safeway_denver': 'Albertsons Denver Price',
-            'jewel': 'Jewel Osco Price',
-            'fresh_encounter': 'Fresh Encounter Price',
-            'intermountain': 'Albertsons Intermountain Price',
-            'texas_division': 'TX Safeway Albertsons Price',
-            'follett' : 'Follett Price'
-
-        }
-
-        try:
-            store_price_column_name = store_price_column_name[f'{self.store_type_input}']
-            print()
-            approval = approval[['Item', f'{store_price_column_name}']]
-
-            approval = approval.rename(columns={f'{store_price_column_name}': 'store_price',
-                                                'Item': 'code'})
-
-            approval = approval.dropna()
-
-        except:
-
-            print(
-                '\nStore not establisehd in transform approval function need to add store in the dictionary for the function\n')
-
-        return approval
-
-    def inventory_transform(self, file):
-
-        inventory = pd.read_csv(f'{file}')
-
-        inventory = inventory[['Unnamed: 0', 'On Hand']]
-
-        inventory = inventory.dropna()
-
-        inventory[["Unnamed: 0", 'abc']] = inventory["Unnamed: 0"].str.split(" ", n=1, expand=True)
-
-        inventory = inventory[['Unnamed: 0', 'On Hand']]
-
-        inventory = inventory.rename(columns={'Unnamed: 0': 'code',
-                                              'On Hand': 'on_hand'})
-
-        return inventory
-
     def find_difference_between_tables(self, current_week_sales_data, previous_week_sales_data):
         
         """
@@ -1038,21 +975,124 @@ class DataPipeline:
 
         return sales_data
 
-    def general_pipeline(self, current_weeks_sales, previous_weeks_sales, general_template):
+    def general_weekly_pipeline(self, current_weeks_sales):
+
+        verify = DataVerification(current_weeks_sales)
+
+        return verify.sales_data
+
+    def general_ytd_pipeline(self, current_week_sales_data, previous_week_sales_data):
         pass
+
+
+class SupportDataPipeline:
+
+    def __init__(self, store_type_input):
+        self.store_type_input = store_type_input
+
+    def approval_transform(self, file):
+
+        approval = pd.read_csv(f'{file}')
+
+        store_price_column_name = {
+
+            'kvat': 'KVAT Food Stores Price',
+            'acme': 'Albertsons Acme Price',
+            'brookshire': 'Brookshire Brothers Price',
+            'kroger_nashville': 'Kroger - Nashville Price',
+            'kroger_michigan': 'Kroger - Michigan Price',
+            'kroger_louisville': 'Kroger South - Louisville Price',
+            'kroger_king_soopers': 'Kroger - King Soopers Price',
+            'kroger_delta': 'Kroger South - Delta Price',
+            'kroger_dillons': 'Kroger - Dillons Price',
+            'kroger_columbus': 'Kroger - Columbus Price',
+            'kroger_cincinatti': 'Kroger - Cincinnati Price',
+            'kroger_central': 'Kroger - Central Price',
+            'kroger_dallas' : 'Kroger Texas - Dallas Price',
+            'kroger_atlanta': 'Kroger South - Atlanta Price',
+            'safeway_denver': 'Albertsons Denver Price',
+            'jewel': 'Jewel Osco Price',
+            'fresh_encounter': 'Fresh Encounter Price',
+            'intermountain': 'Albertsons Intermountain Price',
+            'texas_division': 'TX Safeway Albertsons Price',
+            'follett' : 'Follett Price'
+
+        }
+
+        try:
+            store_price_column_name = store_price_column_name[f'{self.store_type_input}']
+            print()
+            approval = approval[['Item', f'{store_price_column_name}']]
+
+            approval = approval.rename(columns={f'{store_price_column_name}': 'store_price',
+                                                'Item': 'code'})
+
+            approval = approval.dropna()
+
+        except:
+
+            print(
+                '\nStore not establisehd in transform approval function need to add store in the dictionary for the function\n')
+
+        return approval
+
+    def inventory_transform(self, file):
+
+        inventory = pd.read_csv(f'{file}')
+
+        inventory = inventory[['Unnamed: 0', 'On Hand']]
+
+        inventory = inventory.dropna()
+
+        inventory[["Unnamed: 0", 'abc']] = inventory["Unnamed: 0"].str.split(" ", n=1, expand=True)
+
+        inventory = inventory[['Unnamed: 0', 'On Hand']]
+
+        inventory = inventory.rename(columns={'Unnamed: 0': 'code',
+                                              'On Hand': 'on_hand'})
+
+        return inventory
 
 
 class DataVerification:
 
-    def upc_length(self):
+    def __init__(self, sales_data):
+
+        self.sales_data = sales_data
+
+    def upc_check(self):
         """method used for sales data. Check to see if upc is 11 digit instead of 12"""
+
+        length_check = 'Pass'
+
+        i = 0
+
+        while i < len(self.sales_data):
+            upc = self.sales_data.loc[i, 'upc']
+
+            if len(upc) != 11:
+                length_check = 'Fail'
+                break
+
+            i += 1
+
+
+        if length_check != 'pass':
+
+            raise Exception('UPC Failed Data Verification Process: UPC Sales Data need be 11 digits')
+
+    def transition_year_check(self):
+        pass
+
+    def transition_season_check(self):
+        pass
 
 
 class ConvertData:
 
     def __init__(self, store_type_input, data_locker):
 
-        self.store_weeks_calender_file = r'C:\Users\User1\OneDrive\WinWin Staff Folders\Michael\Replenishment program\Replenishment\support document\Store Weeks Calender.xlsx'
+        self.store_weeks_calender_file = os.getcwd() + r'\support document\Store Weeks Calender.xlsx'
 
         self.winwin_calender = pd.read_excel(f'{self.store_weeks_calender_file}',
                                              sheet_name=f'WinWin Fiscal Year',
