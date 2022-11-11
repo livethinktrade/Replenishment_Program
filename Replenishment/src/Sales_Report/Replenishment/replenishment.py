@@ -1,8 +1,7 @@
 import pandas as pd
 import pandas.io.sql as psql
-from Sales_Report.Reports.reportsdata import ReportsData
-import DbConfig
-from DbConfig import EnginePoolDB
+from src.Sales_Report.Reports.reportsdata import ReportsData
+from config.DbConfig import *
 
 
 class Restock:
@@ -41,7 +40,7 @@ class Restock:
 
         self.return_percentage = self.store_setting.loc['Return_Pecentage', 'values']
 
-        self.connection = DbConfig.engine_pool_connection()
+        self.connection = engine_pool_connection()
 
         reports = ReportsData(self.store_type_input, self.store_setting)
 

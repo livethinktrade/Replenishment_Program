@@ -3,8 +3,7 @@ import pandas as pd
 import pandas.io.sql as psql
 from datetime import timedelta, date
 import numpy as np
-import datetime as dt
-import DbConfig
+from config.DbConfig import *
 
 
 class ReportsData:
@@ -49,7 +48,7 @@ class ReportsData:
         else:
             print('\n Store has not been established in list')
 
-        with DbConfig.EnginePoolDB() as connection:
+        with EnginePoolDB() as connection:
 
             # finds the current year per winwin company year
             year = psql.read_sql(f"select max(current_year) from {store_type_input}.sales2;", connection)
@@ -1292,7 +1291,7 @@ class ReportsData:
 
         i = 0
 
-        with DbConfig.EnginePoolDB() as connection:
+        with EnginePoolDB() as connection:
 
             while i < len(on_hands):
 
@@ -1675,7 +1674,7 @@ class ReportsData:
 
         '''
 
-        with DbConfig.EnginePoolDB() as connection:
+        with EnginePoolDB() as connection:
 
             sales_report = psql.read_sql(f"""
     
@@ -1724,7 +1723,7 @@ class ReportsData:
 
         '''
 
-        with DbConfig.EnginePoolDB() as connection:
+        with EnginePoolDB() as connection:
 
             period_table =pd.read_sql(f"""
                 with 
@@ -1819,7 +1818,7 @@ class ReportsData:
         table that shows the sales $ and unit by period
         '''
 
-        with DbConfig.EnginePoolDB() as connection:
+        with EnginePoolDB() as connection:
 
             division_period_table = psql.read_sql(f'''
             
@@ -1848,7 +1847,7 @@ class ReportsData:
 
     def kroger_corporate_sales_overview(self):
 
-        with DbConfig.EnginePoolDB() as connection:
+        with EnginePoolDB() as connection:
 
             overview = psql.read_sql(f'''
             

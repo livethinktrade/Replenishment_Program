@@ -1,11 +1,12 @@
+from store_list import *
+from datetime import datetime
 from etl.Transform_Sales_Data.transform import *
 from etl.Transform_Sales_Data.history_tracking import *
 from etl.db_updater.data_insertion import *
 from Sales_Report.Reports.reports import *
 from Sales_Report.Replenishment.replenishment import *
-from store_list import *
-from datetime import datetime
-import DbConfig
+from config.DbConfig import *
+import os
 
 
 class Replenishment:
@@ -14,9 +15,9 @@ class Replenishment:
         
         self.store_type_input = store_type_input
         
-        self.connection_pool = DbConfig.create_pool_dbconnection()
+        self.connection_pool = create_pool_dbconnection()
 
-        self.connection = DbConfig.engine_pool_connection()
+        self.connection = engine_pool_connection()
 
         self.store_setting = pd.read_excel(rf'C:\Users\User1\OneDrive - winwinproducts.com\Groccery Store Program\{self.store_type_input}\{self.store_type_input}_store_setting.xlsm',
                                            sheet_name='Sheet2',
@@ -272,7 +273,7 @@ class Replenishment:
         update = 0
         insert = 0
 
-        with DbConfig.EnginePoolDB() as connection:
+        with EnginePoolDB() as connection:
 
             while i < len(new_deliv_transform):
 
@@ -402,7 +403,7 @@ class Replenishment:
 
         '''
 
-        with DbConfig.EnginePoolDB() as connection:
+        with EnginePoolDB() as connection:
 
             transform = TransformData(self.store_type_input, self.transition_year, self.transition_season, connection)
 
@@ -440,9 +441,9 @@ class Replenishment:
         insert = 0
         inserted_list = []
 
-        with DbConfig.PsycoPoolDB() as connection_pool:
+        with PsycoPoolDB() as connection_pool:
 
-            with DbConfig.EnginePoolDB() as engine:
+            with EnginePoolDB() as engine:
 
                 while i < len(sales_data):
 
@@ -598,7 +599,7 @@ class Replenishment:
         item_support = len(itemsupport)
         i = 0
 
-        with DbConfig.EnginePoolDB() as connection_pool:
+        with EnginePoolDB() as connection_pool:
 
             while i < item_support:
 
@@ -683,10 +684,10 @@ class Replenishment:
         date = datetime.date.today()
         date = date.strftime("%b-%d-%Y")
 
-        filename = f'{self.store_type_input}_external_sales_report_{date}.xlsx'
+        filename = os.getcwd() + f'\Reports Output\{self.store_type_input}_external_sales_report_{date}.xlsx'
         reports.external_report(filename)
 
-        filename = f'{self.store_type_input}_internal_sales_report_{date}.xlsx'
+        filename = os.getcwd() + f'\Reports Output\{self.store_type_input}_internal_sales_report_{date}.xlsx'
         reports.internal_report(filename)
 
         print("\nSales Report Generated")
@@ -1015,7 +1016,7 @@ class StoreRefresh:
             invoice_type = filtered_credit_memo.loc[i, 'type_x']
 
             date_unconverted = filtered_credit_memo.loc[i, 'date']
-            date = datetime.strptime(date_unconverted, "%m/%d/%Y").date()
+            date = datetime.datetime.strptime(date_unconverted, "%m/%d/%Y").date()
 
             store_id = int(filtered_credit_memo.loc[i, 'store'])
             upc = filtered_credit_memo.loc[i, 'upc_x']
@@ -1077,7 +1078,7 @@ class StoreRefresh:
 
     def create_bandaid_adjustments(self, sum_db_bandaid_qty, credit_memo_qty, store_id, item_group_desc, date, store_type):
 
-        date_created = datetime.now().date()
+        date_created = datetime.datetime.now().date()
 
         # less (cm -13  bandaid -50) or exact (cm -50  bandaid -50)
         if credit_memo_qty >= sum_db_bandaid_qty:

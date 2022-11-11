@@ -1,8 +1,7 @@
 import pandas as pd
 import psycopg2
 import numpy as np
-import DbConfig
-from psycopg2.extensions import register_adapter, AsIs
+from psycopg2.extensions import register_adapter
 
 psycopg2.extensions.register_adapter(np.int64, psycopg2._psycopg.AsIs)
 

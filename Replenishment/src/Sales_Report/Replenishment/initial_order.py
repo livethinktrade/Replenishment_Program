@@ -1,4 +1,4 @@
-from Sales_Report.Replenishment.replenishment import *
+from src.Sales_Report.Replenishment.replenishment import *
 
 
 def initial_order(store_type_input, store_setting):

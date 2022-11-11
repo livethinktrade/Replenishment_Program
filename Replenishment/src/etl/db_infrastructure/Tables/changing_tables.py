@@ -1,8 +1,8 @@
 # this script is used in the event you need to start changing up the table structures for all of the stores.
 # Built this so you don't have to change each one of them manually
-import DbConfig
+from config.DbConfig import *
 
-from store_info import Replenishment
+from src.store_info import Replenishment
 #
 
 def size_table_insert(store_type_input, connection_pool):
@@ -46,7 +46,8 @@ store_list = [
     'texas_division'
 ]
 
-with DbConfig.PsycoPoolDB() as connection:
+with PsycoPoolDB() as connection:
+
     for x in store_list:
 
         store = Replenishment(store_type_input=f'{x}')

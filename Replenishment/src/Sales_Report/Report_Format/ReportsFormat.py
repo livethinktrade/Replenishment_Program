@@ -1,10 +1,9 @@
 # STEP 8 FORMAT SALES SHEET FOR KROGER
 import openpyxl
-from openpyxl.styles import NamedStyle, Font, Border, Side, colors, Color, Alignment
+from openpyxl.styles import Font, Border, Side, Alignment
 # from openpyxl.styles import colors
 # from openpyxl.styles import Font, Color
 from openpyxl.styles.fills import PatternFill
-from store_list import kroger_stores
 
 
 class ReportFormat:

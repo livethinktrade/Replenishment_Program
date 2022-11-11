@@ -1,6 +1,7 @@
 # KROGER SALES DATA TRANSFORM transform df for aproprite store
+import os
 from datetime import datetime
-from etl.db_updater.data_insertion import year_week_verify_insert
+from src.etl.db_updater.data_insertion import year_week_verify_insert
 import psycopg2
 import pandas.io.sql as psql
 import numpy as np
@@ -9,7 +10,7 @@ from psycopg2.extensions import register_adapter
 psycopg2.extensions.register_adapter(np.int64, psycopg2._psycopg.AsIs)
 import pandas as pd
 import datetime as dt
-from DbConfig import EnginePoolDB, PsycoPoolDB
+from config.DbConfig import EnginePoolDB, PsycoPoolDB
 import warnings
 
 
