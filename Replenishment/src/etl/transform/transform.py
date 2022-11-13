@@ -567,92 +567,97 @@ class SalesDataPipeline:
         current_store_year = current_week_sales_data.loc[0, 'store_year']
         previous_store_year = previous_week_sales_data.loc[0, 'store_year']
 
-        '''
-        verify that the previous store week was the last file used to import. necessary so the actor doesn't accidentally
-        choose the wrong file for the previous week.
-        '''
+        verify = DataVerification(self.data_locker, self.store_type_input)
 
-        with EnginePoolDB() as connection:
-
-            last_store_week = psql.read_sql(f'select store_week from {self.store_type_input}.sales2 order by date desc', connection)
-
-            last_store_week = last_store_week.loc[0, 'store_week']
-
-        if previous_week_number == last_store_week:
-            pass
-
-        elif previous_week_number != last_store_week:
-
-            raise Exception(f"""
-                
-                Error: Wrong File Input
-                
-                Did not choose the right file for the previous week sales data. The last sales week was 
-                store_week {last_store_week}""")
-        else:
-            raise Exception('Error')
-
+        verify.ytd_previous_week_file_check(previous_week_number)
+        # '''
+        # verify that the previous store week was the last file used to import. necessary so the actor doesn't accidentally
+        # choose the wrong file for the previous week.
+        # '''
+        #
+        # with EnginePoolDB() as connection:
+        #
+        #     last_store_week = psql.read_sql(f'select store_week from {self.store_type_input}.sales2 order by date desc', connection)
+        #
+        #     last_store_week = last_store_week.loc[0, 'store_week']
+        #
+        # if previous_week_number == last_store_week:
+        #     pass
+        #
+        # elif previous_week_number != last_store_week:
+        #
+        #     raise Exception(f"""
+        #
+        #         Error: Wrong File Input
+        #
+        #         Did not choose the right file for the previous week sales data. The last sales week was
+        #         store_week {last_store_week}""")
+        # else:
+        #     raise Exception('Error')
+        verify.ytd_week_difference_check(current_store_year, previous_store_year,
+                                         current_week_number, previous_week_number)
         # verify data to see if the week difference is greater than one
 
-        if current_store_year-previous_store_year == 0:
-
-            self.store_week_verify(current_week_number, previous_week_number, year_diff=True)
-
-        elif current_store_year-previous_store_year == 1:
-            self.store_week_verify(current_week_number, previous_week_number, year_diff=False)
-
-        else:
-            raise Exception(f"""
-            
-            Data Verification Failed: Trying to import data from 2 different years. 
-            
-            Data from the first file is showing END WK: {current_store_year}
-            Data form teh second file is showing END WK: {previous_store_year}""")
-
-        """
-        verifying to check if either of the weeks sales data has already been imported or the weeks in between the
-        current week or the previous week
-
-        check to see if the current week store year is in the system  or the weeks in between the previous week sales
-        data not done with this verification process. need to fix because the data will not check for multiple years
-
-        create a list of all the numbers in between that 2 sales date
-        """
-
-        week_number_list = list(range(previous_week_number+1, current_week_number+1))
-
-        year_week_list = []
-
-        # creating the year week tuple list. list will be used later to check if the store year is in the db or not yet.
-
-        for x in week_number_list:
-
-            if (x >= 45 and x <= 53):
-                year_week_list.append((previous_store_year, x))
-            else:
-                year_week_list.append((current_store_year, x))
-
-        i = 0
-
-        while i < len(year_week_list):
-
-            year_week_verify = psql.read_sql(f"""select * from {self.store_type_input}.year_week_verify
-                                                  where store_year = {year_week_list[i][0]} and
-                                                        store_week = {year_week_list[i][1]} """, self.connection)
-
-            # if the store_year and store_week is already in the table, then the data is already in the sales table.
-            # passing this if statement would indicate that the data for the weeks in between is not in the sales table.
-
-            if len(year_week_verify) >= 1:
-                raise Exception(f'''
-                Error: db_updater failed.
-
-                Tried to import duplication of same weeks.
-                Store Year:{year_week_list[i][0]}  Week:{year_week_list[i][1]}  sales data already in sales table''')
-            else:
-                pass
-
-            i += 1
+        # if current_store_year-previous_store_year == 0:
+        #
+        #     self.store_week_verify(current_week_number, previous_week_number, year_diff=True)
+        #
+        # elif current_store_year-previous_store_year == 1:
+        #     self.store_week_verify(current_week_number, previous_week_number, year_diff=False)
+        #
+        # else:
+        #     raise Exception(f"""
+        #
+        #     Data Verification Failed: Trying to import data from 2 different years.
+        #
+        #     Data from the first file is showing END WK: {current_store_year}
+        #     Data form teh second file is showing END WK: {previous_store_year}""")
+        year_week_list = verify.ytd_duplicate_data_check(current_store_year, previous_store_year,
+                                                         current_week_number, previous_week_number, self.connection)
+        # """
+        # verifying to check if either of the weeks sales data has already been imported or the weeks in between the
+        # current week or the previous week
+        #
+        # check to see if the current week store year is in the system  or the weeks in between the previous week sales
+        # data not done with this verification process. need to fix because the data will not check for multiple years
+        #
+        # create a list of all the numbers in between that 2 sales date
+        # """
+        #
+        # week_number_list = list(range(previous_week_number+1, current_week_number+1))
+        #
+        # year_week_list = []
+        #
+        # # creating the year week tuple list. list will be used later to check if the store year is in the db or not yet.
+        #
+        # for x in week_number_list:
+        #
+        #     if (x >= 45 and x <= 53):
+        #         year_week_list.append((previous_store_year, x))
+        #     else:
+        #         year_week_list.append((current_store_year, x))
+        #
+        # i = 0
+        #
+        # while i < len(year_week_list):
+        #
+        #     year_week_verify = psql.read_sql(f"""select * from {self.store_type_input}.year_week_verify
+        #                                           where store_year = {year_week_list[i][0]} and
+        #                                                 store_week = {year_week_list[i][1]} """, self.connection)
+        #
+        #     # if the store_year and store_week is already in the table, then the data is already in the sales table.
+        #     # passing this if statement would indicate that the data for the weeks in between is not in the sales table.
+        #
+        #     if len(year_week_verify) >= 1:
+        #         raise Exception(f'''
+        #         Error: db_updater failed.
+        #
+        #         Tried to import duplication of same weeks.
+        #         Store Year:{year_week_list[i][0]}  Week:{year_week_list[i][1]}  sales data already in sales table''')
+        #     else:
+        #         pass
+        #
+        #     i += 1
 
         """
         creating a primary key in the two tables that way we can do a left join on them. Will left join on the current
@@ -693,7 +698,7 @@ class SalesDataPipeline:
                                                                           'store_type_y': 'store_type'
                                                                          })
 
-        # filtering all data that has 0 sales and units
+        # filtering out all data that has 0 sales and units
         left_joined_sales_table = left_joined_sales_table[(left_joined_sales_table['sales'] != 0)
                                                           | (left_joined_sales_table['qty'] != 0)]
 
@@ -783,71 +788,71 @@ class SalesDataPipeline:
 
         return sales_data
 
-    def store_week_verify(self, current_week_number, previous_week_number, year_diff=None):
-
-        """
-
-        verify the starting week and end week for ytd data. Must do this to ensure integrity of the data.
-
-        :param current_week_number: integer
-        :param previous_week_number: integer
-
-        :param year_diff: Boolean (if the differnce betweeen 2 years is )
-
-        :return:
-        """
-
-        if year_diff:
-
-            if current_week_number < previous_week_number:
-                raise Exception("""
-                Data Verification Failed: "END WK" for current week is < than the previous week
-    
-                The store week number from the current week sales data is less the previous weeks sales data""")
-            elif (current_week_number - previous_week_number) == 1:
-                # pass verification test. Showing that the YTD sales data is 1 week apart.
-                pass
-            elif (current_week_number - previous_week_number) > 1:
-                warnings.warn(f"""
-    
-                The 2 files from the sales data is showing that it is {(current_week_number - previous_week_number)} weeks
-                apart.
-    
-                Ideally the sales data imported should be from week to week. However if more than a weeks of sales data
-                was missed being sent, it is still ok to import the sales data.
-    
-                If this is the case, enter 'VERIFIED' if not enter 'CANCEL'""")
-
-                user_input = str(input('\n\n\nREAD STATEMENT ABOVE:\t')).upper()
-
-                i = False
-
-                while not i:
-
-                    if user_input == 'VERIFIED':
-
-                        i = True
-
-                    elif user_input == 'CANCEL':
-                        raise Exception("db_updater Canceled")
-
-                    else:
-                        user_input = str(input('READ STATEMENT ABOVE:\t')).upper()
-
-            else:
-                raise Exception('ERROR')
-
-        elif year_diff == False:
-
-            # if the year differnce is = 1 then
-            # find how many weeks are the two weeks apart from each other.
-            # after you find the diffence then proceed
-
-            raise Exception('ERROR Code has not been establish for this part yet for now just do it manually')
-
-        else:
-
-            raise Exception("This should never happen. will need to investigate")
+    # def store_week_verify(self, current_week_number, previous_week_number, year_diff=None):
+    #
+    #     """
+    #
+    #     verify the starting week and end week for ytd data. Must do this to ensure integrity of the data.
+    #
+    #     :param current_week_number: integer
+    #     :param previous_week_number: integer
+    #
+    #     :param year_diff: Boolean (if the differnce betweeen 2 years is )
+    #
+    #     :return:
+    #     """
+    #
+    #     if year_diff:
+    #
+    #         if current_week_number < previous_week_number:
+    #             raise Exception("""
+    #             Data Verification Failed: "END WK" for current week is < than the previous week
+    #
+    #             The store week number from the current week sales data is less the previous weeks sales data""")
+    #         elif (current_week_number - previous_week_number) == 1:
+    #             # pass verification test. Showing that the YTD sales data is 1 week apart.
+    #             pass
+    #         elif (current_week_number - previous_week_number) > 1:
+    #             warnings.warn(f"""
+    #
+    #             The 2 files from the sales data is showing that it is {(current_week_number - previous_week_number)} weeks
+    #             apart.
+    #
+    #             Ideally the sales data imported should be from week to week. However if more than a weeks of sales data
+    #             was missed being sent, it is still ok to import the sales data.
+    #
+    #             If this is the case, enter 'VERIFIED' if not enter 'CANCEL'""")
+    #
+    #             user_input = str(input('\n\n\nREAD STATEMENT ABOVE:\t')).upper()
+    #
+    #             i = False
+    #
+    #             while not i:
+    #
+    #                 if user_input == 'VERIFIED':
+    #
+    #                     i = True
+    #
+    #                 elif user_input == 'CANCEL':
+    #                     raise Exception("db_updater Canceled")
+    #
+    #                 else:
+    #                     user_input = str(input('READ STATEMENT ABOVE:\t')).upper()
+    #
+    #         else:
+    #             raise Exception('ERROR')
+    #
+    #     elif year_diff == False:
+    #
+    #         # if the year differnce is = 1 then
+    #         # find how many weeks are the two weeks apart from each other.
+    #         # after you find the diffence then proceed
+    #
+    #         raise Exception('ERROR Code has not been establish for this part yet for now just do it manually')
+    #
+    #     else:
+    #
+    #         raise Exception("This should never happen. will need to investigate")
 
     def fresh_encounter_transform(self, current_week_sales_data):
 
@@ -975,14 +980,64 @@ class SalesDataPipeline:
 
         return sales_data
 
-    def general_weekly_pipeline(self, current_weeks_sales):
+    def general_weekly_pipeline(self, current_week_sales):
 
-        verify = DataVerification(current_weeks_sales)
+        current_week_sales = pd.read_excel(current_week_sales)
 
-        return verify.sales_data
+        current_week_sales['upc'] = current_week_sales['upc'].astype('str')
+
+        verify = DataVerification(self.data_locker, self.store_type_input)
+
+        verify.upc_check(current_week_sales)
+
+        verify.store_type_check(current_week_sales)
+
+        # adding transition year, season, current year, current_week,
+        current_week_sales['transition_year'] = self.transition_year
+        current_week_sales['transition_season'] = f'{self.transition_season}'
+
+        data_conversion = ConvertData(self.store_type_input, self.data_locker)
+        
+        i = 0
+        while i < len(current_week_sales):
+
+            date = current_week_sales.loc[i, 'date']
+
+            current_week_sales['current_year'] = data_conversion.find_winwin_year(date)
+
+            current_week_sales['current_week'] = data_conversion.date_to_week_number_conversion(date)
+
+            store = current_week_sales.loc[i, 'store_number']
+
+            upc_11_digit = current_week_sales.loc[i, 'upc']
+
+            current_week_sales.loc[i, 'code'] = data_conversion.quickbooks_code_finder(upc_11_digit, store)
+
+            i += 1
+
+        current_week_sales = current_week_sales.rename(columns={f'unit': 'qty'})
+
+        sales_data = data_conversion.sales_table_format(current_week_sales)
+
+        return sales_data
 
     def general_ytd_pipeline(self, current_week_sales_data, previous_week_sales_data):
-        pass
+
+        current_week_sales_data = pd.read_excel(current_week_sales_data)
+
+        previous_week_sales_data = pd.read_excel(previous_week_sales_data)
+
+        verify = DataVerification(self.data_locker, self.store_type_input)
+
+        verify.upc_check(current_week_sales_data)
+        verify.upc_check(previous_week_sales_data)
+        
+        verify.store_type_check(current_week_sales_data)
+        verify.store_type_check(previous_week_sales_data)
+
+        sales_data = self.find_difference_between_tables(current_week_sales_data, previous_week_sales_data)
+
+        return sales_data
 
 
 class SupportDataPipeline:
@@ -1056,19 +1111,22 @@ class SupportDataPipeline:
 
 class DataVerification:
 
-    def __init__(self, sales_data):
+    def __init__(self, data_locker, store_type_input):
 
-        self.sales_data = sales_data
+        self.data_locker = data_locker
+        self.sales_table = data_locker.sales_table
+        self.store_type_input = store_type_input
 
-    def upc_check(self):
+    def upc_check(self, sales_data):
+
         """method used for sales data. Check to see if upc is 11 digit instead of 12"""
 
         length_check = 'Pass'
 
         i = 0
 
-        while i < len(self.sales_data):
-            upc = self.sales_data.loc[i, 'upc']
+        while i < len(sales_data):
+            upc = sales_data.loc[i, 'upc']
 
             if len(upc) != 11:
                 length_check = 'Fail'
@@ -1076,16 +1134,183 @@ class DataVerification:
 
             i += 1
 
-
-        if length_check != 'pass':
+        if length_check != 'Pass':
 
             raise Exception('UPC Failed Data Verification Process: UPC Sales Data need be 11 digits')
 
-    def transition_year_check(self):
-        pass
+    def ytd_previous_week_file_check(self, previous_week_number):
 
-    def transition_season_check(self):
-        pass
+        """verify that the previous store week was the last file used to import. necessary so the user doesn't
+        accidentally choose the wrong file for the previous week."""
+
+        with EnginePoolDB() as connection:
+
+            last_store_week = psql.read_sql(f'select store_week from {self.store_type_input}.sales2 order by date desc', connection)
+
+            last_store_week = last_store_week.loc[0, 'store_week']
+
+        # sales_table_in_db = self.sales_table.sort_values(by='date', ascending=False)
+        #
+        # sales_table_in_db = sales_table_in_db.reset_index(drop=True)
+        #
+        # last_store_week = sales_table_in_db.loc[0, 'store_week']
+
+        if previous_week_number == last_store_week:
+            pass
+
+        elif previous_week_number != last_store_week:
+
+            raise Exception(f"""
+
+                Error: Wrong File Input
+
+                Did not choose the right file for the previous week sales data. The last sales week was 
+                store_week {last_store_week}""")
+        else:
+            raise Exception('Error')
+
+    def ytd_week_difference_check(self, current_store_year, previous_store_year, current_week_number, previous_week_number):
+
+        """ verify data to see if the week difference is greater than one"""
+
+        if current_store_year - previous_store_year == 0:
+
+            self.ytd_store_week_check(current_week_number, previous_week_number, year_diff=True)
+
+        elif current_store_year - previous_store_year == 1:
+            self.ytd_store_week_check(current_week_number, previous_week_number, year_diff=False)
+
+        else:
+            raise Exception(f"""
+
+                    Data Verification Failed: Trying to import data from 2 different years. 
+
+                    Data from the first file is showing END WK: {current_store_year}
+                    Data form teh second file is showing END WK: {previous_store_year}""")
+
+    def ytd_store_week_check(self, current_week_number, previous_week_number, year_diff=None):
+
+        """
+
+        verify the starting week and end week for ytd data. Must do this to ensure integrity of the data.
+
+        :param current_week_number: integer
+        :param previous_week_number: integer
+
+        :param year_diff: Boolean (if the differnce betweeen 2 years is )
+
+        :return:
+        """
+
+        if year_diff:
+
+            if current_week_number < previous_week_number:
+                raise Exception("""
+                  Data Verification Failed: "END WK" for current week is < than the previous week
+
+                  The store week number from the current week sales data is less the previous weeks sales data""")
+            elif (current_week_number - previous_week_number) == 1:
+                # pass verification test. Showing that the YTD sales data is 1 week apart.
+                pass
+            elif (current_week_number - previous_week_number) > 1:
+                warnings.warn(f"""
+
+                  The 2 files from the sales data is showing that it is {(current_week_number - previous_week_number)} weeks
+                  apart.
+
+                  Ideally the sales data imported should be from week to week. However if more than a weeks of sales data
+                  was missed being sent, it is still ok to import the sales data.
+
+                  If this is the case, enter 'VERIFIED' if not enter 'CANCEL'""")
+
+                user_input = str(input('\n\n\nREAD STATEMENT ABOVE:\t')).upper()
+
+                i = False
+
+                while not i:
+
+                    if user_input == 'VERIFIED':
+
+                        i = True
+
+                    elif user_input == 'CANCEL':
+                        raise Exception("db_updater Canceled")
+
+                    else:
+                        user_input = str(input('READ STATEMENT ABOVE:\t')).upper()
+
+            else:
+                raise Exception('ERROR')
+
+        elif year_diff == False:
+
+            # if the year differnce is = 1 then
+            # find how many weeks are the two weeks apart from each other.
+            # after you find the diffence then proceed
+
+            raise Exception('ERROR Code has not been establish for this part yet for now just do it manually')
+
+        else:
+
+            raise Exception("This should never happen. will need to investigate")
+
+    def ytd_duplicate_data_check(self, current_store_year, previous_store_year, current_week_number, previous_week_number, connection):
+
+        """
+                verifying to check if either of the weeks sales data has already been imported or the weeks in between the
+                current week or the previous week
+
+                check to see if the current week store year is in the system  or the weeks in between the previous week sales
+                data not done with this verification process. need to fix because the data will not check for multiple years
+
+                create a list of all the numbers in between that 2 sales date
+                """
+
+        week_number_list = list(range(previous_week_number + 1, current_week_number + 1))
+
+        year_week_list = []
+
+        # creating the year week tuple list. list will be used later to check if the store year is in the db or not yet.
+
+        for x in week_number_list:
+
+            if (x >= 45 and x <= 53):
+                year_week_list.append((previous_store_year, x))
+            else:
+                year_week_list.append((current_store_year, x))
+
+        i = 0
+
+        while i < len(year_week_list):
+
+            year_week_verify = psql.read_sql(f"""select * from {self.store_type_input}.year_week_verify
+                                                          where store_year = {year_week_list[i][0]} and
+                                                                store_week = {year_week_list[i][1]} """,
+                                             connection)
+
+            # if the store_year and store_week is already in the table, then the data is already in the sales table.
+            # passing this if statement would indicate that the data for the weeks in between is not in the sales table.
+
+            if len(year_week_verify) >= 1:
+                raise Exception(f'''
+                        Error: db_updater failed.
+
+                        Tried to import duplication of same weeks.
+                        Store Year:{year_week_list[i][0]}  Week:{year_week_list[i][1]}  sales data already in sales table''')
+            else:
+                pass
+
+            i += 1
+
+        return year_week_list
+
+    def store_type_check(self, sales_data):
+
+        store_type = sales_data.loc[0, 'store_type']
+        
+        if store_type != self.store_type_input:
+            
+            raise Exception(f'Verification Error: Tried to insert {store_type} into {self.store_type_input} db')
 
 
 class ConvertData:
@@ -1335,6 +1560,3 @@ class ConvertData:
 
         return sales_data
 
-
-class YTD:
-    pass
