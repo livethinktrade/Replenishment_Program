@@ -416,8 +416,8 @@ def year_week_verify_insert(store_year, store_week, store_type_input, connection
     connection = connection_pool.getconn()
     cursor = connection.cursor()
     cursor.execute(
-        f"INSERT INTO {store_type_input}.year_week_verify (store_year, store_week) values (%s,%s)",
-        (store_year, store_week))
+        f"INSERT INTO {store_type_input}.year_week_verify (store_year, store_week, store_type) values (%s,%s,%s)",
+        (store_year, store_week, store_type_input))
 
     connection.commit()
     cursor.close()
