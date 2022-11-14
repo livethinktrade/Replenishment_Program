@@ -1015,7 +1015,7 @@ class SalesDataPipeline:
 
             i += 1
 
-        current_week_sales = current_week_sales.rename(columns={f'unit': 'qty'})
+        current_week_sales = current_week_sales.rename(columns={f'units': 'qty'})
 
         sales_data = data_conversion.sales_table_format(current_week_sales)
 
@@ -1028,12 +1028,18 @@ class SalesDataPipeline:
         previous_week_sales_data = pd.read_excel(previous_week_sales_data)
 
         verify = DataVerification(self.data_locker, self.store_type_input)
+        
+        current_week_sales_data['upc'] = current_week_sales_data['upc'].astype('str')
+        previous_week_sales_data['upc'] = previous_week_sales_data['upc'].astype('str')
 
         verify.upc_check(current_week_sales_data)
         verify.upc_check(previous_week_sales_data)
         
         verify.store_type_check(current_week_sales_data)
         verify.store_type_check(previous_week_sales_data)
+
+        current_week_sales_data = current_week_sales_data.rename(columns={f'store_number': 'store'})
+        previous_week_sales_data = previous_week_sales_data.rename(columns={f'store_number': 'store'})
 
         sales_data = self.find_difference_between_tables(current_week_sales_data, previous_week_sales_data)
 
@@ -1119,24 +1125,30 @@ class DataVerification:
 
     def upc_check(self, sales_data):
 
-        """method used for sales data. Check to see if upc is 11 digit instead of 12"""
+        """method used for sales data. Check to see if upc is 11 digit instead of 12.
+        column must be named 'upc to work'"""
 
         length_check = 'Pass'
 
         i = 0
 
-        while i < len(sales_data):
-            upc = sales_data.loc[i, 'upc']
+        try:
 
-            if len(upc) != 11:
-                length_check = 'Fail'
-                break
+            while i < len(sales_data):
+                upc = sales_data.loc[i, 'upc']
 
-            i += 1
+                if len(upc) != 11:
+                    length_check = 'Fail'
+                    break
 
-        if length_check != 'Pass':
+                i += 1
 
-            raise Exception('UPC Failed Data Verification Process: UPC Sales Data need be 11 digits')
+            if length_check != 'Pass':
+
+                raise Exception(f'UPC Failed Data Verification Process: UPC Sales Data need be 11 digits. Row: {i} in sales data')
+
+        except TypeError:
+            raise Exception('\n\nType Error: upc column must be a str not an int/float value')
 
     def ytd_previous_week_file_check(self, previous_week_number):
 
