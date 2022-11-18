@@ -1,10 +1,10 @@
-from store_list import *
+from src.store_list import *
 from datetime import datetime
-from etl.transform.transform import *
-from etl.transform.history_tracking import *
-from etl.db_updater.data_insertion import *
-from Sales_Report.Reports.reports import *
-from Sales_Report.Replenishment.replenishment import *
+from src.etl.transform.transform import *
+from src.etl.transform.history_tracking import *
+from src.etl.db_updater.data_insertion import *
+from src.Sales_Report.Reports.reports import *
+from src.Sales_Report.Replenishment.replenishment import *
 from config.DbConfig import *
 import os
 

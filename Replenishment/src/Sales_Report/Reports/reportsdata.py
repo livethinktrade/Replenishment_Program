@@ -1849,9 +1849,9 @@ class ReportsData:
 
         with EnginePoolDB() as connection:
 
-            overview = psql.read_sql(f'''
+            overview = f"""
             
-            with 
+                       with 
 
                 grocery_sales as (
             
@@ -1959,8 +1959,10 @@ class ReportsData:
             inner join active_programs on active_programs.store_type = kroger_division.store_type
             
             order by kroger_division.store_type
+            
+            """
 
-            ''', connection)
+            overview = psql.read_sql(overview, connection)
 
         overview = overview.set_index('store_type')
 

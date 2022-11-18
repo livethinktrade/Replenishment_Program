@@ -232,12 +232,12 @@ class SalesDataPipeline:
         old = pd.read_excel(f'{file}', skiprows=2)
 
         # select upc out of string and then converts to proper datatype for database
-        old['UPC - Description'] = old['UPC - Description'].str[:11]
-        old['UPC - Description'] = old['UPC - Description'].astype(str).astype(np.int64)
+        old['Item'] = old['Item'].str[:11]
+        old['Item'] = old['Item'].astype(str).astype(np.int64)
 
-        old = old.rename(columns={'UPC - Description': 'upc',
-                                  'Sales (TY)': 'sales',
-                                  'Units (TY)': 'qty',
+        old = old.rename(columns={'Item': 'upc',
+                                  'Sum of Sales (TY)': 'sales',
+                                  'Sum of Units (TY)': 'qty',
                                   'Store': 'store_number'
                                   })
 
