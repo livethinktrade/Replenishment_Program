@@ -6,6 +6,7 @@ from src.store_list import kroger_stores
 import pandas as pd
 from src.Sales_Report.Reports.reportsdata import ReportsData
 from src.Sales_Report.Replenishment.replenishment import Restock
+import os
 
 
 class Reports:
@@ -325,6 +326,19 @@ class Reports:
         format_report = SalesReportFormat(filename, report_lengths_dict, self.store_setting)
 
         format_report.external_report()
+
+    def generate_grocery_reports(self):
+
+        date = datetime.date.today()
+        date = date.strftime("%b-%d-%Y")
+
+        filename = os.getcwd() + f'\Reports Output\{self.store_type_input}_external_sales_report_{date}.xlsx'
+        self.external_grocery_report(filename)
+
+        filename = os.getcwd() + f'\Reports Output\{self.store_type_input}_internal_sales_report_{date}.xlsx'
+        self.internal_grocery_report(filename)
+
+        print("\nSales Report Generated")
 
     def kroger_corporate_report(self):
 

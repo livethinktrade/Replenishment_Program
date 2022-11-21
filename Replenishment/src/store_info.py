@@ -5,8 +5,6 @@ from datetime import datetime
 from src.etl.transform.transform import *
 from src.etl.transform.history_tracking import *
 from src.etl.db_updater.data_insertion import *
-from src.Sales_Report.Reports.reports import *
-from src.Sales_Report.Replenishment.replenishment import *
 from config.DbConfig import *
 import os
 
@@ -347,10 +345,10 @@ class DbUpdater:
                 bandaid += 1
                 x += 1
 
-        print(f'\n {self.store_type_input} Delivery Data Updated')
+        print(f'\n{self.store_type_input} Delivery Data Updated')
         print('Updated:', update, 'Records')
         print('Inserted:', insert, 'Records')
-        print('Bandaids:', bandaid, 'Records')
+        print('Bandaids:', bandaid, 'Records\n')
 
     def sales_import(self, file):
 
@@ -584,7 +582,7 @@ class DbUpdater:
 
                     i += 1
 
-        print(f'\n {self.store_type_input} Sales Data Updated')
+        print(f'\n{self.store_type_input} Sales Data Updated')
         print('Updated:', update, 'Records')
         print('Inserted:', insert, 'Records')
 
@@ -703,20 +701,20 @@ class DbUpdater:
         print('\nSupport Sheet Imported')
         print(f'Updated: {update}\nInserted: {insert}')
 
-    def sales_report(self):
-
-        reports = Reports(self.store_type_input, self.store_setting)
-
-        date = datetime.date.today()
-        date = date.strftime("%b-%d-%Y")
-
-        filename = os.getcwd() + f'\Reports Output\{self.store_type_input}_external_sales_report_{date}.xlsx'
-        reports.external_grocery_report(filename)
-
-        filename = os.getcwd() + f'\Reports Output\{self.store_type_input}_internal_sales_report_{date}.xlsx'
-        reports.internal_grocery_report(filename)
-
-        print("\nSales Report Generated")
+    # def sales_report(self):
+    #
+    #     reports = Reports(self.store_type_input, self.store_setting)
+    #
+    #     date = datetime.date.today()
+    #     date = date.strftime("%b-%d-%Y")
+    #
+    #     filename = os.getcwd() + f'\Reports Output\{self.store_type_input}_external_sales_report_{date}.xlsx'
+    #     reports.external_grocery_report(filename)
+    #
+    #     filename = os.getcwd() + f'\Reports Output\{self.store_type_input}_internal_sales_report_{date}.xlsx'
+    #     reports.internal_grocery_report(filename)
+    #
+    #     print("\nSales Report Generated")
 
     def store_notes_import(self):
 
@@ -950,13 +948,13 @@ class DbUpdater:
 
         print(f"Updated: {update}\nInserted: {insert}\n Store Table Updated")
 
-    def kroger_corporate_report(self):
-
-        reports = Reports(self.store_type_input, self.store_setting)
-
-        reports.kroger_corporate_report()
-
-        print('Kroger Corporate Report Generated')
+    # def kroger_corporate_report(self):
+    #
+    #     reports = Reports(self.store_type_input, self.store_setting)
+    #
+    #     reports.kroger_corporate_report()
+    #
+    #     print('Kroger Corporate Report Generated')
 
     def ghost_inventory_import(self, file=None, df=None, use_df=False):
 
