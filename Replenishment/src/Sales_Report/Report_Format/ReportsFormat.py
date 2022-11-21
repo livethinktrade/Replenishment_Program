@@ -158,25 +158,23 @@ class ReportFormat:
         self.wb.save(self.file_name)
 
 
-class SalesReportFormat:
+class SalesReportFormat(ReportFormat):
 
-    '''
+    """
 
     class is designed to format the sales table.
 
-    '''
+    """
 
-    def __init__(self, filename, replenishment_len, sales_report_len, store_rank_len, store_setting):
+    def __init__(self, filename, report_length_dict, store_setting):
+
+        super().__init__(filename)
 
         self.filename = filename
 
         self.store_setting = store_setting
 
-        self.replenishment_len = replenishment_len
-
-        self.sales_report_len = sales_report_len
-
-        self.store_rank_len = store_rank_len
+        self.report_length_dict = report_length_dict
 
         # internal report variables
         self.initial_orders = self.store_setting.loc['initial_orders','values']
@@ -298,7 +296,6 @@ class SalesReportFormat:
         pattern_fill_blue = PatternFill(patternType='solid', fgColor='DDEBF7')
         pattern_fill_gray = PatternFill(patternType='solid', fgColor='D0CECE')
         pattern_fill_green = PatternFill(patternType='solid', fgColor='E2EFDA')
-
 
         # changes cell colors
         a1 = ws['A1']
@@ -447,7 +444,7 @@ class SalesReportFormat:
         #     for cell in row:
         #         cell.alignment = Alignment(wrap_text=True, horizontal='center', vertical='center')
 
-        ws.auto_filter.ref = f"A1:J{self.sales_report_len+10}"
+        ws.auto_filter.ref = f"A1:J{sales_report_len+10}"
 
         self.wb.save(self.filename)
 
@@ -481,12 +478,12 @@ class SalesReportFormat:
             for cell in row:
                 cell.font = Font(bold=True)
 
-        #outlining store summary
+        # outlining store summary
         for row in ws.iter_rows(min_row=1, max_row=2, min_col=13, max_col=15):
             for cell in row:
                 cell.border = self.border
 
-        #change width of columns for stores supported table
+        # change width of columns for stores supported table
         ws.column_dimensions['M'].width = 20
         ws.column_dimensions['N'].width = 25
         ws.column_dimensions['O'].width = 20
@@ -507,7 +504,7 @@ class SalesReportFormat:
 
         ws = self.wb['Sales Report']
 
-        #merge cells
+        # merge cells
         ws.merge_cells('M14:M15')
         ws.merge_cells('N14:N15')
         ws.merge_cells('O14:O15')
@@ -521,7 +518,6 @@ class SalesReportFormat:
         ws['P14'].value = 'Sales Per Active Store'
         ws['Q14'].value = 'Active Stores'
         ws['R14'].value = '% of Annual Sales'
-
 
         ws['M16'].value = '1'
         ws['M17'].value = '2'
@@ -539,7 +535,6 @@ class SalesReportFormat:
             for cell in row:
                 cell.font = Font(bold=True)
 
-        bd = Side(style='thick', color="000000")
         bd_thin = Side(style='thin', color="000000")
 
         border = Border(left=bd_thin, top=bd_thin, right=bd_thin, bottom=bd_thin)
@@ -554,7 +549,7 @@ class SalesReportFormat:
 
         ws = self.wb['Sales Report']
 
-        #merge cells
+        # merge cells
         ws.merge_cells('M10:M11')
         ws.merge_cells('N10:N11')
         ws.merge_cells('O10:O11')
@@ -568,12 +563,12 @@ class SalesReportFormat:
 
         pattern_fill_blue = PatternFill(patternType='solid', fgColor='DDEBF7')
 
-        #change background color
+        # change background color
         for row in ws.iter_rows(min_row=10, max_row=10, min_col=13, max_col=15):
             for cell in row:
                 cell.fill = pattern_fill_blue
 
-        #change font to bold
+        # change font to bold
         for row in ws.iter_rows(min_row=10, max_row=11, min_col=13, max_col=15):
             for cell in row:
                 cell.font = Font(bold=True)
@@ -617,7 +612,7 @@ class SalesReportFormat:
             for cell in row:
                 cell.fill = pattern_fill_blue
 
-        #change font to bold
+        # change font to bold
         for row in ws.iter_rows(min_row=5, max_row=6, min_col=13, max_col=15):
             for cell in row:
                 cell.font = Font(bold=True)
@@ -627,7 +622,7 @@ class SalesReportFormat:
 
         border = Border(left=bd_thin, top=bd_thin, right=bd_thin, bottom=bd_thin)
 
-        # outlines Store YTD Collumns
+        # outlines Store YTD Columns
         for row in ws.iter_rows(min_row=5, max_row=7, min_col=13, max_col=15):
             for cell in row:
                 cell.border = border
@@ -638,22 +633,22 @@ class SalesReportFormat:
 
         self.wb.save(self.filename)
 
-    def no_scans(self, in_season_settings):
+    def no_scans(self, in_season_settings, no_scan_len):
 
         ws = self.wb['No Scan']
 
-        if in_season_settings ==1:
+        if in_season_settings == 1:
 
             ws.column_dimensions['B'].width = 30
             ws.column_dimensions['C'].width = 15
             ws['B1'].value = 'Item'
 
             # outlines main sales table
-            for row in ws.iter_rows(min_row=1, max_row=500, min_col=1, max_col=4):
+            for row in ws.iter_rows(min_row=1, max_row=no_scan_len + 10, min_col=1, max_col=4):
                 for cell in row:
                     cell.border = self.border
 
-            ws.auto_filter.ref = f"A1:D10000"
+            ws.auto_filter.ref = f"A1:D{no_scan_len + 10}"
 
         else:
 
@@ -661,18 +656,15 @@ class SalesReportFormat:
             ws['B1'].value = 'Sales $'
 
             # outlines main sales table
-            for row in ws.iter_rows(min_row=1, max_row=1000, min_col=1, max_col=2):
+            for row in ws.iter_rows(min_row=1, max_row=no_scan_len + 10, min_col=1, max_col=2):
                 for cell in row:
                     cell.border = self.border
 
-            ws.auto_filter.ref = f"A1:B10000"
-
-
-
+            ws.auto_filter.ref = f"A1:B{no_scan_len + 10}"
 
         self.wb.save(self.filename)
 
-    def on_hands(self):
+    def on_hands(self, on_hand_len):
 
         ws = self.wb['On Hand']
 
@@ -701,15 +693,15 @@ class SalesReportFormat:
         ws.column_dimensions['K'].width = 15
 
         # outlines main sales table
-        for row in ws.iter_rows(min_row=1, max_row=5000, min_col=1, max_col=11):
+        for row in ws.iter_rows(min_row=1, max_row=on_hand_len+10, min_col=1, max_col=11):
             for cell in row:
                 cell.border = self.border
 
-        ws.auto_filter.ref = f"A1:K500"
+        ws.auto_filter.ref = f"A1:K{on_hand_len + 50}"
 
         self.wb.save(self.filename)
 
-    def replenishment_reasons(self):
+    def replenishment_reasons(self, replen_reason_len):
 
         ws = self.wb['Replenishment Reasons']
 
@@ -725,10 +717,10 @@ class SalesReportFormat:
         ws.column_dimensions['D'].width = 15
         ws.column_dimensions['E'].width = 100
 
-        ws.auto_filter.ref = f"A1:E10000"
+        ws.auto_filter.ref = f"A1:E{replen_reason_len + 10}"
 
         # outlines main sales table
-        for row in ws.iter_rows(min_row=1, max_row=1000, min_col=1, max_col=5):
+        for row in ws.iter_rows(min_row=1, max_row=replen_reason_len + 10, min_col=1, max_col=5):
             for cell in row:
                 cell.border = self.border
 
@@ -800,7 +792,7 @@ class SalesReportFormat:
 
         self.wb.save(self.filename)
 
-    def store_rank(self):
+    def store_rank(self, store_rank_len):
 
         ws = self.wb['Store Ranks']
 
@@ -810,13 +802,13 @@ class SalesReportFormat:
 
         ws.column_dimensions['A'].width = 10
 
-        #numbers the store
+        # numbers the store
         i = 1
-        while i <= self.store_rank_len:
+        while i <= store_rank_len:
             ws[f'A{i+1}'].value = i
-            i+=1
+            i += 1
 
-        for row in ws.iter_rows(min_row=1, max_row=self.store_rank_len+1, min_col=1, max_col=3):
+        for row in ws.iter_rows(min_row=1, max_row=store_rank_len+1, min_col=1, max_col=3):
             for cell in row:
                 cell.border = self.border
 
@@ -824,7 +816,7 @@ class SalesReportFormat:
 
         self.wb.save(self.filename)
 
-    def items_approved(self):
+    def items_approved(self, item_approved_len):
 
         ws = self.wb['Items Approved']
 
@@ -840,16 +832,15 @@ class SalesReportFormat:
         ws.column_dimensions['G'].width = 20
         ws.column_dimensions['H'].width = 20
 
-        for row in ws.iter_rows(min_row=1, max_row=500, min_col=1, max_col=8):
+        for row in ws.iter_rows(min_row=1, max_row=item_approved_len + 10, min_col=1, max_col=8):
             for cell in row:
                 cell.border = self.border
 
-
-        ws.auto_filter.ref = f"A1:H300"
+        ws.auto_filter.ref = f"A1:H{item_approved_len + 10}"
 
         self.wb.save(self.filename)
 
-    def store_programs(self):
+    def store_programs(self, store_programs_len):
 
         ws = self.wb['Store Program']
 
@@ -868,50 +859,54 @@ class SalesReportFormat:
         ws.column_dimensions['K'].width = 30
         ws.column_dimensions['L'].width = 20
 
+        ws.auto_filter.ref = f"A1:L{store_programs_len + 10}"
 
-        ws.auto_filter.ref = f"A1:L500"
-
-        for row in ws.iter_rows(min_row=1, max_row=500, min_col=1, max_col=12):
+        for row in ws.iter_rows(min_row=1, max_row=store_programs_len + 10, min_col=1, max_col=12):
             for cell in row:
                 cell.border = self.border
 
         self.wb.save(self.filename)
 
-    def replenishment_pivot(self):
+    def replenishment_pivot(self, pivot_len):
 
-        pass
+        sheet_name = 'Front Desk'
+
+        self.thin_outline(sheet_name, max_row=pivot_len['row_len']+1, max_col=pivot_len['col_len'])
+
+        # Change Index summary name
+        self.set_value(sheet_name, f"A{pivot_len['row_len']+1}", 'Total')
 
     def external_report(self):
 
-        self.replenishment(self.replenishment_len)
+        self.replenishment(self.report_length_dict['replenishment_len'])
 
         if self.top20 == 1:
             self.top20_format()
 
         else:
-            self.sales_report(self.sales_report_len)
+            self.sales_report(self.report_length_dict['Sales Report'])
 
         if self.ytd_mask_sales_table == 1:
             self.ytd_mask()
 
-        if self.ytd_womask_sales_table ==1:
+        if self.ytd_womask_sales_table == 1:
             self.ytd_womask()
 
         if self.item_sales_rank == 1:
 
             self.item_sales_ranked()
 
-        self.no_scans(self.in_season_setting)
+        self.no_scans(self.in_season_setting, self.report_length_dict['No Scan'])
 
-        self.on_hands()
+        self.on_hands(self.report_length_dict['On Hand'])
 
     def internal_report(self):
 
-        self.replenishment(self.replenishment_len)
+        self.replenishment(self.report_length_dict['replenishment_len'])
 
-        self.on_hands()
+        self.on_hands(self.report_length_dict['On Hand'])
 
-        self.replenishment_reasons()
+        self.replenishment_reasons(self.report_length_dict['Replenishment Reason'])
 
         if self.initial_orders == 1:
             self.initial_orders_tab()
@@ -920,13 +915,16 @@ class SalesReportFormat:
             self.high_returns()
 
         if self.store_sales_rank == 1:
-            self.store_rank()
+            self.store_rank(self.report_length_dict['Store Ranks'])
 
         if self.item_approval == 1:
-            self.items_approved()
+            self.items_approved(self.report_length_dict['Item Approved'])
 
         if self.store_program == 1:
-            self.store_programs()
+            self.store_programs(self.report_length_dict['Store Program'])
+
+        if self.report_length_dict['Front Desk']['row_len'] != 0:
+            self.replenishment_pivot(self.report_length_dict['Front Desk'])
 
 
 class KrogerCorporateFormat(ReportFormat):

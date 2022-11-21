@@ -823,18 +823,18 @@ class GhostInventory:
     def clear_ghost(self):
 
         # rename columns
-        ghost_inventory_candidates = self.ghost_inventory_candidates.rename(columns={'store': 'store_id'})
+        ghost_inventory_candidates = self.ghost_inventory_candidates.rename(columns={'store': 'store_id',
+                                                                                     'last sale date': 'effective_date'})
 
         # add reason, storetype, effective date, date created, type
 
         ghost_inventory_candidates['store_type'] = self.store_type_input
         ghost_inventory_candidates['type'] = 'Bandaid'
-        ghost_inventory_candidates['reason'] = 'Ghost Inventory Eliminated by code '
+        ghost_inventory_candidates['reason'] = 'Ghost Inventory Eliminated by code'
         ghost_inventory_candidates['qty'] = ghost_inventory_candidates['on_hand'] * -1
 
         date = datetime.date.today()
 
-        ghost_inventory_candidates['effective_date'] = date
         ghost_inventory_candidates['date_created'] = date
 
         # reorganize columns to insert into bandaids

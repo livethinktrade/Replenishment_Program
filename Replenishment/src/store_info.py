@@ -711,10 +711,10 @@ class DbUpdater:
         date = date.strftime("%b-%d-%Y")
 
         filename = os.getcwd() + f'\Reports Output\{self.store_type_input}_external_sales_report_{date}.xlsx'
-        reports.external_report(filename)
+        reports.external_grocery_report(filename)
 
         filename = os.getcwd() + f'\Reports Output\{self.store_type_input}_internal_sales_report_{date}.xlsx'
-        reports.internal_report(filename)
+        reports.internal_grocery_report(filename)
 
         print("\nSales Report Generated")
 
@@ -1083,7 +1083,6 @@ class StoreRefresh:
                 pass
             else:
                 raise Exception(f"Credit Memo Qty is not negative value: {credit_memo_qty}")
-
 
             duplicate_check = self.delivery_table_in_db[(self.delivery_table_in_db['date'] == date) &
                                                    (self.delivery_table_in_db['type'] == invoice_type) &

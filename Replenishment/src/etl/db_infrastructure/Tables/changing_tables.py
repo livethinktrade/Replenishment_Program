@@ -2,7 +2,7 @@
 # Built this so you don't have to change each one of them manually
 from config.DbConfig import *
 
-from src.store_info import Replenishment
+from src.store_info import DbUpdater
 #
 
 def size_table_insert(store_type_input, connection_pool):
@@ -11,12 +11,19 @@ def size_table_insert(store_type_input, connection_pool):
     cursor.execute(
         f"""
 
-           Create Table {store_type_input}.year_week_verify (
-            store_year integer,
-            store_week integer,
-            store_type character varying(20)
-)
-            
+    Create Table {store_type_input}.bandaids (
+        type character varying(11) NOT NULL,
+        store_id integer not null,
+        item_group_desc varchar(50),
+        qty numeric not null,
+        date_created date NOT NULL,
+        effective_date date NOT NULL,
+        store_type character varying(20) NOT NULL,
+        reason character varying(100) NOT NULL,
+    
+        PRIMARY KEY(store_id, item_group_desc, effective_date)
+    )
+                
 """)
 
     connection.commit()
@@ -43,14 +50,16 @@ store_list = [
     'kroger_nashville',
     'kvat',
     'safeway_denver',
-    'texas_division'
+    'texas_division',
+    'midwest',
+    'sal'
 ]
 
 with PsycoPoolDB() as connection:
 
     for x in store_list:
 
-        store = Replenishment(store_type_input=f'{x}')
+        store = DbUpdater(store_type_input=f'{x}')
 
         try:
             size_table_insert(store.store_type_input, connection)

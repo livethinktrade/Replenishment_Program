@@ -51,13 +51,7 @@ class Reports:
         self.item_sales_rank = self.store_setting.loc['item_sales_rank', 'values']
         self.top20 = self.store_setting.loc['top20', 'values']
 
-    def internal_report(self, filename):
-
-        # self.external_report(filename)
-        #
-        # ExcelWorkbook = load_workbook(filename)
-        # writer = pd.ExcelWriter(filename, engine='openpyxl')
-        # writer.book = ExcelWorkbook
+    def internal_grocery_report(self, filename):
 
         with pd.ExcelWriter(filename, engine='openpyxl') as writer:
 
@@ -68,6 +62,8 @@ class Reports:
                                                columns=('store_name', 'item', 'case',
                                                         'notes', 'case_qty', 'display_size'))
 
+            front_desk_len = {'row_len': 0, 'col_len': 0}
+
             try:
 
                 replen_pivot = pd.pivot_table(self.replenishment_report,
@@ -75,14 +71,35 @@ class Reports:
                                               index=['initial', 'store'],
                                               columns='item',
                                               aggfunc=np.sum,
-                                              fill_value= '',
-                                              margins= True)
+                                              fill_value=0,
+                                              margins=True)
+                # save summary row
+                summary_row = replen_pivot.tail(1)
+
+                # drop summary
+                replen_pivot.drop(replen_pivot.tail(1).index, inplace=True)
+
+                # re-order columns
+                columns_names = replen_pivot.columns.to_list()
+                columns_names.remove('All')
+                replen_pivot = replen_pivot.sort_values(columns_names, ascending=False)
+
+                # add summary back in
+                replen_pivot = pd.concat([replen_pivot, summary_row])
+
+                # take zero out and replace with blank string
+                replen_pivot= replen_pivot.replace(0, ' ')
+
+                # rename column
+                replen_pivot = replen_pivot.rename(columns={'All': 'Total'})
+
                 replen_pivot = replen_pivot.reset_index()
 
                 replen_pivot.to_excel(writer, sheet_name='Front Desk', index=False)
 
-            except Exception as e:
-                print(f'Error: {e}')
+                front_desk_len = {'row_len': len(replen_pivot), 'col_len': len(replen_pivot.columns.to_list())}
+
+            except ValueError:
                 pass
 
             self.on_hand.to_excel(writer, sheet_name="On Hand", index=False)
@@ -94,14 +111,14 @@ class Reports:
 
                 # will need to replace the code for this
                 self.on_hands_store.to_excel(writer, sheet_name="Potential Initial Orders",
-                                                    index=False,
-                                                    startcol=6,
-                                                    startrow=1)
+                                             index=False,
+                                             startcol=6,
+                                             startrow=1)
 
                 self.on_hands_display_size_season.to_excel(writer, sheet_name="Potential Initial Orders",
-                                                    index=False,
-                                                    startcol=12,
-                                                    startrow=1)
+                                                           index=False,
+                                                           startcol=12,
+                                                           startrow=1)
 
             if self.size_build_up == 1:
                 pass
@@ -122,8 +139,6 @@ class Reports:
 
                 store_sales_rank = self.reports.store_sales_rank()
 
-                store_sales_rank_len = len(store_sales_rank)
-
                 store_sales_rank.to_excel(writer, sheet_name="Store Ranks", index=False, startcol=1)
 
             if self.item_approval == 1:
@@ -140,11 +155,19 @@ class Reports:
 
             writer.save()
 
-        format = SalesReportFormat(filename, self.replenishment_len, 1, store_sales_rank_len, self.store_setting)
+        report_lengths_dict = {'replenishment_len': self.replenishment_len,
+                               'Front Desk': front_desk_len,
+                               'On Hand': len(self.on_hand),
+                               'Replenishment Reason': len(self.replenishment_reasons),
+                               'Store Ranks': len(store_sales_rank),
+                               'Item Approved': len(item_approval),
+                               'Store Program': len(store_program)}
 
-        format.internal_report()
+        format_report = SalesReportFormat(filename, report_lengths_dict, self.store_setting)
 
-    def external_report(self, filename):
+        format_report.internal_report()
+
+    def external_grocery_report(self, filename):
 
         print(filename)
 
@@ -228,7 +251,7 @@ class Reports:
                                            index=False,
                                            header=(
                                                    'Store (#)', 'Current Week Sales', 'Previous Week Sales',
-                                                   '% +/- Change WOW','Sales ($) 2022 Current Week',
+                                                   '% +/- Change WOW', 'Sales ($) 2022 Current Week',
                                                    'Sales ($) 2021 Current Week', '% +/- Change YOY',
                                                    'Sales ($) 2022 YTD', 'Sales ($) 2021 YTD', '% +/- Change (YOY)')
                                            )
@@ -239,8 +262,10 @@ class Reports:
 
                 item_sales_rank.to_excel(writer, sheet_name="Sales Report",
                                          index=True,
-                                         columns=('item_group_desc', 'sales', 'sales per active store', 'active stores','percent_of_total_sales'),
-                                         header=('item', 'sales ($)', 'Sales Per Active Store', 'Active Stores', '% of Annual Sales'),
+                                         columns=('item_group_desc', 'sales', 'sales per active store', 'active stores',
+                                                  'percent_of_total_sales'),
+                                         header=('item', 'sales ($)', 'Sales Per Active Store', 'Active Stores',
+                                                 '% of Annual Sales'),
                                          startrow=14,
                                          startcol=12)
 
@@ -262,8 +287,8 @@ class Reports:
 
                 sales_rank_table.to_excel(writer, sheet_name="Qty Report",
                                           index=True,
-                                          columns=('item_group_desc', 'units_sold', 'units sold per active store', 'active stores',
-                                                   'percent_of_total_sales'),
+                                          columns=('item_group_desc', 'units_sold', 'units sold per active store',
+                                                   'active stores', 'percent_of_total_sales'),
                                           header=('item', 'Units Sold', 'Units Sold Per Active Store', 'Active Stores',
                                                   '% of Annual Sales'),
                                           startrow=14,
@@ -291,9 +316,15 @@ class Reports:
         ReportsFormat class instantiated for use later
         
         '''
-        format = SalesReportFormat(filename, self.replenishment_len, self.sales_report_len, 1, self.store_setting)
 
-        format.external_report()
+        report_lengths_dict = {'replenishment_len': self.replenishment_len,
+                               'Sales Report': self.sales_report_len,
+                               'On Hand': len(self.on_hand),
+                               'No Scan': len(self.no_scan)}
+
+        format_report = SalesReportFormat(filename, report_lengths_dict, self.store_setting)
+
+        format_report.external_report()
 
     def kroger_corporate_report(self):
 
