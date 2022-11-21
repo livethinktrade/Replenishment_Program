@@ -1,7 +1,10 @@
+import datetime
 import pandas as pd
 import pandas.io.sql as psql
 from src.Sales_Report.Reports.reportsdata import ReportsData
 from config.DbConfig import *
+from dateutil.relativedelta import relativedelta
+from src.store_info import DbUpdater
 
 
 class Restock:
@@ -40,13 +43,23 @@ class Restock:
 
         self.return_percentage = self.store_setting.loc['Return_Pecentage', 'values']
 
+        self.ghost_sales_month = self.store_setting.loc['Ghost_Sales_Month', 'values']
+        self.ghost_deliv_month = self.store_setting.loc['Ghost_Deliv_Month', 'values']
+
         self.connection = engine_pool_connection()
+
+        self.on_hands = None
+
+    def replenishment(self):
 
         reports = ReportsData(self.store_type_input, self.store_setting)
 
-        self.on_hands = reports.on_hands()
+        # Eliminate all ghost inventory before replenishment is done
+        ghost_inventory_report = reports.ghost_inventory()
+        ghost_inventory = GhostInventory(self.store_type_input, ghost_inventory_report)
+        ghost_inventory.eliminator(self.ghost_sales_month, self.ghost_deliv_month)
 
-    def replenishment(self):
+        self.on_hands = reports.on_hands()
 
         data = {'Carded': [self.carded_1, self.carded_2, self.carded_3],
                 'Long Hanging Top': [self.top_1, self.top_2, self.top_3],
@@ -101,7 +114,6 @@ class Restock:
                                                                           'lht_sn', 'lhd_ay', 'lhd_sn', 'lhp_ay', 'lhp_sn']]
         store_display_size_season_capacity = store_display_size_capacity.groupby(by='store_id').sum()
 
-
         # combining the AY & seasonal display size space to find out how much capacity
         store_display_size_capacity['Carded'] = store_display_size_capacity['cd_ay'] + store_display_size_capacity['cd_sn']
         store_display_size_capacity['Long Hanging Top'] = store_display_size_capacity['lht_ay'] + store_display_size_capacity['lht_sn']
@@ -140,7 +152,6 @@ class Restock:
 
         on_hands_display_size['space available'] = on_hands_display_size['display_space_capacity'] - on_hands_display_size[
             'case_qty']
-
 
         replenishment = pd.DataFrame(
             columns=['initial', 'store', 'item', 'case', 'notes', 'case_qty', 'display_size'])
@@ -763,6 +774,89 @@ class Restock:
             status = True
 
         return status
+
+
+class GhostInventory:
+
+    def __init__(self, store_type_input, ghost_inventory_report):
+
+        self.store_type_input = store_type_input
+        self.ghost_inventory_report = ghost_inventory_report
+        self.ghost_inventory_candidates = None
+
+    def eliminator(self, ghost_sales_month, ghost_deliv_month):
+
+        self.find_ghost(ghost_sales_month, ghost_deliv_month)
+        self.clear_ghost()
+
+    def find_ghost(self, ghost_sales_month, ghost_deliv_month):
+
+        """
+        find the search date for deliveries and sales. Want to find items that have not sold in X amount of months.
+
+        Need to Sales. If an item that has not sold in x amount of month it's a good indicator
+        that the item is not on the store floor selling.
+
+        Need to look for delivery because you don't want the program to accidentally zero out an inventory for the store
+        if you just sent them product. Sometimes they will take a couple of weeks to display the product.
+
+        """
+
+        delivery_search_date = datetime.date.today() - relativedelta(months=ghost_deliv_month)
+        sales_search_date = datetime.date.today() - relativedelta(months=ghost_sales_month)
+
+        # filtering out items that have no sales
+
+        ghost_inventory_report = self.ghost_inventory_report[self.ghost_inventory_report['last sale date'] != 'No Sales']
+
+        # filter using delivery search date. Also filterig out all items that have zero on hands
+
+        ghost_inventory_candidates= ghost_inventory_report[
+                                                          (ghost_inventory_report['last delivery date'] <= delivery_search_date) &
+                                                          (ghost_inventory_report['case_qty'] != 0) &
+                                                          (ghost_inventory_report['on_hand'] >= 0) &
+                                                          (ghost_inventory_report['last sale date'] <= sales_search_date)
+                                                         ]
+
+        self.ghost_inventory_candidates = ghost_inventory_candidates.reset_index(drop=True)
+
+    def clear_ghost(self):
+
+        # rename columns
+        ghost_inventory_candidates = self.ghost_inventory_candidates.rename(columns={'store': 'store_id'})
+
+        # add reason, storetype, effective date, date created, type
+
+        ghost_inventory_candidates['store_type'] = self.store_type_input
+        ghost_inventory_candidates['type'] = 'Bandaid'
+        ghost_inventory_candidates['reason'] = 'Ghost Inventory Eliminated by code '
+        ghost_inventory_candidates['qty'] = ghost_inventory_candidates['on_hand'] * -1
+
+        date = datetime.date.today()
+
+        ghost_inventory_candidates['effective_date'] = date
+        ghost_inventory_candidates['date_created'] = date
+
+        # reorganize columns to insert into bandaids
+        ghost_inventory_candidates = ghost_inventory_candidates[['type',
+                                                                 'store_id',
+                                                                 'item_group_desc',
+                                                                 'qty',
+                                                                 'date_created',
+                                                                 'effective_date',
+                                                                 'store_type',
+                                                                 'reason']]
+
+        if len(ghost_inventory_candidates) > 0:
+
+            update = DbUpdater(self.store_type_input)
+            update.ghost_inventory_import(df=ghost_inventory_candidates, use_df=True)
+
+
+
+
+
+
 
 
 

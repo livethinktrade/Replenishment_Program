@@ -1,9 +1,11 @@
 # from datetime import timedelta, date, datetime
 import datetime
-from src.Sales_Report.Replenishment.initial_order import *
 from src.Sales_Report.Report_Format.ReportsFormat import SalesReportFormat, KrogerCorporateFormat
 import numpy as np
 from src.store_list import kroger_stores
+import pandas as pd
+from src.Sales_Report.Reports.reportsdata import ReportsData
+from src.Sales_Report.Replenishment.replenishment import Restock
 
 
 class Reports:
@@ -35,7 +37,7 @@ class Reports:
         self.sales_report = self.reports.sales_table()
         self.sales_report_len = self.reports.sales_report_len(self.sales_report)
 
-        #internal report variables
+        # internal report variables
         self.initial_orders = self.store_setting.loc['initial_orders', 'values']
         self.size_build_up = self.store_setting.loc['size_build_up', 'values']
         self.high_return = self.store_setting.loc['high_return', 'values']

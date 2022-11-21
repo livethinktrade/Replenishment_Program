@@ -1,3 +1,5 @@
+import pandas as pd
+
 from src.store_list import *
 from datetime import datetime
 from src.etl.transform.transform import *
@@ -9,7 +11,7 @@ from config.DbConfig import *
 import os
 
 
-class Replenishment:
+class DbUpdater:
 
     def __init__(self, store_type_input):
         
@@ -19,7 +21,9 @@ class Replenishment:
 
         self.connection = engine_pool_connection()
 
-        self.store_setting = pd.read_excel(rf'C:\Users\User1\OneDrive - winwinproducts.com\Groccery Store Program\{self.store_type_input}\{self.store_type_input}_store_setting.xlsm',
+        store_settings_file = os.getcwd() + f'\support document\store program\{self.store_type_input}\{self.store_type_input}_store_setting.xlsm'
+
+        self.store_setting = pd.read_excel(store_settings_file,
                                            sheet_name='Sheet2',
                                            header=None,
                                            index_col=0,
@@ -28,13 +32,13 @@ class Replenishment:
         self.transition_year = self.store_setting.loc['Transition_year', 'values']
         self.transition_season = self.store_setting.loc['Transition_Season', 'values']
 
-        self.store_programs = pd.read_excel(rf'C:\Users\User1\OneDrive - winwinproducts.com\Groccery Store Program\{self.store_type_input}\{self.store_type_input}_store_setting.xlsm',
+        self.store_programs = pd.read_excel(store_settings_file,
                                             sheet_name='Store Programs')
 
-        self.store_notes = pd.read_excel(rf'C:\Users\User1\OneDrive - winwinproducts.com\Groccery Store Program\{self.store_type_input}\{self.store_type_input}_store_setting.xlsm',
+        self.store_notes = pd.read_excel(store_settings_file,
                                          sheet_name='Store Notes')
 
-        self.master_planogram = pd.read_excel(r'C:\Users\User1\OneDrive\WinWin Staff Folders\Michael\Replenishment program\Replenishment\support document\MASTER PLANOGRAM.xlsx',
+        self.master_planogram = pd.read_excel(os.getcwd() + f'\support document\MASTER PLANOGRAM.xlsx',
                                               sheet_name='MASTER PLANOGRAM UPDATED', skiprows=1, )
 
         self.data_locker = DataLocker(self.store_type_input)
@@ -953,6 +957,31 @@ class Replenishment:
         reports.kroger_corporate_report()
 
         print('Kroger Corporate Report Generated')
+
+    def ghost_inventory_import(self, file=None, df=None, use_df=False):
+
+        """
+        Imports ghost inventory to the db.
+        Method takes a df or an excel file. GhostInventory Class uses this method
+
+        :param file: excel file
+        :param df: pandas df
+        :param use_df: False. If parameter is true then method will use the df to import
+        :return: None
+
+        """
+
+        if not use_df:
+            ghost_inventory = pd.read_excel(file)
+
+        else:
+            ghost_inventory = df
+
+        with config.DbConfig.PsycoPoolDB() as connection_pool:
+
+            insert_execute_batch(connection_pool, ghost_inventory, f'{self.store_type_input}.bandaids')
+
+        print(f'Bandaid for ghost inserted: {len(ghost_inventory)}')
 
 
 class DataLocker:

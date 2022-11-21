@@ -1975,7 +1975,7 @@ class ReportsData:
 
 
 
-# store_type_input = 'kroger_cincinatti'
+# store_type_input = 'kroger_dallas'
 #
 # store_setting = pd.read_excel(
 #     rf'C:\Users\User1\OneDrive - winwinproducts.com\Groccery Store Program\{store_type_input}\{store_type_input}_store_setting.xlsm',
@@ -1985,12 +1985,12 @@ class ReportsData:
 #     names=('setting', 'values'))
 # #
 # test = ReportsData(store_type_input, store_setting)
-# a = test.on_hands()
-# # b = test.item_sales_rank_qty()
-# #
-# a.to_excel('sales-qty.xlsx')
-# # b.to_excel('item-qty.xlsx')
+# # a = test.on_hands()
+# # # b = test.item_sales_rank_qty()
+# # #
+# # a.to_excel('sales-qty.xlsx')
+# # # b.to_excel('item-qty.xlsx')
 #
 #
-# # ghost=test.ghost_inventory()
-# # ghost.to_excel('dallas_ghost.xlsx')
+# ghost=test.ghost_inventory()
+# ghost.to_excel(f'{store_type_input}_ghost.xlsx')

@@ -2,7 +2,7 @@
 
 import psycopg2
 import numpy as np
-
+from psycopg2 import extras
 from psycopg2.extensions import register_adapter, AsIs
 psycopg2.extensions.register_adapter(np.int64, psycopg2._psycopg.AsIs)
 
@@ -422,3 +422,40 @@ def year_week_verify_insert(store_year, store_week, store_type_input, connection
     connection.commit()
     cursor.close()
     connection_pool.putconn(connection)
+
+
+def insert_execute_batch(connection_pool, df, table_name, page_size=100):
+    """
+    Using psycopg2.extras.execute_batch() to insert the dataframe
+    """
+
+    # Comma-separated dataframe columns
+    cols = ','.join(list(df.columns))
+
+    number_of_columns = len(list(df.columns))
+
+    # Create a list of tuples from the dataframe values
+    tuples_list = [tuple(x) for x in df.to_numpy()]
+
+    values = '%%s'
+
+    for i in range(number_of_columns - 1):
+        values = values + ',%%s'
+
+    # SQL query to execute
+    query = f"INSERT INTO %s(%s) VALUES({values})" % (table_name, cols)
+
+    connection = connection_pool.getconn()
+    cursor = connection.cursor()
+
+    try:
+        extras.execute_batch(cursor, query, tuples_list, page_size)
+        connection.commit()
+
+    except (Exception, psycopg2.DatabaseError) as error:
+        print("Error: %s" % error)
+        connection.rollback()
+        cursor.close()
+
+    print("Insert execute_batch() done")
+    cursor.close()
