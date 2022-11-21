@@ -1239,6 +1239,7 @@ class ReportsData:
         from {self.store_type_input}.store_program
         inner join master_planogram on {self.store_type_input}.store_program.program_id = master_planogram.program_id
         inner join {self.store_type_input}.store on {self.store_type_input}.store_program.store_id = {self.store_type_input}.store.store_id
+        where activity = 'ACTIVE'
         order by {self.store_type_input}.store_program.store_id
         
         """
@@ -1261,7 +1262,10 @@ class ReportsData:
 
             store = store_program.loc[i, 'store_id']
 
-            programs = psql.read_sql(f'select * from {self.store_type_input}.store_program where store_id = {store}', self.connection)
+            programs = psql.read_sql(f"""
+            select * from {self.store_type_input}.store_program 
+            where store_id = '{store}' and activity = 'ACTIVE'
+            """, self.connection)
 
             programs = programs[['program_id']]
 
